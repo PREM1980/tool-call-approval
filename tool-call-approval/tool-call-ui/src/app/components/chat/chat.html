@@ -1,0 +1,87 @@
+<div class="chat-container">
+  <header class="chat-header">
+    <span class="header-icon">🤖</span>
+    <div class="header-text">
+      <h1>Tool Call Approval</h1>
+      <span class="subtitle">Claude agent with human-in-the-loop</span>
+    </div>
+
+    <div class="mode-toggle">
+      <button
+        type="button"
+        class="mode-btn"
+        [class.active]="mode === 'sse'"
+        [disabled]="isSwitching"
+        (click)="switchMode('sse')"
+      >
+        <span class="mode-dot"></span>
+        SSE
+      </button>
+      <button
+        type="button"
+        class="mode-btn"
+        [class.active]="mode === 'websocket'"
+        [disabled]="isSwitching"
+        (click)="switchMode('websocket')"
+      >
+        <span class="mode-dot"></span>
+        WebSocket
+      </button>
+    </div>
+  </header>
+
+  <div class="message-list" #messageList>
+    @if (messages.length === 0) {
+      <div class="empty-state">
+        <p>Try asking:</p>
+        <ul>
+          <li>"What is 1234 × 5678?"</li>
+          <li>"What's the weather in London?"</li>
+          <li>"Search for information about black holes"</li>
+        </ul>
+      </div>
+    }
+
+    @for (message of messages; track message.id) {
+      <div class="message" [ngClass]="message.role">
+        <div class="bubble">{{ message.content }}</div>
+        <span class="timestamp">{{ message.timestamp | date: 'HH:mm' }}</span>
+      </div>
+    }
+
+    @if (pendingToolCall) {
+      <app-tool-approval
+        [toolCall]="pendingToolCall"
+        [disabled]="isWaiting"
+        (approved)="handleApproval($event)"
+      />
+    }
+
+    @if (isWaiting && !pendingToolCall) {
+      <div class="thinking">
+        <span class="dot"></span>
+        <span class="dot"></span>
+        <span class="dot"></span>
+      </div>
+    }
+  </div>
+
+  <form class="input-area" (ngSubmit)="sendMessage()">
+    <input
+      class="input-field"
+      type="text"
+      [(ngModel)]="userInput"
+      name="userInput"
+      placeholder="Ask the agent something..."
+      [disabled]="isWaiting || !!pendingToolCall"
+      autocomplete="off"
+    />
+    <button
+      class="send-btn"
+      type="submit"
+      [disabled]="isWaiting || !!pendingToolCall || !userInput.trim()"
+    >
+      Send
+    </button>
+  </form>
+</div>

@@ -1,0 +1,24 @@
+<div class="approval-card">
+  <div class="approval-header">
+    <span class="tool-icon">⚙️</span>
+    <div class="tool-info">
+      <span class="label">Tool Call Request</span>
+      <span class="tool-name">{{ toolCall.tool_name }}</span>
+    </div>
+    <span class="badge pending">Awaiting Approval</span>
+  </div>
+
+  <div class="approval-body">
+    <span class="args-label">Arguments</span>
+    <pre class="args-block"><code>{{ formattedInput }}</code></pre>
+  </div>
+
+  <div class="approval-actions">
+    <button class="btn btn-reject" [disabled]="disabled" (click)="reject()">
+      ✕ Reject
+    </button>
+    <button class="btn btn-approve" [disabled]="disabled" (click)="approve()">
+      ✓ Approve
+    </button>
+  </div>
+</div>
