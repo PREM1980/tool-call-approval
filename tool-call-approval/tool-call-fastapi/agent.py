@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from agno.agent import Agent
-from agno.models.anthropic import Claude
+from agno.models.aws.bedrock import AwsBedrock
 from agno.run.agent import (
     RunCompletedEvent,
     RunContentEvent,
@@ -14,6 +14,7 @@ from agno.run.agent import (
 from agno.tools import tool
 from agno.run.requirement import RunRequirement
 from dotenv import load_dotenv
+from langfuse.decorators import langfuse_context, observe
 
 from tools import execute_tool
 
@@ -49,10 +50,11 @@ class Session:
 
     def __post_init__(self):
         self.agent = Agent(
-            model=Claude(id="claude-sonnet-4-6"),
+            model=AwsBedrock(id="us.anthropic.claude-sonnet-4-20250514-v1:0"),
             tools=[calculate, get_weather, search_web],
             instructions="You are a helpful assistant with access to tools. Always use tools when appropriate to provide accurate information.",
             stream=True,
+            cache_session=True,
         )
 
 
@@ -92,7 +94,7 @@ async def _send_tool_rejected(session: Session, tool_execution: Any) -> None:
     )
 
 
-async def _process_event(session: Session, event: Any) -> bool:
+async def _process_event(session: Session, event: Any, tool_spans: list, response_parts: list) -> bool:
     if isinstance(event, RunPausedEvent):
         requirements = event.requirements or []
         requirement = next((req for req in requirements if req.needs_confirmation), None)
@@ -110,6 +112,7 @@ async def _process_event(session: Session, event: Any) -> bool:
         else:
             requirement.reject()
             await _send_tool_rejected(session, tool_execution)
+            return False
 
         async for resumed_event in session.agent.acontinue_run(
             run_id=event.run_id,
@@ -118,7 +121,11 @@ async def _process_event(session: Session, event: Any) -> bool:
             stream_events=True,
             yield_run_output=True,
         ):
-            if await _process_event(session, resumed_event):
+            if isinstance(resumed_event, ToolCallCompletedEvent) and resumed_event.tool:
+                result = str(resumed_event.content)
+                tool_spans.append({"tool": tool_execution.tool_name, "result": result})
+                await _send_tool_result(session, resumed_event.tool, resumed_event.content)
+            elif await _process_event(session, resumed_event, tool_spans, response_parts):
                 return True
 
         return True
@@ -130,6 +137,7 @@ async def _process_event(session: Session, event: Any) -> bool:
 
     if isinstance(event, RunContentEvent):
         if event.content:
+            response_parts.append(str(event.content))
             await _send_message(session, str(event.content))
         return False
 
@@ -145,9 +153,19 @@ async def _process_event(session: Session, event: Any) -> bool:
     return False
 
 
+@observe(name="agent-run", capture_input=False, capture_output=False)
 async def run_agent(session: Session, user_message: str) -> None:
+    langfuse_context.update_current_trace(
+        user_id=session.id,
+        tags=["tool-call-approval"],
+    )
+    langfuse_context.update_current_observation(input=user_message)
+
     session.messages.append({"role": "user", "content": user_message})
     await session.queue.put({"type": "thinking", "content": "Thinking..."})
+
+    tool_spans: list = []
+    response_parts: list = []
 
     try:
         async for event in session.agent.arun(
@@ -156,10 +174,21 @@ async def run_agent(session: Session, user_message: str) -> None:
             stream_events=True,
             yield_run_output=True,
         ):
-            handled = await _process_event(session, event)
+            handled = await _process_event(session, event, tool_spans, response_parts)
             if handled and isinstance(event, RunCompletedEvent):
                 break
     except Exception as e:
+        langfuse_context.update_current_observation(
+            level="ERROR",
+            status_message=str(e),
+        )
         await session.queue.put({"type": "error", "content": f"Unexpected error: {str(e)}"})
         await session.queue.put({"type": "done"})
+        return
 
+    final_output = "".join(response_parts)
+    langfuse_context.update_current_observation(
+        output=final_output,
+        metadata={"tool_calls": tool_spans, "turn": len(session.messages)},
+    )
+    langfuse_context.update_current_trace(output=final_output)
