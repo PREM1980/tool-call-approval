@@ -6,7 +6,9 @@ from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
-from agent import Session, run_agent
+from agent_service import AgentService
+from repository import PostgresRepository
+from session import Session
 from models import ApprovalRequest, ChatRequest, SessionResponse
 
 app = FastAPI(title="Tool Call Approval API")
