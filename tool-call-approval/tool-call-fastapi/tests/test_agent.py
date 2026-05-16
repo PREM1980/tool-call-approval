@@ -25,3 +25,14 @@ def test_postgres_repository_singleton():
         db2 = repo.get_db()
         assert db1 is db2
         assert MockDb.call_count == 1
+
+
+from session import Session
+
+
+def test_session_defaults():
+    session = Session(id="abc-123")
+    assert session.id == "abc-123"
+    assert session.queue.empty()
+    assert not session.approval_event.is_set()
+    assert session.approval_result is False
