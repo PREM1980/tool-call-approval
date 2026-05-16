@@ -184,6 +184,7 @@ POST /chat
 | `AgentService.get_session` | Unknown `session_id` | Returns `None` → `main.py` raises HTTP 404 |
 | `AgentService.run` | Bedrock / agno exception | `_on_error` puts `{type: "error"}` then `{type: "done"}` on queue |
 | `AgentService._dispatch` | Unrecognised event type | Returns `False`, loop continues silently |
+| `AgentService._sessions` | Run completes or errors | Session removed from `_sessions` dict after `RunCompletedEvent` or `RunErrorEvent` to prevent unbounded memory growth |
 | `AgentService.approve` | Unknown session | `get_session` returns `None`, 404 raised before `approve` is called |
 
 ---

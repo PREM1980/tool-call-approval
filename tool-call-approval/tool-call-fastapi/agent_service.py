@@ -83,6 +83,16 @@ class AgentService:
             db=self._repository.get_db(),
         )
 
+    def get_history(self, session_id: str) -> list[dict]:
+        db = self._repository.get_db()
+        agent_session = db.get_session(session_id)
+        if agent_session is None:
+            return []
+        return [
+            {"role": msg.role, "content": msg.content or ""}
+            for msg in agent_session.get_chat_history()
+        ]
+
     def _get_agent(self, session_id: str) -> Agent | None:
         pair = self._sessions.get(session_id)
         return pair[1] if pair else None

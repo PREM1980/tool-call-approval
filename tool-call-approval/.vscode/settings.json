@@ -1,0 +1,17 @@
+{
+    "python-envs.defaultEnvManager": "ms-python.python:pyenv",
+    "sqltools.connections": [
+        {
+            "ssh": "Disabled",
+            "previewLimit": 50,
+            "server": "localhost",
+            "port": 5432,
+            "driver": "PostgreSQL",
+            "name": "local-postgres",
+            "group": "local",
+            "database": "postgres",
+            "username": "postgres",
+            "password": ""
+        }
+    ]
+}

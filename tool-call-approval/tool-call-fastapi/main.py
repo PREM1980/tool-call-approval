@@ -61,6 +61,11 @@ async def stream_events(session_id: str) -> StreamingResponse:
     )
 
 
+@app.get("/sessions/{session_id}/history")
+async def get_history(session_id: str) -> list[dict]:
+    return service.get_history(session_id)
+
+
 @app.post("/sessions/{session_id}/approve")
 async def approve_tool(session_id: str, request: ApprovalRequest) -> dict:
     session = service.get_session(session_id)
