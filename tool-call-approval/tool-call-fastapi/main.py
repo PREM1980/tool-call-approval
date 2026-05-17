@@ -2,10 +2,16 @@ import asyncio
 import json
 import os
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
+from admin_repository import AdminRepository
+from admin_router import init_router, router as admin_router
 from agent_service import AgentService
 from models import ApprovalRequest, ChatRequest, SessionResponse
 from repository import PostgresRepository
@@ -20,10 +26,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-_repository = PostgresRepository(
-    url=os.getenv("POSTGRES_URL", "postgresql+psycopg2://localhost:5432/postgres")
-)
+_postgres_url = os.getenv("POSTGRES_URL", "postgresql+psycopg2://localhost:5432/postgres")
+_repository = PostgresRepository(url=_postgres_url)
+_admin_repository = AdminRepository(_postgres_url)
+init_router(_admin_repository)
+
 service = AgentService(repository=_repository)
+app.include_router(admin_router, prefix="/admin", tags=["admin"])
 
 
 @app.post("/sessions", response_model=SessionResponse)

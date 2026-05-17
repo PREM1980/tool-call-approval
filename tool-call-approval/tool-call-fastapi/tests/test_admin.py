@@ -103,3 +103,110 @@ def test_persona_name_must_be_unique(repo):
     repo.create_persona("Unique", [])
     with pytest.raises(Exception):
         repo.create_persona("Unique", [])
+
+
+# ── API-level tests ────────────────────────────────────────────────────────
+
+import io
+from fastapi.testclient import TestClient
+from main import app
+
+http = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def clean_tables():
+    conn = psycopg2.connect(TEST_URL)
+    with conn.cursor() as cur:
+        cur.execute("DELETE FROM admin_credentials")
+        cur.execute("DELETE FROM admin_mcp_servers")
+        cur.execute("DELETE FROM admin_skills")
+        cur.execute("DELETE FROM admin_personas")
+    conn.commit()
+    conn.close()
+    yield
+
+
+def test_get_credentials_initially_null():
+    response = http.get("/admin/credentials")
+    assert response.status_code == 200
+    assert response.json() is None
+
+
+def test_save_and_get_credentials_via_api():
+    http.post("/admin/credentials", json={
+        "aws_access_key_id": "AKID",
+        "aws_secret_access_key": "SECRET",
+        "aws_region": "us-east-1",
+    })
+    response = http.get("/admin/credentials")
+    data = response.json()
+    assert data["aws_access_key_id"] == "AKID"
+    assert data["aws_secret_access_key"] == "***"
+
+
+def test_save_mcp_server_invalid_position():
+    response = http.post("/admin/mcp-servers/6", json={"name": "x", "config": {}})
+    assert response.status_code == 422
+
+
+def test_save_and_list_mcp_servers_via_api():
+    http.post("/admin/mcp-servers/1", json={"name": "srv", "config": {"url": "http://x"}})
+    response = http.get("/admin/mcp-servers")
+    servers = response.json()
+    assert any(s["name"] == "srv" for s in servers)
+
+
+def test_upload_and_list_skills_via_api():
+    file_content = b"def my_tool(): pass"
+    response = http.post(
+        "/admin/skills",
+        files={"file": ("tool.py", io.BytesIO(file_content), "text/plain")},
+    )
+    assert response.status_code == 200
+    skill = response.json()
+    assert skill["filename"] == "tool.py"
+
+    skills = http.get("/admin/skills").json()
+    assert any(s["id"] == skill["id"] for s in skills)
+
+
+def test_delete_skill_via_api():
+    file_content = b"pass"
+    upload = http.post(
+        "/admin/skills",
+        files={"file": ("del.py", io.BytesIO(file_content), "text/plain")},
+    )
+    skill_id = upload.json()["id"]
+    response = http.delete(f"/admin/skills/{skill_id}")
+    assert response.status_code == 200
+
+
+def test_create_and_list_personas_via_api():
+    response = http.post("/admin/personas", json={"name": "TestPersona", "skill_ids": []})
+    assert response.status_code == 201
+    persona = response.json()
+    assert persona["name"] == "TestPersona"
+
+    personas = http.get("/admin/personas").json()
+    assert any(p["id"] == persona["id"] for p in personas)
+
+
+def test_duplicate_persona_name_returns_409():
+    http.post("/admin/personas", json={"name": "DupTest", "skill_ids": []})
+    response = http.post("/admin/personas", json={"name": "DupTest", "skill_ids": []})
+    assert response.status_code == 409
+
+
+def test_update_persona_via_api():
+    create = http.post("/admin/personas", json={"name": "OldName", "skill_ids": []})
+    persona_id = create.json()["id"]
+    response = http.put(f"/admin/personas/{persona_id}", json={"name": "NewName", "skill_ids": []})
+    assert response.json()["name"] == "NewName"
+
+
+def test_delete_persona_via_api():
+    create = http.post("/admin/personas", json={"name": "ToDelete", "skill_ids": []})
+    persona_id = create.json()["id"]
+    response = http.delete(f"/admin/personas/{persona_id}")
+    assert response.status_code == 200
