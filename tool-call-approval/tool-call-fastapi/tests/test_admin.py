@@ -1,0 +1,105 @@
+import pytest
+import psycopg2
+from admin_repository import AdminRepository
+
+TEST_URL = "postgresql://localhost:5432/postgres"
+
+
+@pytest.fixture
+def repo():
+    r = AdminRepository(TEST_URL)
+    # clean slate before each test
+    conn = psycopg2.connect(TEST_URL)
+    with conn.cursor() as cur:
+        cur.execute("DELETE FROM admin_credentials")
+        cur.execute("DELETE FROM admin_mcp_servers")
+        cur.execute("DELETE FROM admin_skills")
+        cur.execute("DELETE FROM admin_personas")
+    conn.commit()
+    conn.close()
+    return r
+
+
+def test_credentials_empty_initially(repo):
+    assert repo.get_credentials() is None
+
+
+def test_upsert_and_get_credentials(repo):
+    repo.upsert_credentials("AKID", "SECRET", "us-east-1", "kubeconfig: {}")
+    creds = repo.get_credentials()
+    assert creds["aws_access_key_id"] == "AKID"
+    assert creds["aws_secret_access_key"] == "SECRET"
+    assert creds["kubeconfig"] == "kubeconfig: {}"
+
+
+def test_upsert_credentials_twice_keeps_one_row(repo):
+    repo.upsert_credentials("A", "B", "us-east-1", None)
+    repo.upsert_credentials("C", "D", "us-west-2", None)
+    assert repo.get_credentials()["aws_access_key_id"] == "C"
+
+
+def test_mcp_servers_empty_initially(repo):
+    assert repo.get_mcp_servers() == []
+
+
+def test_upsert_and_get_mcp_server(repo):
+    repo.upsert_mcp_server(1, "my-server", {"url": "http://localhost:3001"})
+    servers = repo.get_mcp_servers()
+    assert len(servers) == 1
+    assert servers[0]["name"] == "my-server"
+    assert servers[0]["config"]["url"] == "http://localhost:3001"
+
+
+def test_delete_mcp_server(repo):
+    repo.upsert_mcp_server(2, "srv", {"url": "http://x"})
+    assert repo.delete_mcp_server(2) is True
+    assert repo.get_mcp_servers() == []
+
+
+def test_delete_nonexistent_mcp_server(repo):
+    assert repo.delete_mcp_server(3) is False
+
+
+def test_save_and_list_skills(repo):
+    skill_id = repo.save_skill("tool.py", "def tool(): pass")
+    skills = repo.get_skills()
+    assert len(skills) == 1
+    assert skills[0]["filename"] == "tool.py"
+    assert str(skills[0]["id"]) == skill_id
+
+
+def test_delete_skill(repo):
+    skill_id = repo.save_skill("x.py", "pass")
+    assert repo.delete_skill(skill_id) is True
+    assert repo.get_skills() == []
+
+
+def test_delete_nonexistent_skill(repo):
+    assert repo.delete_skill("00000000-0000-0000-0000-000000000000") is False
+
+
+def test_create_and_list_personas(repo):
+    skill_id = repo.save_skill("s.py", "pass")
+    persona = repo.create_persona("DevOps", [skill_id])
+    assert persona["name"] == "DevOps"
+    assert skill_id in persona["skill_ids"]
+    personas = repo.get_personas()
+    assert len(personas) == 1
+
+
+def test_update_persona(repo):
+    persona = repo.create_persona("Eng", [])
+    updated = repo.update_persona(str(persona["id"]), "SRE", [])
+    assert updated["name"] == "SRE"
+
+
+def test_delete_persona(repo):
+    persona = repo.create_persona("Temp", [])
+    assert repo.delete_persona(str(persona["id"])) is True
+    assert repo.get_personas() == []
+
+
+def test_persona_name_must_be_unique(repo):
+    repo.create_persona("Unique", [])
+    with pytest.raises(Exception):
+        repo.create_persona("Unique", [])

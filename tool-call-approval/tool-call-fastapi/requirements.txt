@@ -10,3 +10,4 @@ boto3
 aioboto3
 psycopg2-binary
 langfuse==2.60.10
+python-multipart
