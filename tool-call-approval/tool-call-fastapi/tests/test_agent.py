@@ -98,7 +98,8 @@ async def test_on_completed_puts_done_and_removes_session(service):
     await service._on_completed(session, RunCompletedEvent(), [], [])
     item = await session.queue.get()
     assert item == {"type": "done"}
-    assert service.get_session(session_id) is None
+    # Session is kept alive across turns — only removed on error
+    assert service.get_session(session_id) is not None
 
 
 async def test_on_error_puts_error_and_done(service):
