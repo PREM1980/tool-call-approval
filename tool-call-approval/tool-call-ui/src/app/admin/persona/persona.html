@@ -1,0 +1,64 @@
+<div class="layout">
+  <div class="list-pane">
+    <div class="list-header">
+      <h2>Personas</h2>
+      <button class="btn-new" (click)="startNew()">+ New</button>
+    </div>
+
+    @if (personas.length === 0) {
+      <p class="empty">No personas yet.</p>
+    } @else {
+      @for (persona of personas; track persona.id) {
+        <div
+          class="persona-item"
+          [class.active]="selected?.id === persona.id"
+          (click)="selectPersona(persona)"
+        >
+          <span class="persona-name">{{ persona.name }}</span>
+          <span class="skill-count">{{ persona.skill_ids.length }} skill{{ persona.skill_ids.length !== 1 ? 's' : '' }}</span>
+          <button class="btn-delete-inline" (click)="$event.stopPropagation(); deletePersona(persona)">✕</button>
+        </div>
+      }
+    }
+  </div>
+
+  <div class="form-pane">
+    @if (showForm) {
+      <h3>{{ isNew ? 'New Persona' : 'Edit Persona' }}</h3>
+
+      <div class="field">
+        <label>Name</label>
+        <input type="text" [(ngModel)]="form.name" placeholder="e.g. DevOps Engineer" />
+      </div>
+
+      <div class="field">
+        <label>Skills</label>
+        @if (skills.length === 0) {
+          <p class="empty-skills">No skills uploaded yet. Upload skills first.</p>
+        } @else {
+          <div class="skill-list">
+            @for (skill of skills; track skill.id) {
+              <label class="skill-check">
+                <input
+                  type="checkbox"
+                  [checked]="isSkillSelected(skill.id)"
+                  (change)="toggleSkill(skill.id)"
+                />
+                {{ skill.filename }}
+              </label>
+            }
+          </div>
+        }
+      </div>
+
+      <div class="actions">
+        <button class="btn-save" (click)="save()" [disabled]="saving">
+          {{ saving ? 'Saving…' : 'Save' }}
+        </button>
+        @if (error) { <span class="error">{{ error }}</span> }
+      </div>
+    } @else {
+      <p class="placeholder">Select a persona to edit, or create a new one.</p>
+    }
+  </div>
+</div>

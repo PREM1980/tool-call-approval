@@ -1,0 +1,32 @@
+<h2>Skills</h2>
+
+<div class="upload-area">
+  <label class="upload-label">
+    <input type="file" (change)="onFile($event)" [disabled]="uploading" hidden />
+    <span class="upload-btn">{{ uploading ? 'Uploading…' : '+ Upload Skill File' }}</span>
+  </label>
+  @if (error) { <span class="error">{{ error }}</span> }
+</div>
+
+@if (skills.length === 0) {
+  <p class="empty">No skills uploaded yet.</p>
+} @else {
+  <table class="skills-table">
+    <thead>
+      <tr>
+        <th>Filename</th>
+        <th>Uploaded</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (skill of skills; track skill.id) {
+        <tr>
+          <td>{{ skill.filename }}</td>
+          <td>{{ skill.uploaded_at | date:'medium' }}</td>
+          <td><button class="btn-delete" (click)="delete(skill.id)">Delete</button></td>
+        </tr>
+      }
+    </tbody>
+  </table>
+}

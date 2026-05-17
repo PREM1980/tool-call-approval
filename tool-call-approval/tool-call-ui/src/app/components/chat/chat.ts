@@ -117,7 +117,7 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
           break;
         case 'message':
           this.isWaiting = false;
-          this.addMessage('assistant', event.content ?? '');
+          this.appendAssistantMessage(event.content ?? '');
           break;
         case 'done':
           this.isWaiting = false;
@@ -134,6 +134,15 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
       this.shouldScrollToBottom = true;
       this.cdr.detectChanges();
     });
+  }
+
+  private appendAssistantMessage(content: string): void {
+    const last = this.messages.at(-1);
+    if (last?.role === 'assistant') {
+      last.content += content;
+    } else {
+      this.addMessage('assistant', content);
+    }
   }
 
   private addMessage(role: 'user' | 'assistant', content: string): void {

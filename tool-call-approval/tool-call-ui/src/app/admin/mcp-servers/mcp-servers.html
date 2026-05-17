@@ -1,0 +1,33 @@
+<h2>MCP Servers</h2>
+<p class="subtitle">Configure up to 5 MCP server connections.</p>
+
+<div class="slots">
+  @for (slot of slots; track $index) {
+    <div class="slot">
+      <div class="slot-header">
+        <span class="slot-num">{{ $index + 1 }}</span>
+        <input
+          type="text"
+          [(ngModel)]="slot.name"
+          placeholder="Server name"
+          class="name-input"
+        />
+      </div>
+      <textarea
+        [(ngModel)]="slot.config"
+        placeholder='{ "url": "http://localhost:3001" }'
+        rows="5"
+        class="config-input"
+        [class.invalid]="slot.error === 'Invalid JSON'"
+      ></textarea>
+      <div class="slot-actions">
+        <button class="btn-save" (click)="save($index)" [disabled]="slot.saving">
+          {{ slot.saving ? 'Saving…' : 'Save' }}
+        </button>
+        <button class="btn-clear" (click)="clear($index)">Clear</button>
+        @if (slot.saved) { <span class="success">Saved!</span> }
+        @if (slot.error) { <span class="error">{{ slot.error }}</span> }
+      </div>
+    </div>
+  }
+</div>

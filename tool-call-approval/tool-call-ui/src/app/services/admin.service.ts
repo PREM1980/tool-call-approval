@@ -1,0 +1,88 @@
+import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { firstValueFrom } from 'rxjs';
+
+const API = 'http://localhost:8000/admin';
+
+export interface CredentialsData {
+  aws_access_key_id: string;
+  aws_secret_access_key: string;
+  aws_region: string;
+  kubeconfig: string | null;
+}
+
+export interface McpServer {
+  position: number;
+  name: string;
+  config: Record<string, unknown>;
+  updated_at: string;
+}
+
+export interface Skill {
+  id: string;
+  filename: string;
+  uploaded_at: string;
+}
+
+export interface PersonaData {
+  id: string;
+  name: string;
+  skill_ids: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+@Injectable({ providedIn: 'root' })
+export class AdminService {
+  constructor(private http: HttpClient) {}
+
+  getCredentials() {
+    return firstValueFrom(this.http.get<CredentialsData | null>(`${API}/credentials`));
+  }
+
+  saveCredentials(creds: CredentialsData) {
+    return firstValueFrom(this.http.post(`${API}/credentials`, creds));
+  }
+
+  getMcpServers() {
+    return firstValueFrom(this.http.get<McpServer[]>(`${API}/mcp-servers`));
+  }
+
+  saveMcpServer(position: number, name: string, config: Record<string, unknown>) {
+    return firstValueFrom(this.http.post(`${API}/mcp-servers/${position}`, { name, config }));
+  }
+
+  deleteMcpServer(position: number) {
+    return firstValueFrom(this.http.delete(`${API}/mcp-servers/${position}`));
+  }
+
+  getSkills() {
+    return firstValueFrom(this.http.get<Skill[]>(`${API}/skills`));
+  }
+
+  uploadSkill(file: File) {
+    const form = new FormData();
+    form.append('file', file);
+    return firstValueFrom(this.http.post<Skill>(`${API}/skills`, form));
+  }
+
+  deleteSkill(id: string) {
+    return firstValueFrom(this.http.delete(`${API}/skills/${id}`));
+  }
+
+  getPersonas() {
+    return firstValueFrom(this.http.get<PersonaData[]>(`${API}/personas`));
+  }
+
+  createPersona(name: string, skill_ids: string[]) {
+    return firstValueFrom(this.http.post<PersonaData>(`${API}/personas`, { name, skill_ids }));
+  }
+
+  updatePersona(id: string, name: string, skill_ids: string[]) {
+    return firstValueFrom(this.http.put<PersonaData>(`${API}/personas/${id}`, { name, skill_ids }));
+  }
+
+  deletePersona(id: string) {
+    return firstValueFrom(this.http.delete(`${API}/personas/${id}`));
+  }
+}
