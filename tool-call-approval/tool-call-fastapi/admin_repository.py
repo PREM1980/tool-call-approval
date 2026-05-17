@@ -1,19 +1,20 @@
 import json
 import psycopg2
+import psycopg2.extensions
 import psycopg2.extras
 
 
-def _dsn(url: str) -> str:
+def _to_dsn(url: str) -> str:
     return url.replace("postgresql+psycopg2://", "postgresql://")
 
 
 class AdminRepository:
     def __init__(self, url: str) -> None:
-        self._dsn = _dsn(url)
+        self._url = _to_dsn(url)
         self._create_tables()
 
-    def _connect(self):
-        return psycopg2.connect(self._dsn)
+    def _connect(self) -> psycopg2.extensions.connection:
+        return psycopg2.connect(self._url)
 
     def _create_tables(self) -> None:
         conn = self._connect()
@@ -56,6 +57,9 @@ class AdminRepository:
                     )
                 """)
             conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
         finally:
             conn.close()
 
@@ -93,6 +97,9 @@ class AdminRepository:
                         updated_at            = NOW()
                 """, (aws_access_key_id, aws_secret_access_key, aws_region, kubeconfig))
             conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
         finally:
             conn.close()
 
@@ -120,6 +127,9 @@ class AdminRepository:
                         updated_at = NOW()
                 """, (position, name, json.dumps(config)))
             conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
         finally:
             conn.close()
 
@@ -131,6 +141,9 @@ class AdminRepository:
                 deleted = cur.rowcount > 0
             conn.commit()
             return deleted
+        except Exception:
+            conn.rollback()
+            raise
         finally:
             conn.close()
 
@@ -155,9 +168,15 @@ class AdminRepository:
                     "INSERT INTO admin_skills (filename, content) VALUES (%s, %s) RETURNING id",
                     (filename, content),
                 )
-                skill_id = str(cur.fetchone()[0])
+                row = cur.fetchone()
+                if row is None:
+                    raise RuntimeError("INSERT INTO admin_skills returned no row")
+                skill_id = str(row[0])
             conn.commit()
             return skill_id
+        except Exception:
+            conn.rollback()
+            raise
         finally:
             conn.close()
 
@@ -169,6 +188,9 @@ class AdminRepository:
                 deleted = cur.rowcount > 0
             conn.commit()
             return deleted
+        except Exception:
+            conn.rollback()
+            raise
         finally:
             conn.close()
 
@@ -194,6 +216,9 @@ class AdminRepository:
                 row = dict(cur.fetchone())
             conn.commit()
             return row
+        except Exception:
+            conn.rollback()
+            raise
         finally:
             conn.close()
 
@@ -210,6 +235,9 @@ class AdminRepository:
                 row = cur.fetchone()
             conn.commit()
             return dict(row) if row else None
+        except Exception:
+            conn.rollback()
+            raise
         finally:
             conn.close()
 
@@ -221,5 +249,8 @@ class AdminRepository:
                 deleted = cur.rowcount > 0
             conn.commit()
             return deleted
+        except Exception:
+            conn.rollback()
+            raise
         finally:
             conn.close()
