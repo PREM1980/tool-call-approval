@@ -68,6 +68,18 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
     this.activeService.closeStream();
   }
 
+  async newSession(): Promise<void> {
+    if (this.isSwitching) return;
+    this.isSwitching = true;
+    this.sseSubscription?.unsubscribe();
+    this.activeService.closeStream();
+    this.messages = [];
+    this.pendingToolCall = null;
+    this.isWaiting = false;
+    await this.initConnection();
+    this.isSwitching = false;
+  }
+
   async switchMode(newMode: ConnectionMode): Promise<void> {
     if (newMode === this.mode || this.isSwitching) return;
     this.isSwitching = true;

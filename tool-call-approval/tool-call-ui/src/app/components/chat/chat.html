@@ -6,6 +6,14 @@
       <span class="subtitle">Claude agent with human-in-the-loop</span>
     </div>
 
+    <button
+      type="button"
+      class="new-session-btn"
+      [disabled]="isSwitching || isWaiting"
+      (click)="newSession()"
+      title="New session"
+    >+ New</button>
+
     <div class="mode-toggle">
       <button
         type="button"
