@@ -1,3 +1,4 @@
+from unittest.mock import patch, MagicMock
 from tools import execute_tool, TOOL_DEFINITIONS
 
 
@@ -41,3 +42,44 @@ def test_tool_definitions_have_required_keys():
         assert "name" in tool
         assert "description" in tool
         assert "input_schema" in tool
+
+
+def _mock_kubectl(returncode: int, stdout: str, stderr: str = "") -> MagicMock:
+    m = MagicMock()
+    m.returncode = returncode
+    m.stdout = stdout
+    m.stderr = stderr
+    return m
+
+
+def test_kubectl_success():
+    with patch("tools.subprocess.run", return_value=_mock_kubectl(0, "pod/nginx Running")):
+        result = execute_tool("kubectl", {"args": "get pods"})
+    assert result == "pod/nginx Running"
+
+
+def test_kubectl_strips_kubectl_prefix():
+    with patch("tools.subprocess.run") as mock_run:
+        mock_run.return_value = _mock_kubectl(0, "ok")
+        execute_tool("kubectl", {"args": "kubectl get pods"})
+        cmd = mock_run.call_args[0][0]
+    assert cmd[0] == "kubectl"
+    assert cmd[1] == "get"
+
+
+def test_kubectl_nonzero_exit_returns_stderr():
+    with patch("tools.subprocess.run", return_value=_mock_kubectl(1, "", "Error from server: not found")):
+        result = execute_tool("kubectl", {"args": "get pod missing"})
+    assert "Error" in result
+    assert "not found" in result
+
+
+def test_kubectl_empty_output():
+    with patch("tools.subprocess.run", return_value=_mock_kubectl(0, "")):
+        result = execute_tool("kubectl", {"args": "get pods"})
+    assert result == "(no output)"
+
+
+def test_kubectl_invalid_args():
+    result = execute_tool("kubectl", {"args": "get pods --namespace 'unclosed"})
+    assert "Error" in result

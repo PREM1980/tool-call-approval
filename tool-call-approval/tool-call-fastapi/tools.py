@@ -1,4 +1,6 @@
 import math as _math
+import shlex
+import subprocess
 
 TOOL_DEFINITIONS = [
     {
@@ -37,6 +39,26 @@ TOOL_DEFINITIONS = [
             "required": ["query"],
         },
     },
+    {
+        "name": "kubectl",
+        "description": (
+            "Execute a kubectl command against the configured Kubernetes cluster. "
+            "Provide only the arguments after 'kubectl', e.g. 'get pods -n default'. "
+            "Read-only commands (get, describe, logs, top, explain, version, cluster-info) "
+            "are preferred. Mutating commands (apply, delete, scale, rollout) require "
+            "explicit user approval."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "args": {
+                    "type": "string",
+                    "description": "kubectl arguments, e.g. 'get pods -n kube-system -o wide'",
+                }
+            },
+            "required": ["args"],
+        },
+    },
 ]
 
 _WEATHER_DB = {
@@ -72,4 +94,33 @@ def execute_tool(name: str, tool_input: dict) -> str:
             f"Additional results at example.com/search?q={query.replace(' ', '+')}"
         )
 
+    if name == "kubectl":
+        return _run_kubectl(tool_input["args"])
+
     return f"Unknown tool: {name}"
+
+
+_KUBECTL_TIMEOUT = 30  # seconds
+
+
+def _run_kubectl(args: str) -> str:
+    try:
+        parts = shlex.split(args)
+    except ValueError as exc:
+        return f"Error parsing kubectl args: {exc}"
+
+    # Prevent callers from sneaking in a different binary
+    if parts and parts[0].lower() == "kubectl":
+        parts = parts[1:]
+
+    result = subprocess.run(
+        ["kubectl"] + parts,
+        capture_output=True,
+        text=True,
+        timeout=_KUBECTL_TIMEOUT,
+    )
+    output = result.stdout.strip()
+    if result.returncode != 0:
+        stderr = result.stderr.strip()
+        return f"Error (exit {result.returncode}):\n{stderr}" if stderr else f"Exit code {result.returncode}"
+    return output or "(no output)"

@@ -19,6 +19,8 @@ from session import Session
 from tools import execute_tool
 
 _MODEL_ID = "us.anthropic.claude-sonnet-4-20250514-v1:0"
+_THROTTLE_MAX_RETRIES = 3
+_THROTTLE_BASE_DELAY = 5  # seconds; backoff: 5s, 10s, 20s
 
 
 @tool(requires_confirmation=True)
@@ -37,6 +39,12 @@ def get_weather(city: str) -> str:
 def search_web(query: str) -> str:
     """Search the web for information on a topic."""
     return execute_tool("search_web", {"query": query})
+
+
+@tool(requires_confirmation=True)
+def kubectl(args: str) -> str:
+    """Execute a kubectl command. Provide arguments after 'kubectl', e.g. 'get pods -n default'."""
+    return execute_tool("kubectl", {"args": args})
 
 
 class AgentService:
@@ -72,10 +80,45 @@ class AgentService:
     def _build_agent(self, session_id: str) -> Agent:
         return Agent(
             model=AwsBedrock(id=_MODEL_ID),
-            tools=[calculate, get_weather, search_web],
+            tools=[calculate, get_weather, search_web, kubectl],
             instructions=(
-                "You are a helpful assistant with access to tools. "
-                "Always use tools when appropriate to provide accurate information."
+                "<agent>\n"
+                "  <identity>\n"
+                "    You are a Kubernetes operations agent. Your sole purpose is to help users\n"
+                "    manage, debug, and operate Kubernetes clusters.\n"
+                "  </identity>\n"
+                "\n"
+                "  <scope>\n"
+                "    <allowed>\n"
+                "      Pods, Deployments, StatefulSets, DaemonSets, ReplicaSets, Jobs, CronJobs,\n"
+                "      Services, Ingress, NetworkPolicies, ConfigMaps, Secrets, PersistentVolumes,\n"
+                "      PersistentVolumeClaims, StorageClasses, Namespaces, Nodes, ResourceQuotas,\n"
+                "      LimitRanges, HorizontalPodAutoscalers, ClusterRoles, Roles, RoleBindings,\n"
+                "      ServiceAccounts, CustomResourceDefinitions, Helm charts, kubeconfig,\n"
+                "      kubectl commands, cluster upgrades, and Kubernetes troubleshooting.\n"
+                "    </allowed>\n"
+                "    <prohibited>\n"
+                "      Any topic outside of Kubernetes. If the user asks about anything unrelated\n"
+                "      to Kubernetes — including general coding, weather, math, or other domains —\n"
+                "      respond only with: 'I am a Kubernetes agent and cannot help with that.'\n"
+                "    </prohibited>\n"
+                "  </scope>\n"
+                "\n"
+                "  <tool_usage>\n"
+                "    <rule>Always call the relevant tool before composing your response.</rule>\n"
+                "    <rule>When the user asks about multiple Kubernetes resources, call the tool\n"
+                "      once for EACH resource before writing your final answer.</rule>\n"
+                "    <rule>Never assume, skip, or fabricate tool results.</rule>\n"
+                "    <rule>If a tool call is approved and returns a result, immediately call the\n"
+                "      tool for the next item if more items remain.</rule>\n"
+                "  </tool_usage>\n"
+                "\n"
+                "  <response_style>\n"
+                "    <rule>Be concise and precise. Kubernetes operators value accuracy over verbosity.</rule>\n"
+                "    <rule>Prefer kubectl command examples when explaining operations.</rule>\n"
+                "    <rule>When diagnosing issues, state the likely root cause first, then remediation steps.</rule>\n"
+                "  </response_style>\n"
+                "</agent>"
             ),
             stream=True,
             session_id=session_id,
@@ -118,24 +161,30 @@ class AgentService:
         tool_spans: list = []
         response_parts: list = []
 
-        try:
-            async for event in agent.arun(
-                message,
-                stream=True,
-                stream_events=True,
-                yield_run_output=True,
-            ):
-                done = await self._dispatch(session, event, tool_spans, response_parts)
-                if done and isinstance(event, RunCompletedEvent):
-                    break
-        except Exception as e:
-            langfuse_context.update_current_observation(
-                level="ERROR", status_message=str(e)
-            )
-            await session.queue.put({"type": "error", "content": f"Unexpected error: {str(e)}"})
-            await session.queue.put({"type": "done"})
-            self._remove_session(session.id)
-            return
+        for attempt in range(_THROTTLE_MAX_RETRIES + 1):
+            tool_spans = []
+            response_parts = []
+            try:
+                async for event in agent.arun(
+                    message,
+                    stream=True,
+                    stream_events=True,
+                    yield_run_output=True,
+                ):
+                    done = await self._dispatch(session, event, tool_spans, response_parts)
+                    if done and isinstance(event, RunCompletedEvent):
+                        break
+                break  # success — exit retry loop
+            except Exception as e:
+                error_str = str(e)
+                if "ThrottlingException" in error_str and attempt < _THROTTLE_MAX_RETRIES:
+                    await asyncio.sleep(_THROTTLE_BASE_DELAY * (2 ** attempt))
+                    continue
+                langfuse_context.update_current_observation(level="ERROR", status_message=error_str)
+                await session.queue.put({"type": "error", "content": f"Unexpected error: {error_str}"})
+                await session.queue.put({"type": "done"})
+                self._remove_session(session.id)
+                return
 
         final_output = "".join(response_parts)
         langfuse_context.update_current_observation(
@@ -222,7 +271,6 @@ class AgentService:
         self, session: Session, event: RunCompletedEvent, tool_spans: list, response_parts: list
     ) -> bool:
         await session.queue.put({"type": "done"})
-        self._remove_session(session.id)
         return True
 
     async def _on_error(
