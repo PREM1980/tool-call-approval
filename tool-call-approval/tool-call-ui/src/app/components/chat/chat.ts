@@ -10,6 +10,7 @@ import {
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
+import { AdminService } from '../../services/admin.service';
 import { ChatService } from '../../services/chat.service';
 import { WebsocketChatService } from '../../services/websocket-chat.service';
 import { ToolApproval } from '../tool-approval/tool-approval';
@@ -36,10 +37,12 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
 
   private sseSubscription!: Subscription;
   private shouldScrollToBottom = false;
+  private kubeconfig: string | null = null;
 
   constructor(
     private chatService: ChatService,
     private wsChatService: WebsocketChatService,
+    private adminService: AdminService,
     private cdr: ChangeDetectorRef
   ) {}
 
@@ -48,6 +51,8 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
   }
 
   async ngOnInit(): Promise<void> {
+    const creds = await this.adminService.getCredentials().catch(() => null);
+    this.kubeconfig = creds?.kubeconfig ?? null;
     await this.initConnection();
   }
 
@@ -82,7 +87,8 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
     this.userInput = '';
     this.addMessage('user', text);
     this.isWaiting = true;
-    await this.activeService.sendMessage(text);
+    const platformContext = this.kubeconfig ? { kubeconfig: this.kubeconfig } : undefined;
+    await this.activeService.sendMessage(text, platformContext);
   }
 
   async handleApproval(approved: boolean): Promise<void> {

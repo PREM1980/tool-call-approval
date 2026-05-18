@@ -16,7 +16,7 @@ from langfuse.decorators import langfuse_context, observe
 
 from repository import IAgentStorage
 from session import Session
-from tools import execute_tool
+from tools import execute_tool, reset_kubeconfig, set_kubeconfig
 
 _MODEL_ID = "us.anthropic.claude-sonnet-4-20250514-v1:0"
 _THROTTLE_MAX_RETRIES = 3
@@ -151,6 +151,13 @@ class AgentService:
         if agent is None:
             return
 
+        kubeconfig_token = set_kubeconfig(session.kubeconfig)
+        try:
+            await self._run_inner(session, agent, message)
+        finally:
+            reset_kubeconfig(kubeconfig_token)
+
+    async def _run_inner(self, session: Session, agent: Any, message: str) -> None:
         langfuse_context.update_current_trace(
             user_id=session.id,
             tags=["tool-call-approval"],

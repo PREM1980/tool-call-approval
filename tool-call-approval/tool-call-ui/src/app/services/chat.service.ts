@@ -36,10 +36,12 @@ export class ChatService {
     };
   }
 
-  async sendMessage(message: string): Promise<void> {
+  async sendMessage(message: string, platformContext?: { kubeconfig: string | null }): Promise<void> {
     if (!this.sessionId) throw new Error('No active session');
+    const body: Record<string, unknown> = { message };
+    if (platformContext) body['platform_context'] = platformContext;
     await firstValueFrom(
-      this.http.post(`${API_URL}/sessions/${this.sessionId}/chat`, { message })
+      this.http.post(`${API_URL}/sessions/${this.sessionId}/chat`, body)
     );
   }
 

@@ -1,6 +1,21 @@
+import contextvars
 import math as _math
+import os
 import shlex
 import subprocess
+import tempfile
+
+_kubeconfig_ctx: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "kubeconfig", default=None
+)
+
+
+def set_kubeconfig(kubeconfig: str | None) -> contextvars.Token:
+    return _kubeconfig_ctx.set(kubeconfig)
+
+
+def reset_kubeconfig(token: contextvars.Token) -> None:
+    _kubeconfig_ctx.reset(token)
 
 TOOL_DEFINITIONS = [
     {
@@ -109,16 +124,33 @@ def _run_kubectl(args: str) -> str:
     except ValueError as exc:
         return f"Error parsing kubectl args: {exc}"
 
-    # Prevent callers from sneaking in a different binary
     if parts and parts[0].lower() == "kubectl":
         parts = parts[1:]
 
-    result = subprocess.run(
-        ["kubectl"] + parts,
-        capture_output=True,
-        text=True,
-        timeout=_KUBECTL_TIMEOUT,
-    )
+    kubeconfig = _kubeconfig_ctx.get()
+    env = os.environ.copy()
+    tmp_path: str | None = None
+
+    if kubeconfig:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".yaml", delete=False
+        ) as tmp:
+            tmp.write(kubeconfig)
+            tmp_path = tmp.name
+        env["KUBECONFIG"] = tmp_path
+
+    try:
+        result = subprocess.run(
+            ["kubectl"] + parts,
+            capture_output=True,
+            text=True,
+            timeout=_KUBECTL_TIMEOUT,
+            env=env,
+        )
+    finally:
+        if tmp_path:
+            os.unlink(tmp_path)
+
     output = result.stdout.strip()
     if result.returncode != 0:
         stderr = result.stderr.strip()

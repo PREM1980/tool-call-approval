@@ -46,6 +46,8 @@ async def chat(session_id: str, request: ChatRequest) -> dict:
     session = service.get_session(session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
+    if request.platform_context:
+        session.kubeconfig = request.platform_context.kubeconfig
     asyncio.create_task(service.run(session, request.message))
     return {"status": "processing"}
 

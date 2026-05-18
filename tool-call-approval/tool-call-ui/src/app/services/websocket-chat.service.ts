@@ -35,11 +35,11 @@ export class WebsocketChatService {
     };
   }
 
-  async sendMessage(message: string): Promise<void> {
+  async sendMessage(message: string, platformContext?: { kubeconfig: string | null }): Promise<void> {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       throw new Error('No active WebSocket connection');
     }
-    this.ws.send(JSON.stringify({ type: 'chat', message }));
+    this.ws.send(JSON.stringify({ type: 'chat', message, platform_context: platformContext ?? null }));
   }
 
   async approveTool(approved: boolean): Promise<void> {

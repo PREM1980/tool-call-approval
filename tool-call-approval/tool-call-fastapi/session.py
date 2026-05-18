@@ -8,3 +8,4 @@ class Session:
     queue: asyncio.Queue = field(default_factory=asyncio.Queue)
     approval_event: asyncio.Event = field(default_factory=asyncio.Event)
     approval_result: bool = False
+    kubeconfig: str | None = None
