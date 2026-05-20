@@ -1,11 +1,11 @@
 # tool-call-web
 
-API gateway that sits between `tool-call-ui` and `tool-call-fastapi`. The Angular UI communicates exclusively with this service; it forwards requests to the agent backend.
+API gateway that sits between `tool-call-ui` and `tool-call-agent`. The Angular UI communicates exclusively with this service; it forwards requests to the agent backend.
 
 ## Architecture
 
 ```
-tool-call-ui (:4200) → tool-call-web (:8080) → tool-call-fastapi (:8000)
+tool-call-ui (:4200) → tool-call-web (:8080) → tool-call-agent (:8000)
 ```
 
 ## Routes
@@ -29,7 +29,7 @@ pip install -r requirements.txt
 
 | Variable | Default | Description |
 |---|---|---|
-| `AGENT_BACKEND_URL` | `http://localhost:8000` | URL of the `tool-call-fastapi` backend |
+| `AGENT_BACKEND_URL` | `http://localhost:8000` | URL of the `tool-call-agent` backend |
 
 ## Running
 

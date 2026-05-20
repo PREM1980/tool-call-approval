@@ -3,5 +3,5 @@ kind: ConfigMap
 metadata:
   name: tool-call-web-config
 data:
-  AGENT_BACKEND_URL: http://tool-call-fastapi:8000
+  AGENT_BACKEND_URL: http://tool-call-agent:8000
   CORS_ORIGIN: http://tool-call.local

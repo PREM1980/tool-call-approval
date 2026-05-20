@@ -21,24 +21,24 @@ session persistence.
 
 | File | Purpose |
 |---|---|
-| `tool-call-fastapi/agent.py` | Agent definition, session/db wiring, event processing |
-| `tool-call-fastapi/main.py` | FastAPI routes (sessions, chat, stream, approve) |
-| `tool-call-fastapi/client.py` | CLI SSE test client |
-| `tool-call-fastapi/tools.py` | Tool implementations (calculate, weather, search) |
-| `tool-call-fastapi/models.py` | Pydantic request/response models |
+| `tool-call-agent/agent.py` | Agent definition, session/db wiring, event processing |
+| `tool-call-agent/main.py` | FastAPI routes (sessions, chat, stream, approve) |
+| `tool-call-agent/client.py` | CLI SSE test client |
+| `tool-call-agent/tools.py` | Tool implementations (calculate, weather, search) |
+| `tool-call-agent/models.py` | Pydantic request/response models |
 | `docker-compose.yml` | Langfuse stack (postgres on 5433, redis, minio, clickhouse) |
 
 ## Common Commands
 
 ```bash
 # Start the API server
-cd tool-call-fastapi && uvicorn main:app --reload
+cd tool-call-agent && uvicorn main:app --reload
 
 # Run the test client
-cd tool-call-fastapi && python client.py "your message here"
+cd tool-call-agent && python client.py "your message here"
 
 # Run tests
-cd tool-call-fastapi && pytest
+cd tool-call-agent && pytest
 
 # Start Langfuse stack
 docker compose up -d

@@ -1,25 +1,25 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: tool-call-fastapi
+  name: tool-call-agent
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: tool-call-fastapi
+      app: tool-call-agent
   template:
     metadata:
       labels:
-        app: tool-call-fastapi
+        app: tool-call-agent
     spec:
       containers:
-        - name: tool-call-fastapi
-          image: tool-call-fastapi:latest
+        - name: tool-call-agent
+          image: tool-call-agent:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8000
           envFrom:
             - configMapRef:
-                name: tool-call-fastapi-config
+                name: tool-call-agent-config
             - secretRef:
-                name: tool-call-fastapi-secret
+                name: tool-call-agent-secret

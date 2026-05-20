@@ -1,10 +1,10 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: tool-call-fastapi
+  name: tool-call-agent
 spec:
   selector:
-    app: tool-call-fastapi
+    app: tool-call-agent
   ports:
     - port: 8000
       targetPort: 8000

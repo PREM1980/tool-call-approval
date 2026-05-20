@@ -117,6 +117,44 @@ def execute_tool(name: str, tool_input: dict) -> str:
 
 _KUBECTL_TIMEOUT = 30  # seconds
 
+# Only developer-workflow commands are permitted; anything not in this set is rejected.
+_ALLOWED_SUBCOMMANDS = {
+    # Read / inspect
+    "get", "describe", "logs", "top", "explain", "version",
+    "cluster-info", "api-resources", "api-versions", "config", "events",
+    # Mutating (namespace-scoped, developer-safe)
+    "apply", "create", "delete", "edit", "patch", "replace",
+    "rollout", "scale", "autoscale", "set",
+    "run", "expose", "label", "annotate",
+    # Interaction
+    "exec", "port-forward", "cp", "debug",
+    # Diff / dry-run
+    "diff", "wait",
+}
+
+# Specific (subcommand, resource) pairs that are denied even though the subcommand is allowed.
+_DENIED_ARGS: set[tuple[str, str]] = {
+    # cluster-info dump exposes sensitive cluster data
+    ("cluster-info", "dump"),
+    # delete of cluster-scoped resources is an infra-engineer operation
+    ("delete", "node"), ("delete", "nodes"), ("delete", "no"),
+    ("delete", "namespace"), ("delete", "namespaces"), ("delete", "ns"),
+    ("delete", "pv"), ("delete", "persistentvolume"), ("delete", "persistentvolumes"),
+    ("delete", "clusterrole"), ("delete", "clusterroles"),
+    ("delete", "clusterrolebinding"), ("delete", "clusterrolebindings"),
+}
+
+
+def _is_allowed(parts: list[str]) -> bool:
+    if not parts:
+        return False
+    cmd = parts[0].lower()
+    if cmd not in _ALLOWED_SUBCOMMANDS:
+        return False
+    if len(parts) >= 2 and (cmd, parts[1].lower()) in _DENIED_ARGS:
+        return False
+    return True
+
 
 def _run_kubectl(args: str) -> str:
     try:
@@ -126,6 +164,15 @@ def _run_kubectl(args: str) -> str:
 
     if parts and parts[0].lower() == "kubectl":
         parts = parts[1:]
+
+    if not _is_allowed(parts):
+        cmd = parts[0] if parts else "(empty)"
+        return (
+            f"Error: '{cmd}' is not an allowed kubectl command for this developer agent. "
+            "Permitted operations cover get, describe, logs, apply, delete, rollout, scale, "
+            "exec, port-forward, and similar developer workflows. Node management and "
+            "cluster-admin operations are reserved for infrastructure engineers."
+        )
 
     kubeconfig = _kubeconfig_ctx.get()
     env = os.environ.copy()

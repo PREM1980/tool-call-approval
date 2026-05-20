@@ -1,4 +1,4 @@
-# tool-call-fastapi
+# tool-call-agent
 
 FastAPI backend for the tool-call-approval demo. Runs a Claude agent (via AWS Bedrock) with human-in-the-loop tool approval, streaming events over SSE and WebSocket. Includes Langfuse tracing and a mock mode that requires no API keys.
 
@@ -205,7 +205,7 @@ pytest -v
 
 ```bash
 # Build
-docker build -t tool-call-fastapi:latest .
+docker build -t tool-call-agent:latest .
 
 # Run (point at host Postgres and Langfuse)
 docker run --rm \
@@ -217,7 +217,7 @@ docker run --rm \
   -e LANGFUSE_SECRET_KEY=sk-lf-local-tool-call-approval \
   -e LANGFUSE_HOST=http://host.docker.internal:3000 \
   -p 8000:8000 \
-  tool-call-fastapi:latest
+  tool-call-agent:latest
 ```
 
 ---
@@ -226,9 +226,9 @@ docker run --rm \
 
 ```bash
 # Copy and fill in secret values (base64-encode each value)
-cp ../k8s/tool-call-fastapi/secret.yaml.example ../k8s/tool-call-fastapi/secret.yaml
+cp ../k8s/tool-call-agent/secret.yaml.example ../k8s/tool-call-agent/secret.yaml
 # Edit secret.yaml with your real base64-encoded credentials
 
 # Apply all manifests
-kubectl apply -f ../k8s/tool-call-fastapi/
+kubectl apply -f ../k8s/tool-call-agent/
 ```

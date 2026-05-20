@@ -11,7 +11,7 @@ npm install
 ng serve          # runs on http://localhost:4200
 ```
 
-Requires the `tool-call-fastapi` backend running on `http://localhost:8000`.
+Requires the `tool-call-agent` backend running on `http://localhost:8000`.
 
 ## Features
 
