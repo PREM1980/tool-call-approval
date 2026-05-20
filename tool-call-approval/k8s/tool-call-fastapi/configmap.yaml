@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tool-call-fastapi-config
+data:
+  AWS_DEFAULT_REGION: us-east-1
+  LANGFUSE_HOST: http://langfuse-web:3000

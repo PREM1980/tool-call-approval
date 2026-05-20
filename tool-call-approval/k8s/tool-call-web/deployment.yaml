@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tool-call-web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tool-call-web
+  template:
+    metadata:
+      labels:
+        app: tool-call-web
+    spec:
+      containers:
+        - name: tool-call-web
+          image: tool-call-web:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: tool-call-web-config
