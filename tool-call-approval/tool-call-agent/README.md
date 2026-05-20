@@ -179,6 +179,18 @@ View traces at `http://localhost:3000` → **tool-call-approval** project → **
 
 ---
 
+## Logging
+
+The service emits structured JSON logs to stdout. Each line is a valid JSON object:
+
+```json
+{"timestamp": "2026-05-20T12:00:00", "level": "INFO", "logger": "main", "service": "tool-call-agent", "message": "session created", "session_id": "abc-123"}
+```
+
+When running via Docker Compose, Promtail ships these logs to Loki automatically. Query them in Grafana at `http://localhost:3001` → **Explore** → select **Loki** datasource.
+
+---
+
 ## Project files
 
 | File | Description |

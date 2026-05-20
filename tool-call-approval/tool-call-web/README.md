@@ -71,3 +71,9 @@ kubectl apply -f ../k8s/tool-call-web/
 echo "127.0.0.1 tool-call.local" | sudo tee -a /etc/hosts
 # Then open http://tool-call.local in a browser
 ```
+
+---
+
+## Logging
+
+The gateway emits structured JSON logs to stdout. Backend errors (502, 504) are logged at `ERROR` level. When running via Docker Compose, Promtail ships logs to Loki automatically. Query in Grafana at `http://localhost:3001`.
