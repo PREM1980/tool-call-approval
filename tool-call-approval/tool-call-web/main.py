@@ -12,7 +12,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 
 load_dotenv()
 
-from logging_config import setup_logging  # noqa: E402
+from logging_config import reconfigure_uvicorn_loggers, setup_logging  # noqa: E402
 
 setup_logging("tool-call-web")
 
@@ -25,6 +25,7 @@ _client: httpx.AsyncClient | None = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    reconfigure_uvicorn_loggers("tool-call-web")
     global _client
     _client = httpx.AsyncClient(
         limits=httpx.Limits(max_connections=500, max_keepalive_connections=500),

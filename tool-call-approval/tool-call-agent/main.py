@@ -2,12 +2,14 @@ import asyncio
 import json
 import logging
 import os
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
 
 load_dotenv()
 
-from logging_config import setup_logging  # noqa: E402
+from logging_config import reconfigure_uvicorn_loggers, setup_logging  # noqa: E402
 
 setup_logging("tool-call-agent")
 
@@ -23,7 +25,13 @@ from agent_service import AgentService
 from models import ApprovalRequest, ChatRequest, SessionResponse
 from repository import PostgresRepository
 
-app = FastAPI(title="Tool Call Approval API")
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    reconfigure_uvicorn_loggers("tool-call-agent")
+    yield
+
+
+app = FastAPI(title="Tool Call Approval API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
