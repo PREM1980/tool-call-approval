@@ -149,6 +149,35 @@ services:
       timeout: 3s
       retries: 10
 
+  tool-call-agent:
+    build:
+      context: ./tool-call-agent
+    image: tool-call-agent:latest
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./tool-call-agent/.env
+    environment:
+      POSTGRES_URL: postgresql+psycopg2://postgres:postgres@postgres:5432/postgres
+      LANGFUSE_HOST: http://langfuse-web:3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      langfuse-web:
+        condition: service_started
+
+  tool-call-web:
+    build:
+      context: ./tool-call-web
+    image: tool-call-web:latest
+    ports:
+      - "8080:8080"
+    environment:
+      AGENT_BACKEND_URL: http://tool-call-agent:8000
+      CORS_ORIGIN: http://localhost:4200
+    depends_on:
+      - tool-call-agent
+
   loki:
     image: grafana/loki:3.0.0
     ports:
