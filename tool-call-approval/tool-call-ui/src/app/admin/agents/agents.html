@@ -1,0 +1,21 @@
+<h2>Agents</h2>
+
+@if (kubeconfigError) {
+  <div class="banner">{{ kubeconfigError }}</div>
+}
+
+<div class="tabs">
+  <button class="tab" [class.active]="tab === 'deployments'" (click)="tab = 'deployments'">
+    Deployments
+  </button>
+  <button class="tab" [class.active]="tab === 'view'" (click)="tab = 'view'">
+    View
+  </button>
+</div>
+
+@if (tab === 'deployments') {
+  <app-deploy-form (deployed)="onDeployed()" />
+}
+@if (tab === 'view') {
+  <app-agent-list />
+}
