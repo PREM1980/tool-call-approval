@@ -1,3 +1,4 @@
+import logging
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -10,6 +11,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 
 load_dotenv()
+
+from logging_config import setup_logging  # noqa: E402
+
+setup_logging("tool-call-web")
+
+logger = logging.getLogger(__name__)
 
 _BACKEND = os.getenv("AGENT_BACKEND_URL", "http://localhost:8000")
 _CORS_ORIGIN = os.getenv("CORS_ORIGIN", "http://localhost:4200")
@@ -48,8 +55,10 @@ async def _proxy(coro: Awaitable[httpx.Response]) -> JSONResponse:
     try:
         resp = await coro
     except httpx.ConnectError:
+        logger.error("backend unreachable")
         raise HTTPException(status_code=502, detail="Backend unreachable")
     except httpx.TimeoutException:
+        logger.error("backend timeout")
         raise HTTPException(status_code=504, detail="Backend timeout")
     if resp.status_code == 404:
         raise HTTPException(status_code=404, detail=resp.json().get("detail", "Not found"))
