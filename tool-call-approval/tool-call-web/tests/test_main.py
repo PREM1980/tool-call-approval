@@ -99,3 +99,36 @@ async def test_stream(ac):
     mock_client.stream.assert_called_once_with(
         "GET", "http://localhost:8000/sessions/abc-123/stream"
     )
+
+
+async def test_session_not_found(ac):
+    mock_client = AsyncMock()
+    mock_client.get.return_value = _resp(404, {"detail": "Session not found"})
+
+    with patch("main._client", mock_client):
+        resp = await ac.get("/api/sessions/bad-id/history")
+
+    assert resp.status_code == 404
+    assert resp.json()["detail"] == "Session not found"
+
+
+async def test_backend_unreachable(ac):
+    mock_client = AsyncMock()
+    mock_client.post.side_effect = httpx.ConnectError("connection refused")
+
+    with patch("main._client", mock_client):
+        resp = await ac.post("/api/sessions")
+
+    assert resp.status_code == 502
+    assert resp.json()["detail"] == "Backend unreachable"
+
+
+async def test_backend_timeout(ac):
+    mock_client = AsyncMock()
+    mock_client.post.side_effect = httpx.TimeoutException("timed out")
+
+    with patch("main._client", mock_client):
+        resp = await ac.post("/api/sessions")
+
+    assert resp.status_code == 504
+    assert resp.json()["detail"] == "Backend timeout"
