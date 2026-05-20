@@ -54,3 +54,10 @@ async def _proxy(coro: Awaitable[httpx.Response]) -> JSONResponse:
         raise HTTPException(status_code=404, detail=resp.json().get("detail", "Not found"))
     resp.raise_for_status()
     return JSONResponse(content=resp.json(), status_code=resp.status_code)
+
+
+@app.post("/api/sessions")
+async def create_session() -> JSONResponse:
+    return await _proxy(
+        _get_client().post(f"{_BACKEND}/sessions", timeout=30.0)
+    )
