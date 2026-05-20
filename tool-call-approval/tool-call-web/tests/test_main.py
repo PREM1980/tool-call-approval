@@ -27,3 +27,20 @@ async def test_create_session(ac):
     assert resp.status_code == 200
     assert resp.json() == {"session_id": "abc-123"}
     mock_client.post.assert_called_once_with("http://localhost:8000/sessions", timeout=30.0)
+
+
+async def test_chat(ac):
+    mock_client = AsyncMock()
+    mock_client.post.return_value = _resp(200, {"status": "processing"})
+
+    with patch("main._client", mock_client):
+        resp = await ac.post(
+            "/api/sessions/abc-123/chat",
+            json={"message": "hello"},
+        )
+
+    assert resp.status_code == 200
+    assert resp.json() == {"status": "processing"}
+    call_args = mock_client.post.call_args
+    assert "/sessions/abc-123/chat" in call_args.args[0]
+    assert b'"message":"hello"' in call_args.kwargs["content"]

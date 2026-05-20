@@ -61,3 +61,16 @@ async def create_session() -> JSONResponse:
     return await _proxy(
         _get_client().post(f"{_BACKEND}/sessions", timeout=30.0)
     )
+
+
+@app.post("/api/sessions/{session_id}/chat")
+async def chat(session_id: str, request: Request) -> JSONResponse:
+    body = await request.body()
+    return await _proxy(
+        _get_client().post(
+            f"{_BACKEND}/sessions/{session_id}/chat",
+            content=body,
+            headers={"Content-Type": "application/json"},
+            timeout=30.0,
+        )
+    )
