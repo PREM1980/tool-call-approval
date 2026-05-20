@@ -27,4 +27,9 @@ export const adminRoutes: Routes = [
     loadComponent: () =>
       import('./persona/persona').then((m) => m.Persona),
   },
+  {
+    path: 'agents',
+    loadComponent: () =>
+      import('./agents/agents').then((m) => m.Agents),
+  },
 ];
