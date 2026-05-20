@@ -1,10 +1,17 @@
 import asyncio
 import json
+import logging
 import os
 
 from dotenv import load_dotenv
 
 load_dotenv()
+
+from logging_config import setup_logging  # noqa: E402
+
+setup_logging("tool-call-agent")
+
+logger = logging.getLogger(__name__)
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -38,6 +45,7 @@ app.include_router(admin_router, prefix="/admin", tags=["admin"])
 @app.post("/sessions", response_model=SessionResponse)
 async def create_session() -> SessionResponse:
     session = service.create_session()
+    logger.info("session created", extra={"session_id": session.id})
     return SessionResponse(session_id=session.id)
 
 
@@ -83,4 +91,8 @@ async def approve_tool(session_id: str, request: ApprovalRequest) -> dict:
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     service.approve(session, request.approved)
+    logger.info(
+        "tool approval received",
+        extra={"session_id": session_id, "approved": request.approved},
+    )
     return {"status": "ok"}
