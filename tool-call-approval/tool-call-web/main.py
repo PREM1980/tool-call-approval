@@ -12,6 +12,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 load_dotenv()
 
 _BACKEND = os.getenv("AGENT_BACKEND_URL", "http://localhost:8000")
+_CORS_ORIGIN = os.getenv("CORS_ORIGIN", "http://localhost:4200")
 _client: httpx.AsyncClient | None = None
 
 
@@ -30,7 +31,7 @@ app = FastAPI(title="Tool Call Web", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:4200"],
+    allow_origins=[_CORS_ORIGIN],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
