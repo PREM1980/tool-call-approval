@@ -175,8 +175,21 @@ services:
     environment:
       AGENT_BACKEND_URL: http://tool-call-agent:8000
       CORS_ORIGIN: http://localhost:4200
+      K8S_BACKEND_URL: http://tool-call-k8s:8001
     depends_on:
       - tool-call-agent
+      - tool-call-k8s
+
+  tool-call-k8s:
+    build:
+      context: ./tool-call-k8s
+    image: tool-call-k8s:latest
+    ports:
+      - "8001:8001"
+    volumes:
+      - k8s_data:/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   loki:
     image: grafana/loki:3.0.0
@@ -227,3 +240,4 @@ volumes:
   langfuse_redis_data:
   loki_data:
   grafana_data:
+  k8s_data:
