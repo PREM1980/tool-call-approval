@@ -41,7 +41,7 @@ export class AgentsService {
   }
 
   deploy(req: DeployRequest) {
-    return firstValueFrom(this.http.post<AgentDeployment>(`${API}/agents/`, req));
+    return firstValueFrom(this.http.post<AgentDeployment>(`${API}/agents`, req));
   }
 
   list() {

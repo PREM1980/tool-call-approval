@@ -18,11 +18,12 @@ def _kubeconfig_exists() -> bool:
     return Path(_KUBECONFIG_PATH).exists()
 
 
-def _run(args: list[str]) -> str:
+def _run(args: list[str], stdin: str | None = None) -> str:
     if not _kubeconfig_exists():
         raise RuntimeError("kubeconfig not configured")
     result = subprocess.run(
         ["kubectl", "--kubeconfig", _KUBECONFIG_PATH] + args,
+        input=stdin,
         capture_output=True,
         text=True,
         timeout=_KUBECTL_TIMEOUT,
@@ -65,15 +66,33 @@ def create_deployment(
     name: str, image: str, namespace: str, replicas: int, env: list[dict]
 ) -> dict:
     full_name = f"{name}{_SUFFIX}"
-    _run([
-        "create", "deployment", full_name,
-        f"--image={image}",
-        f"--replicas={replicas}",
-        f"--namespace={namespace}",
-    ])
-    if env:
-        env_args = [f"{e['key']}={e['value']}" for e in env]
-        _run(["set", "env", f"deployment/{full_name}", "--namespace", namespace] + env_args)
+    env_block = (
+        "\n".join(f"        - name: {e['key']}\n          value: {json.dumps(str(e['value']))}" for e in env)
+        if env else ""
+    )
+    manifest = f"""apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {full_name}
+  namespace: {namespace}
+spec:
+  replicas: {replicas}
+  selector:
+    matchLabels:
+      app: {full_name}
+  template:
+    metadata:
+      labels:
+        app: {full_name}
+    spec:
+      containers:
+      - name: {full_name}
+        image: {image}
+        imagePullPolicy: IfNotPresent
+        env:
+{env_block}
+"""
+    _run(["apply", "-f", "-"], stdin=manifest)
     raw = _run(["get", "deployment", full_name, "--namespace", namespace, "-o", "json"])
     return _parse_deployment(json.loads(raw))
 

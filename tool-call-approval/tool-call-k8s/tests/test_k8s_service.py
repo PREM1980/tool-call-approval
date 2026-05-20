@@ -68,14 +68,15 @@ def test_run_raises_on_nonzero_exit():
 def test_create_deployment_uses_ui_agents_suffix():
     _existing_kubeconfig()
     dep = _dep_json("my-agent-ui-agents")
-    calls = []
-    def fake_run(cmd, **kwargs):
-        calls.append(cmd)
-        return _make_proc(json.dumps(dep) if "get" in cmd else "created")
+    manifests = []
+    def fake_run(cmd, input=None, **kwargs):
+        if "apply" in cmd:
+            manifests.append(input)
+        return _make_proc(json.dumps(dep) if "get" in cmd else "applied")
     with patch("subprocess.run", side_effect=fake_run):
         result = k8s_service.create_deployment("my-agent", "img:latest", "default", 1, [])
-    create_cmd = next(c for c in calls if "create" in c)
-    assert "my-agent-ui-agents" in create_cmd
+    assert len(manifests) == 1
+    assert "my-agent-ui-agents" in manifests[0]
     assert result["name"] == "my-agent-ui-agents"
     assert result["status"] == "Running"
 
@@ -83,26 +84,30 @@ def test_create_deployment_uses_ui_agents_suffix():
 def test_create_deployment_sets_env_vars():
     _existing_kubeconfig()
     dep = _dep_json("x-ui-agents")
-    calls = []
-    def fake_run(cmd, **kwargs):
-        calls.append(cmd)
-        return _make_proc(json.dumps(dep) if "get" in cmd else "ok")
+    manifests = []
+    def fake_run(cmd, input=None, **kwargs):
+        if "apply" in cmd:
+            manifests.append(input)
+        return _make_proc(json.dumps(dep) if "get" in cmd else "applied")
     with patch("subprocess.run", side_effect=fake_run):
         k8s_service.create_deployment("x", "img", "default", 1, [{"key": "FOO", "value": "bar"}])
-    set_cmd = next(c for c in calls if "set" in c)
-    assert "FOO=bar" in set_cmd
+    assert len(manifests) == 1
+    assert "FOO" in manifests[0]
+    assert "bar" in manifests[0]
 
 
 def test_create_deployment_skips_set_env_when_no_env():
     _existing_kubeconfig()
     dep = _dep_json("x-ui-agents")
-    calls = []
-    def fake_run(cmd, **kwargs):
-        calls.append(cmd)
-        return _make_proc(json.dumps(dep) if "get" in cmd else "ok")
+    manifests = []
+    def fake_run(cmd, input=None, **kwargs):
+        if "apply" in cmd:
+            manifests.append(input)
+        return _make_proc(json.dumps(dep) if "get" in cmd else "applied")
     with patch("subprocess.run", side_effect=fake_run):
         k8s_service.create_deployment("x", "img", "default", 1, [])
-    assert not any("set" in c for c in calls)
+    assert len(manifests) == 1
+    assert "imagePullPolicy: IfNotPresent" in manifests[0]
 
 
 # ── list_deployments ─────────────────────────────────────────────────────────
