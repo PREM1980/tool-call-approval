@@ -198,3 +198,37 @@ View traces at `http://localhost:3000` → **tool-call-approval** project → **
 ```bash
 pytest -v
 ```
+
+---
+
+## Docker
+
+```bash
+# Build
+docker build -t tool-call-fastapi:latest .
+
+# Run (point at host Postgres and Langfuse)
+docker run --rm \
+  -e AWS_DEFAULT_REGION=us-east-1 \
+  -e AWS_ACCESS_KEY_ID=your_key \
+  -e AWS_SECRET_ACCESS_KEY=your_secret \
+  -e POSTGRES_URL=postgresql+psycopg2://postgres:postgres@host.docker.internal:5432/postgres \
+  -e LANGFUSE_PUBLIC_KEY=pk-lf-local-tool-call-approval \
+  -e LANGFUSE_SECRET_KEY=sk-lf-local-tool-call-approval \
+  -e LANGFUSE_HOST=http://host.docker.internal:3000 \
+  -p 8000:8000 \
+  tool-call-fastapi:latest
+```
+
+---
+
+## Kubernetes
+
+```bash
+# Copy and fill in secret values (base64-encode each value)
+cp ../k8s/tool-call-fastapi/secret.yaml.example ../k8s/tool-call-fastapi/secret.yaml
+# Edit secret.yaml with your real base64-encoded credentials
+
+# Apply all manifests
+kubectl apply -f ../k8s/tool-call-fastapi/
+```

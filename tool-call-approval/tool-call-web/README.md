@@ -42,3 +42,32 @@ uvicorn main:app --host 0.0.0.0 --port 8080 --reload
 ```bash
 pytest -v
 ```
+
+---
+
+## Docker
+
+```bash
+# Build
+docker build -t tool-call-web:latest .
+
+# Run (forwarding to a local backend)
+docker run --rm \
+  -e AGENT_BACKEND_URL=http://host.docker.internal:8000 \
+  -e CORS_ORIGIN=http://localhost:4200 \
+  -p 8080:8080 \
+  tool-call-web:latest
+```
+
+---
+
+## Kubernetes
+
+```bash
+# Apply all manifests
+kubectl apply -f ../k8s/tool-call-web/
+
+# For local K8s (minikube/kind): add the ingress host to /etc/hosts
+echo "127.0.0.1 tool-call.local" | sudo tee -a /etc/hosts
+# Then open http://tool-call.local in a browser
+```
