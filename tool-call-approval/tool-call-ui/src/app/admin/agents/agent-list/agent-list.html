@@ -1,0 +1,46 @@
+@if (loading) {
+  <p class="muted">Loading…</p>
+}
+@if (error) {
+  <p class="error">{{ error }}</p>
+}
+@if (!loading && !error && agents.length === 0) {
+  <p class="muted">No agents deployed yet.</p>
+}
+@if (agents.length > 0) {
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Namespace</th>
+        <th>Image</th>
+        <th>Replicas</th>
+        <th>Status</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (a of agents; track a.name) {
+        <tr>
+          <td>{{ a.name }}</td>
+          <td class="muted">{{ a.namespace }}</td>
+          <td class="muted img">{{ a.image }}</td>
+          <td>
+            <span class="scale-cell">
+              {{ a.replicas }}
+              <span class="scale-btns">
+                <button (click)="scale(a, -1)">−</button>
+                <button (click)="scale(a, 1)">+</button>
+              </span>
+            </span>
+          </td>
+          <td><span class="status" [attr.data-status]="a.status">{{ a.status }}</span></td>
+          <td class="action-cell">
+            <button class="btn-restart" (click)="restart(a)">Restart</button>
+            <button class="btn-delete" (click)="delete(a)">Delete</button>
+          </td>
+        </tr>
+      }
+    </tbody>
+  </table>
+}
