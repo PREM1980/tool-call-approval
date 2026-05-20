@@ -132,3 +132,82 @@ async def test_backend_timeout(ac):
 
     assert resp.status_code == 504
     assert resp.json()["detail"] == "Backend timeout"
+
+
+async def test_admin_get_proxied(ac):
+    mock_client = AsyncMock()
+    mock_client.request.return_value = _resp(200, {"aws_access_key_id": "AKIA..."})
+
+    with patch("main._client", mock_client):
+        resp = await ac.get("/api/admin/credentials")
+
+    assert resp.status_code == 200
+    assert resp.json()["aws_access_key_id"] == "AKIA..."
+    mock_client.request.assert_called_once()
+    call_kwargs = mock_client.request.call_args
+    assert call_kwargs.args[0] == "GET"
+    assert call_kwargs.args[1] == "http://localhost:8000/admin/credentials"
+
+
+async def test_admin_post_proxied(ac):
+    mock_client = AsyncMock()
+    mock_client.request.return_value = _resp(200, {"status": "saved"})
+
+    with patch("main._client", mock_client):
+        resp = await ac.post(
+            "/api/admin/credentials",
+            json={"aws_access_key_id": "AKIA...", "aws_secret_access_key": "secret", "aws_region": "us-east-1", "kubeconfig": None},
+        )
+
+    assert resp.status_code == 200
+    assert resp.json() == {"status": "saved"}
+    call_kwargs = mock_client.request.call_args
+    assert call_kwargs.args[0] == "POST"
+    assert call_kwargs.args[1] == "http://localhost:8000/admin/credentials"
+
+
+async def test_admin_delete_proxied(ac):
+    mock_client = AsyncMock()
+    mock_client.request.return_value = _resp(200, {"status": "deleted"})
+
+    with patch("main._client", mock_client):
+        resp = await ac.delete("/api/admin/skills/some-id")
+
+    assert resp.status_code == 200
+    call_kwargs = mock_client.request.call_args
+    assert call_kwargs.args[0] == "DELETE"
+    assert call_kwargs.args[1] == "http://localhost:8000/admin/skills/some-id"
+
+
+async def test_agents_get_proxied(ac):
+    mock_client = AsyncMock()
+    mock_client.request.return_value = _resp(200, [{"name": "x-ui-agents", "namespace": "default",
+        "image": "img", "replicas": 1, "ready_replicas": 1, "status": "Running"}])
+    with patch("main._client", mock_client):
+        resp = await ac.get("/api/agents")
+    assert resp.status_code == 200
+    call = mock_client.request.call_args
+    assert call.args[0] == "GET"
+    assert "localhost:8001/agents" in call.args[1]
+
+
+async def test_agents_post_proxied(ac):
+    mock_client = AsyncMock()
+    mock_client.request.return_value = _resp(201, {"name": "x-ui-agents", "namespace": "default",
+        "image": "img", "replicas": 1, "ready_replicas": 0, "status": "Pending"})
+    with patch("main._client", mock_client):
+        resp = await ac.post("/api/agents/", json={"name": "x", "image": "img"})
+    assert resp.status_code == 201
+    call = mock_client.request.call_args
+    assert call.args[0] == "POST"
+    assert "localhost:8001/agents" in call.args[1]
+
+
+async def test_k8s_config_proxied(ac):
+    mock_client = AsyncMock()
+    mock_client.post.return_value = _resp(200, {"status": "ok"})
+    with patch("main._client", mock_client):
+        resp = await ac.post("/api/k8s-config", json={"content": "apiVersion: v1"})
+    assert resp.status_code == 200
+    mock_client.post.assert_called_once()
+    assert "localhost:8001/kubeconfig" in mock_client.post.call_args.args[0]

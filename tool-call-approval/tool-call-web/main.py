@@ -19,6 +19,7 @@ setup_logging("tool-call-web")
 logger = logging.getLogger(__name__)
 
 _BACKEND = os.getenv("AGENT_BACKEND_URL", "http://localhost:8000")
+_K8S_BACKEND = os.getenv("K8S_BACKEND_URL", "http://localhost:8001")
 _CORS_ORIGIN = os.getenv("CORS_ORIGIN", "http://localhost:4200")
 _client: httpx.AsyncClient | None = None
 
@@ -100,6 +101,54 @@ async def approve(session_id: str, request: Request) -> JSONResponse:
     return await _proxy(
         _get_client().post(
             f"{_BACKEND}/sessions/{session_id}/approve",
+            content=body,
+            headers={"Content-Type": "application/json"},
+            timeout=30.0,
+        )
+    )
+
+
+@app.api_route("/api/admin/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
+async def admin_proxy(path: str, request: Request) -> JSONResponse:
+    body = await request.body()
+    headers = {}
+    if ct := request.headers.get("content-type"):
+        headers["Content-Type"] = ct
+    return await _proxy(
+        _get_client().request(
+            request.method,
+            f"{_BACKEND}/admin/{path}",
+            content=body or None,
+            headers=headers if headers else None,
+            timeout=30.0,
+        )
+    )
+
+
+@app.api_route("/api/agents{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
+async def agents_proxy(path: str, request: Request) -> JSONResponse:
+    body = await request.body()
+    headers = {}
+    if ct := request.headers.get("content-type"):
+        headers["Content-Type"] = ct
+    return await _proxy(
+        _get_client().request(
+            request.method,
+            f"{_K8S_BACKEND}/agents{path}",
+            content=body or None,
+            headers=headers if headers else None,
+            params=dict(request.query_params),
+            timeout=30.0,
+        )
+    )
+
+
+@app.post("/api/k8s-config")
+async def k8s_config_proxy(request: Request) -> JSONResponse:
+    body = await request.body()
+    return await _proxy(
+        _get_client().post(
+            f"{_K8S_BACKEND}/kubeconfig",
             content=body,
             headers={"Content-Type": "application/json"},
             timeout=30.0,
