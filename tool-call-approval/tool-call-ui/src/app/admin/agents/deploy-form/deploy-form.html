@@ -1,0 +1,47 @@
+<div class="form">
+  <div class="row">
+    <div class="field">
+      <label>Name</label>
+      <input type="text" [(ngModel)]="form.name" placeholder="my-agent" />
+      @if (fullName) {
+        <span class="preview">→ {{ fullName }}</span>
+      }
+    </div>
+    <div class="field">
+      <label>Docker Image</label>
+      <input type="text" [(ngModel)]="form.image" placeholder="my-org/my-agent:latest" />
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="field">
+      <label>Namespace</label>
+      <input type="text" [(ngModel)]="form.namespace" />
+    </div>
+    <div class="field">
+      <label>Replicas</label>
+      <input type="number" [(ngModel)]="form.replicas" min="1" />
+    </div>
+  </div>
+
+  <div class="field">
+    <label>Environment Variables</label>
+    @for (ev of env; track $index) {
+      <div class="env-row">
+        <input type="text" [(ngModel)]="ev.key" placeholder="KEY" />
+        <input type="text" [(ngModel)]="ev.value" placeholder="value" />
+        <button class="btn-remove" (click)="removeEnvVar($index)">✕</button>
+      </div>
+    }
+    <button class="btn-add" (click)="addEnvVar()">+ Add variable</button>
+  </div>
+
+  <div class="actions">
+    <button (click)="deploy()" [disabled]="deploying || !form.name || !form.image">
+      {{ deploying ? 'Deploying…' : 'Deploy' }}
+    </button>
+    @if (error) {
+      <span class="error">{{ error }}</span>
+    }
+  </div>
+</div>
