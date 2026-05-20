@@ -2,3 +2,6 @@
 *.env
 .env.*
 !.env.example
+
+# K8s secrets — never commit real values
+k8s/**/secret.yaml
