@@ -74,3 +74,39 @@ async def chat(session_id: str, request: Request) -> JSONResponse:
             timeout=30.0,
         )
     )
+
+
+@app.get("/api/sessions/{session_id}/history")
+async def history(session_id: str) -> JSONResponse:
+    return await _proxy(
+        _get_client().get(f"{_BACKEND}/sessions/{session_id}/history", timeout=30.0)
+    )
+
+
+@app.post("/api/sessions/{session_id}/approve")
+async def approve(session_id: str, request: Request) -> JSONResponse:
+    body = await request.body()
+    return await _proxy(
+        _get_client().post(
+            f"{_BACKEND}/sessions/{session_id}/approve",
+            content=body,
+            headers={"Content-Type": "application/json"},
+            timeout=30.0,
+        )
+    )
+
+
+@app.get("/api/sessions/{session_id}/stream")
+async def stream_events(session_id: str) -> StreamingResponse:
+    async def event_generator() -> AsyncIterator[str]:
+        async with _get_client().stream(
+            "GET", f"{_BACKEND}/sessions/{session_id}/stream"
+        ) as resp:
+            async for chunk in resp.aiter_text():
+                yield chunk
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )

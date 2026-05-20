@@ -44,3 +44,58 @@ async def test_chat(ac):
     call_args = mock_client.post.call_args
     assert "/sessions/abc-123/chat" in call_args.args[0]
     assert b'"message":"hello"' in call_args.kwargs["content"]
+
+
+async def test_history(ac):
+    mock_client = AsyncMock()
+    mock_client.get.return_value = _resp(200, [{"role": "user", "content": "hello"}])
+
+    with patch("main._client", mock_client):
+        resp = await ac.get("/api/sessions/abc-123/history")
+
+    assert resp.status_code == 200
+    assert resp.json() == [{"role": "user", "content": "hello"}]
+    mock_client.get.assert_called_once_with(
+        "http://localhost:8000/sessions/abc-123/history", timeout=30.0
+    )
+
+
+async def test_approve(ac):
+    mock_client = AsyncMock()
+    mock_client.post.return_value = _resp(200, {"status": "ok"})
+
+    with patch("main._client", mock_client):
+        resp = await ac.post(
+            "/api/sessions/abc-123/approve",
+            json={"approved": True},
+        )
+
+    assert resp.status_code == 200
+    assert resp.json() == {"status": "ok"}
+    call_args = mock_client.post.call_args
+    assert "/sessions/abc-123/approve" in call_args.args[0]
+
+
+async def test_stream(ac):
+    async def fake_aiter_text():
+        yield 'data: {"type": "message", "content": "hi"}\n\n'
+        yield 'data: {"type": "done"}\n\n'
+
+    stream_ctx = MagicMock()
+    stream_ctx.aiter_text = fake_aiter_text
+    stream_ctx.__aenter__ = AsyncMock(return_value=stream_ctx)
+    stream_ctx.__aexit__ = AsyncMock(return_value=None)
+
+    mock_client = MagicMock()
+    mock_client.stream.return_value = stream_ctx
+
+    with patch("main._client", mock_client):
+        resp = await ac.get("/api/sessions/abc-123/stream")
+
+    assert resp.status_code == 200
+    assert "text/event-stream" in resp.headers["content-type"]
+    assert 'data: {"type": "message"' in resp.text
+    assert 'data: {"type": "done"}' in resp.text
+    mock_client.stream.assert_called_once_with(
+        "GET", "http://localhost:8000/sessions/abc-123/stream"
+    )
