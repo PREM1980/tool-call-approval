@@ -62,9 +62,6 @@ async def _proxy(coro: Awaitable[httpx.Response]) -> JSONResponse:
     except httpx.TimeoutException:
         logger.error("backend timeout")
         raise HTTPException(status_code=504, detail="Backend timeout")
-    if resp.status_code == 404:
-        raise HTTPException(status_code=404, detail=resp.json().get("detail", "Not found"))
-    resp.raise_for_status()
     return JSONResponse(content=resp.json(), status_code=resp.status_code)
 
 
