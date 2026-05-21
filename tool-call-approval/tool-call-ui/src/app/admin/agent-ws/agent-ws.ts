@@ -1,11 +1,13 @@
 import { Component } from '@angular/core';
+import { AgentConfigure } from './agent-configure/agent-configure';
 
 @Component({
   selector: 'app-agent-ws',
   standalone: true,
+  imports: [AgentConfigure],
   template: `
     <h2>Agent-WS</h2>
-    <p style="color:#8b949e;margin-top:8px">Coming soon</p>
+    <app-agent-configure />
   `,
 })
 export class AgentWs {}

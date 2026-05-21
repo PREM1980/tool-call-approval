@@ -11,9 +11,6 @@
   <button type="button" class="tab" [class.active]="tab === 'view'" (click)="tab = 'view'">
     View
   </button>
-  <button type="button" class="tab" [class.active]="tab === 'configure'" (click)="tab = 'configure'">
-    Configure
-  </button>
 </div>
 
 @if (tab === 'deployments') {
@@ -21,7 +18,4 @@
 }
 @if (tab === 'view') {
   <app-agent-list />
-}
-@if (tab === 'configure') {
-  <app-agent-configure />
 }

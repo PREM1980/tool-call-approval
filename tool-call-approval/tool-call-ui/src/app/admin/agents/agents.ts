@@ -3,17 +3,16 @@ import { CommonModule } from '@angular/common';
 import { AgentsService } from '../../services/agents.service';
 import { DeployForm } from './deploy-form/deploy-form';
 import { AgentList } from './agent-list/agent-list';
-import { AgentConfigure } from './agent-configure/agent-configure';
 
 @Component({
   selector: 'app-agents',
   standalone: true,
-  imports: [CommonModule, DeployForm, AgentList, AgentConfigure],
+  imports: [CommonModule, DeployForm, AgentList],
   templateUrl: './agents.html',
   styleUrl: './agents.css',
 })
 export class Agents implements OnInit {
-  tab: 'deployments' | 'view' | 'configure' = 'deployments';
+  tab: 'deployments' | 'view' = 'deployments';
   kubeconfigError = '';
 
   constructor(private agentsService: AgentsService) {}
