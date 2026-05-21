@@ -5,11 +5,14 @@
 }
 
 <div class="tabs">
-  <button class="tab" [class.active]="tab === 'deployments'" (click)="tab = 'deployments'">
+  <button type="button" class="tab" [class.active]="tab === 'deployments'" (click)="tab = 'deployments'">
     Deployments
   </button>
-  <button class="tab" [class.active]="tab === 'view'" (click)="tab = 'view'">
+  <button type="button" class="tab" [class.active]="tab === 'view'" (click)="tab = 'view'">
     View
+  </button>
+  <button type="button" class="tab" [class.active]="tab === 'configure'" (click)="tab = 'configure'">
+    Configure
   </button>
 </div>
 
@@ -18,4 +21,7 @@
 }
 @if (tab === 'view') {
   <app-agent-list />
+}
+@if (tab === 'configure') {
+  <app-agent-configure />
 }
