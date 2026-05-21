@@ -36,6 +36,7 @@ def test_session_defaults():
     assert session.queue.empty()
     assert not session.approval_event.is_set()
     assert session.approval_result is False
+    assert session.tmpdir is None
 
 
 from agno.models.response import ToolExecution
