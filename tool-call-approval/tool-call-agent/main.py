@@ -15,14 +15,14 @@ setup_logging("tool-call-agent")
 
 logger = logging.getLogger(__name__)
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Body, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
 from admin_repository import AdminRepository
 from admin_router import init_router, router as admin_router
 from agent_service import AgentService
-from models import ApprovalRequest, ChatRequest, SessionResponse
+from models import ApprovalRequest, ChatRequest, CreateSessionRequest, SessionResponse
 from repository import PostgresRepository
 
 @asynccontextmanager
@@ -51,9 +51,14 @@ app.include_router(admin_router, prefix="/admin", tags=["admin"])
 
 
 @app.post("/sessions", response_model=SessionResponse)
-async def create_session() -> SessionResponse:
-    session = service.create_session()
-    logger.info("session created", extra={"session_id": session.id})
+async def create_session(
+    request: CreateSessionRequest = Body(CreateSessionRequest()),
+) -> SessionResponse:
+    session = service.create_session(request.instance_id)
+    logger.info(
+        "session created",
+        extra={"session_id": session.id, "instance_id": request.instance_id},
+    )
     return SessionResponse(session_id=session.id)
 
 

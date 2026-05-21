@@ -51,3 +51,28 @@ def test_approve_known_session_returns_ok():
     response = client.post(f"/sessions/{sid}/approve", json={"approved": True})
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
+
+
+def test_get_all_agent_instances_no_filter():
+    response = client.get("/admin/agent-instances")
+    assert response.status_code == 200
+    assert isinstance(response.json(), list)
+
+
+def test_create_session_with_null_instance_id():
+    response = client.post("/sessions", json={"instance_id": None})
+    assert response.status_code == 200
+    assert "session_id" in response.json()
+
+
+def test_create_session_with_instance_id_string():
+    import uuid
+    response = client.post("/sessions", json={"instance_id": str(uuid.uuid4())})
+    assert response.status_code == 200
+    assert "session_id" in response.json()
+
+
+def test_create_session_no_body_still_works():
+    response = client.post("/sessions")
+    assert response.status_code == 200
+    assert "session_id" in response.json()

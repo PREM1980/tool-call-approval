@@ -132,8 +132,10 @@ async def delete_persona(persona_id: str):
 # ── Agent Instances ────────────────────────────────────────────────────────
 
 @router.get("/agent-instances", response_model=list[AgentInstanceResponse])
-async def get_agent_instances(agent_name: str):
-    return _get_repo().get_agent_instances(agent_name)
+async def get_agent_instances(agent_name: str | None = None):
+    if agent_name:
+        return _get_repo().get_agent_instances(agent_name)
+    return _get_repo().get_all_agent_instances()
 
 
 @router.post("/agent-instances", response_model=AgentInstanceResponse, status_code=201)

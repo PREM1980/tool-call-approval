@@ -61,7 +61,7 @@ class AgentService:
 
     # ── Session lifecycle ──────────────────────────────────────────────────
 
-    def create_session(self) -> Session:
+    def create_session(self, instance_id: str | None = None) -> Session:
         session = Session(id=str(uuid4()))
         agent = self._build_agent(session.id)
         self._sessions[session.id] = (session, agent)

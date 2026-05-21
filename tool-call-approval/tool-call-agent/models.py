@@ -16,3 +16,7 @@ class ApprovalRequest(BaseModel):
 
 class SessionResponse(BaseModel):
     session_id: str
+
+
+class CreateSessionRequest(BaseModel):
+    instance_id: str | None = None
