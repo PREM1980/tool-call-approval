@@ -10,7 +10,7 @@ import {
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
-import { AdminService } from '../../services/admin.service';
+import { AdminService, AgentInstance } from '../../services/admin.service';
 import { ChatService } from '../../services/chat.service';
 import { WebsocketChatService } from '../../services/websocket-chat.service';
 import { ToolApproval } from '../tool-approval/tool-approval';
@@ -34,6 +34,8 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
   isWaiting = false;
   mode: ConnectionMode = 'sse';
   isSwitching = false;
+  instances: AgentInstance[] = [];
+  selectedInstanceId: string | null = null;
 
   private sseSubscription!: Subscription;
   private shouldScrollToBottom = false;
@@ -51,8 +53,13 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
   }
 
   async ngOnInit(): Promise<void> {
-    const creds = await this.adminService.getCredentials().catch(() => null);
+    const [creds, instances] = await Promise.all([
+      this.adminService.getCredentials().catch(() => null),
+      this.adminService.getAllAgentInstances().catch(() => []),
+    ]);
     this.kubeconfig = creds?.kubeconfig ?? null;
+    this.instances = instances;
+    this.selectedInstanceId = instances[0]?.id ?? null;
     await this.initConnection();
   }
 
@@ -78,6 +85,10 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
     this.isWaiting = false;
     await this.initConnection();
     this.isSwitching = false;
+  }
+
+  async onInstanceChange(): Promise<void> {
+    await this.newSession();
   }
 
   async switchMode(newMode: ConnectionMode): Promise<void> {
@@ -110,7 +121,7 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
   }
 
   private async initConnection(): Promise<void> {
-    await this.activeService.createSession();
+    await this.activeService.createSession(this.selectedInstanceId ?? undefined);
     this.activeService.connectStream();
     this.sseSubscription = this.activeService.sseEvents$.subscribe((event) => {
       switch (event.type) {
@@ -139,7 +150,6 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
           break;
         case 'done':
           this.isWaiting = false;
-          // SSE closes on done and must reopen; WebSocket stays open
           if (this.mode === 'sse') {
             this.activeService.connectStream();
           }

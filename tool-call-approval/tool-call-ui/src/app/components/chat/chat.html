@@ -38,6 +38,24 @@
     </div>
   </header>
 
+  @if (instances.length > 0) {
+    <div class="instance-bar">
+      <label class="instance-label">Agent instance</label>
+      <select
+        class="instance-select"
+        [(ngModel)]="selectedInstanceId"
+        (ngModelChange)="onInstanceChange()"
+        name="instanceSelect"
+        title="Agent instance"
+      >
+        <option [ngValue]="null">— none —</option>
+        @for (inst of instances; track inst.id) {
+          <option [ngValue]="inst.id">{{ inst.agent_name }} / {{ inst.instance_name }}</option>
+        }
+      </select>
+    </div>
+  }
+
   <div class="message-list" #messageList>
     @if (messages.length === 0) {
       <div class="empty-state">
