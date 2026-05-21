@@ -1,0 +1,94 @@
+@if (error) {
+  <p class="error">{{ error }}</p>
+}
+
+<div class="agent-selector">
+  <label class="field-label">Agent</label>
+  @if (agents.length === 0) {
+    <p class="muted">No agents deployed. Deploy an agent first.</p>
+  } @else {
+    <select [(ngModel)]="selectedAgent" (ngModelChange)="onAgentChange()">
+      @for (a of agents; track a.name) {
+        <option [value]="a.name">{{ a.name }}</option>
+      }
+    </select>
+  }
+</div>
+
+@if (selectedAgent) {
+  <div class="instances-header">
+    <span class="muted">{{ instances.length }} instance{{ instances.length !== 1 ? 's' : '' }}</span>
+    <button class="btn-add" (click)="addInstance()">+ Add Instance</button>
+  </div>
+
+  @if (loading) {
+    <p class="muted">Loading…</p>
+  }
+
+  <div class="instance-list">
+    @for (form of instances; track $index; let i = $index) {
+      <div class="instance-row" [class.expanded]="form.expanded">
+        <div class="instance-header" (click)="toggle(form)">
+          <div class="instance-summary">
+            <span class="instance-name">{{ form.instance_name || 'New Instance' }}</span>
+            @if (!form.expanded && form.id) {
+              <span class="muted summary-text">
+                Persona: {{ personaName(form.persona_id) }} · MCP: {{ mcpSummary(form.mcp_positions) }}
+              </span>
+            }
+          </div>
+          <div class="instance-actions">
+            <button class="btn-delete" (click)="deleteInstance(form, i); $event.stopPropagation()">Delete</button>
+            <span class="chevron">{{ form.expanded ? '▲' : '▼' }}</span>
+          </div>
+        </div>
+
+        @if (form.expanded) {
+          <div class="instance-body">
+            @if (form.error) {
+              <p class="error">{{ form.error }}</p>
+            }
+            <div class="fields">
+              <div class="field">
+                <label class="field-label">Instance Name</label>
+                <input [(ngModel)]="form.instance_name" placeholder="e.g. Customer Support" />
+              </div>
+              <div class="field">
+                <label class="field-label">Persona</label>
+                <select [(ngModel)]="form.persona_id">
+                  <option [ngValue]="null">— None —</option>
+                  @for (p of personas; track p.id) {
+                    <option [value]="p.id">{{ p.name }}</option>
+                  }
+                </select>
+              </div>
+              <div class="field">
+                <label class="field-label">MCP Servers</label>
+                <div class="mcp-list">
+                  @for (s of mcpServers; track s.position) {
+                    <label class="mcp-item">
+                      <input
+                        type="checkbox"
+                        [checked]="isMcpSelected(form, s.position)"
+                        (change)="toggleMcp(form, s.position)"
+                      />
+                      {{ s.name }}
+                    </label>
+                  }
+                  @if (mcpServers.length === 0) {
+                    <span class="muted">No MCP servers configured.</span>
+                  }
+                </div>
+              </div>
+            </div>
+            <div class="instance-footer">
+              <button class="btn-save" (click)="save(form)" [disabled]="form.saving">
+                {{ form.saving ? 'Saving…' : 'Save' }}
+              </button>
+            </div>
+          </div>
+        }
+      </div>
+    }
+  </div>
+}
