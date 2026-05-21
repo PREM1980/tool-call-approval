@@ -56,6 +56,18 @@ class AdminRepository:
                         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
                     )
                 """)
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS admin_agent_instances (
+                        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                        agent_name TEXT NOT NULL,
+                        instance_name TEXT NOT NULL,
+                        persona_id UUID,
+                        mcp_positions JSONB NOT NULL DEFAULT '[]',
+                        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                        UNIQUE (agent_name, instance_name)
+                    )
+                """)
             conn.commit()
         except Exception:
             conn.rollback()
@@ -246,6 +258,90 @@ class AdminRepository:
         try:
             with conn.cursor() as cur:
                 cur.execute("DELETE FROM admin_personas WHERE id = %s::uuid", (persona_id,))
+                deleted = cur.rowcount > 0
+            conn.commit()
+            return deleted
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
+    # ── Agent Instances ────────────────────────────────────────────────────
+
+    def get_agent_instances(self, agent_name: str) -> list[dict]:
+        conn = self._connect()
+        try:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute(
+                    "SELECT * FROM admin_agent_instances WHERE agent_name = %s ORDER BY created_at",
+                    (agent_name,),
+                )
+                return [dict(r) for r in cur.fetchall()]
+        finally:
+            conn.close()
+
+    def create_agent_instance(
+        self,
+        agent_name: str,
+        instance_name: str,
+        persona_id: str | None,
+        mcp_positions: list[int],
+    ) -> dict:
+        conn = self._connect()
+        try:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute(
+                    """INSERT INTO admin_agent_instances
+                           (agent_name, instance_name, persona_id, mcp_positions)
+                       VALUES (%s, %s, %s::uuid, %s::jsonb) RETURNING *""",
+                    (agent_name, instance_name, persona_id, json.dumps(mcp_positions)),
+                )
+                row = dict(cur.fetchone())
+            conn.commit()
+            return row
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
+    def update_agent_instance(
+        self,
+        instance_id: str,
+        instance_name: str,
+        persona_id: str | None,
+        mcp_positions: list[int],
+    ) -> dict | None:
+        conn = self._connect()
+        try:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute(
+                    """UPDATE admin_agent_instances
+                       SET instance_name = %s,
+                           persona_id    = %s::uuid,
+                           mcp_positions = %s::jsonb,
+                           updated_at    = NOW()
+                       WHERE id = %s::uuid
+                       RETURNING *""",
+                    (instance_name, persona_id, json.dumps(mcp_positions), instance_id),
+                )
+                row = cur.fetchone()
+            conn.commit()
+            return dict(row) if row else None
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
+    def delete_agent_instance(self, instance_id: str) -> bool:
+        conn = self._connect()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "DELETE FROM admin_agent_instances WHERE id = %s::uuid", (instance_id,)
+                )
                 deleted = cur.rowcount > 0
             conn.commit()
             return deleted

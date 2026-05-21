@@ -15,6 +15,7 @@ def repo():
         cur.execute("DELETE FROM admin_mcp_servers")
         cur.execute("DELETE FROM admin_skills")
         cur.execute("DELETE FROM admin_personas")
+        cur.execute("DELETE FROM admin_agent_instances")
     conn.commit()
     conn.close()
     return r
@@ -103,6 +104,64 @@ def test_persona_name_must_be_unique(repo):
     repo.create_persona("Unique", [])
     with pytest.raises(Exception):
         repo.create_persona("Unique", [])
+
+
+# ── Agent Instances ────────────────────────────────────────────────────────
+
+def test_agent_instances_empty_initially(repo):
+    assert repo.get_agent_instances("my-agent") == []
+
+
+def test_create_and_list_agent_instances(repo):
+    inst = repo.create_agent_instance("my-agent", "Support", None, [1, 2])
+    assert inst["instance_name"] == "Support"
+    assert inst["mcp_positions"] == [1, 2]
+    assert inst["persona_id"] is None
+    instances = repo.get_agent_instances("my-agent")
+    assert len(instances) == 1
+
+
+def test_create_agent_instance_with_persona(repo):
+    persona = repo.create_persona("DevOps", [])
+    inst = repo.create_agent_instance("my-agent", "Sales", str(persona["id"]), [3])
+    assert str(inst["persona_id"]) == str(persona["id"])
+
+
+def test_create_agent_instance_duplicate_name_raises(repo):
+    repo.create_agent_instance("my-agent", "Support", None, [])
+    with pytest.raises(Exception):
+        repo.create_agent_instance("my-agent", "Support", None, [])
+
+
+def test_update_agent_instance(repo):
+    inst = repo.create_agent_instance("my-agent", "Support", None, [1])
+    updated = repo.update_agent_instance(str(inst["id"]), "Sales", None, [2, 3])
+    assert updated["instance_name"] == "Sales"
+    assert updated["mcp_positions"] == [2, 3]
+
+
+def test_update_nonexistent_agent_instance_returns_none(repo):
+    result = repo.update_agent_instance(
+        "00000000-0000-0000-0000-000000000000", "X", None, []
+    )
+    assert result is None
+
+
+def test_delete_agent_instance(repo):
+    inst = repo.create_agent_instance("my-agent", "Support", None, [])
+    assert repo.delete_agent_instance(str(inst["id"])) is True
+    assert repo.get_agent_instances("my-agent") == []
+
+
+def test_delete_nonexistent_agent_instance(repo):
+    assert repo.delete_agent_instance("00000000-0000-0000-0000-000000000000") is False
+
+
+def test_get_instances_only_returns_matching_agent(repo):
+    repo.create_agent_instance("agent-a", "Inst1", None, [])
+    repo.create_agent_instance("agent-b", "Inst2", None, [])
+    assert len(repo.get_agent_instances("agent-a")) == 1
+    assert len(repo.get_agent_instances("agent-b")) == 1
 
 
 # ── API-level tests ────────────────────────────────────────────────────────
