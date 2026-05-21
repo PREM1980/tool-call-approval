@@ -339,3 +339,72 @@ def test_delete_agent_instance_via_api():
 def test_delete_nonexistent_instance_returns_404():
     response = http.delete("/admin/agent-instances/00000000-0000-0000-0000-000000000000")
     assert response.status_code == 404
+
+
+# ── get_all_agent_instances ────────────────────────────────────────────────
+
+def test_get_all_agent_instances_empty(repo):
+    assert repo.get_all_agent_instances() == []
+
+
+def test_get_all_agent_instances_returns_all(repo):
+    repo.create_agent_instance("agent-a", "inst-1", None, [])
+    repo.create_agent_instance("agent-b", "inst-2", None, [])
+    rows = repo.get_all_agent_instances()
+    names = [r["instance_name"] for r in rows]
+    assert "inst-1" in names
+    assert "inst-2" in names
+
+
+def test_get_all_agent_instances_sorted(repo):
+    repo.create_agent_instance("zebra", "z-inst", None, [])
+    repo.create_agent_instance("alpha", "a-inst", None, [])
+    rows = repo.get_all_agent_instances()
+    agent_names = [r["agent_name"] for r in rows]
+    assert agent_names == sorted(agent_names)
+
+
+# ── get_agent_instance ────────────────────────────────────────────────────
+
+def test_get_agent_instance_returns_none_for_unknown(repo):
+    import uuid
+    assert repo.get_agent_instance(str(uuid.uuid4())) is None
+
+
+def test_get_agent_instance_returns_row(repo):
+    created = repo.create_agent_instance("agent-a", "my-inst", None, [1, 2])
+    fetched = repo.get_agent_instance(str(created["id"]))
+    assert fetched is not None
+    assert fetched["instance_name"] == "my-inst"
+    assert fetched["mcp_positions"] == [1, 2]
+
+
+# ── get_persona ───────────────────────────────────────────────────────────
+
+def test_get_persona_returns_none_for_unknown(repo):
+    import uuid
+    assert repo.get_persona(str(uuid.uuid4())) is None
+
+
+def test_get_persona_returns_row(repo):
+    created = repo.create_persona("My Persona", ["skill-1"])
+    fetched = repo.get_persona(str(created["id"]))
+    assert fetched is not None
+    assert fetched["name"] == "My Persona"
+    assert fetched["skill_ids"] == ["skill-1"]
+
+
+# ── get_skill_content ─────────────────────────────────────────────────────
+
+def test_get_skill_content_returns_none_for_unknown(repo):
+    import uuid
+    assert repo.get_skill_content(str(uuid.uuid4())) is None
+
+
+def test_get_skill_content_returns_filename_and_content(repo):
+    skill_id = repo.save_skill("my-skill.md", "# My Skill\nDo things.")
+    result = repo.get_skill_content(skill_id)
+    assert result is not None
+    filename, content = result
+    assert filename == "my-skill.md"
+    assert content == "# My Skill\nDo things."

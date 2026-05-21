@@ -335,6 +335,56 @@ class AdminRepository:
         finally:
             conn.close()
 
+    def get_all_agent_instances(self) -> list[dict]:
+        conn = self._connect()
+        try:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute(
+                    "SELECT * FROM admin_agent_instances ORDER BY agent_name, instance_name"
+                )
+                return [dict(r) for r in cur.fetchall()]
+        finally:
+            conn.close()
+
+    def get_agent_instance(self, instance_id: str) -> dict | None:
+        conn = self._connect()
+        try:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute(
+                    "SELECT * FROM admin_agent_instances WHERE id = %s::uuid",
+                    (instance_id,),
+                )
+                row = cur.fetchone()
+                return dict(row) if row else None
+        finally:
+            conn.close()
+
+    def get_persona(self, persona_id: str) -> dict | None:
+        conn = self._connect()
+        try:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute(
+                    "SELECT * FROM admin_personas WHERE id = %s::uuid",
+                    (persona_id,),
+                )
+                row = cur.fetchone()
+                return dict(row) if row else None
+        finally:
+            conn.close()
+
+    def get_skill_content(self, skill_id: str) -> tuple[str, str] | None:
+        conn = self._connect()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT filename, content FROM admin_skills WHERE id = %s::uuid",
+                    (skill_id,),
+                )
+                row = cur.fetchone()
+                return (row[0], row[1]) if row else None
+        finally:
+            conn.close()
+
     def delete_agent_instance(self, instance_id: str) -> bool:
         conn = self._connect()
         try:
