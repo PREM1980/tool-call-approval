@@ -3,7 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { Subject, firstValueFrom } from 'rxjs';
 import { SseEvent } from '../models/types';
 
-const API_URL = 'http://localhost:8000';
+const API_URL = 'http://localhost:8080/api';
 
 @Injectable({ providedIn: 'root' })
 export class ChatService {
@@ -14,9 +14,10 @@ export class ChatService {
 
   constructor(private http: HttpClient) {}
 
-  async createSession(): Promise<void> {
+  async createSession(instanceId?: string | null): Promise<void> {
+    const body = instanceId ? { instance_id: instanceId } : {};
     const res = await firstValueFrom(
-      this.http.post<{ session_id: string }>(`${API_URL}/sessions`, {})
+      this.http.post<{ session_id: string }>(`${API_URL}/sessions`, body)
     );
     this.sessionId = res.session_id;
   }

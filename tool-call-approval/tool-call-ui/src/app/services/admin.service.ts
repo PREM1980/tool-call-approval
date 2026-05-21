@@ -104,6 +104,10 @@ export class AdminService {
     );
   }
 
+  getAllAgentInstances() {
+    return firstValueFrom(this.http.get<AgentInstance[]>(`${API}/agent-instances`));
+  }
+
   createAgentInstance(
     agentName: string,
     instanceName: string,

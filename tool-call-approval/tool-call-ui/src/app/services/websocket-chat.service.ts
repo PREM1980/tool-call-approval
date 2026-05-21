@@ -15,9 +15,10 @@ export class WebsocketChatService {
 
   constructor(private http: HttpClient) {}
 
-  async createSession(): Promise<void> {
+  async createSession(instanceId?: string | null): Promise<void> {
+    const body = instanceId ? { instance_id: instanceId } : {};
     const res = await firstValueFrom(
-      this.http.post<{ session_id: string }>(`${API_URL}/sessions`, {})
+      this.http.post<{ session_id: string }>(`${API_URL}/sessions`, body)
     );
     this.sessionId = res.session_id;
   }
