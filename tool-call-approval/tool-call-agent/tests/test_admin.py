@@ -181,6 +181,7 @@ def clean_tables():
         cur.execute("DELETE FROM admin_mcp_servers")
         cur.execute("DELETE FROM admin_skills")
         cur.execute("DELETE FROM admin_personas")
+        cur.execute("DELETE FROM admin_agent_instances")
     conn.commit()
     conn.close()
     yield
@@ -269,3 +270,72 @@ def test_delete_persona_via_api():
     persona_id = create.json()["id"]
     response = http.delete(f"/admin/personas/{persona_id}")
     assert response.status_code == 200
+
+
+# ── Agent Instances API ────────────────────────────────────────────────────
+
+def test_list_agent_instances_empty():
+    response = http.get("/admin/agent-instances?agent_name=my-agent")
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_create_and_list_agent_instances_via_api():
+    response = http.post("/admin/agent-instances", json={
+        "agent_name": "my-agent",
+        "instance_name": "Support",
+        "mcp_positions": [1, 2],
+    })
+    assert response.status_code == 201
+    inst = response.json()
+    assert inst["instance_name"] == "Support"
+    assert inst["mcp_positions"] == [1, 2]
+    assert inst["persona_id"] is None
+
+    listed = http.get("/admin/agent-instances?agent_name=my-agent").json()
+    assert len(listed) == 1
+    assert listed[0]["id"] == inst["id"]
+
+
+def test_create_duplicate_instance_returns_409():
+    http.post("/admin/agent-instances", json={
+        "agent_name": "my-agent", "instance_name": "Support", "mcp_positions": [],
+    })
+    response = http.post("/admin/agent-instances", json={
+        "agent_name": "my-agent", "instance_name": "Support", "mcp_positions": [],
+    })
+    assert response.status_code == 409
+
+
+def test_update_agent_instance_via_api():
+    inst = http.post("/admin/agent-instances", json={
+        "agent_name": "my-agent", "instance_name": "Support", "mcp_positions": [1],
+    }).json()
+    response = http.put(f"/admin/agent-instances/{inst['id']}", json={
+        "instance_name": "Sales",
+        "mcp_positions": [2, 3],
+    })
+    assert response.status_code == 200
+    assert response.json()["instance_name"] == "Sales"
+
+
+def test_update_nonexistent_instance_returns_404():
+    response = http.put(
+        "/admin/agent-instances/00000000-0000-0000-0000-000000000000",
+        json={"instance_name": "X", "mcp_positions": []},
+    )
+    assert response.status_code == 404
+
+
+def test_delete_agent_instance_via_api():
+    inst = http.post("/admin/agent-instances", json={
+        "agent_name": "my-agent", "instance_name": "Support", "mcp_positions": [],
+    }).json()
+    response = http.delete(f"/admin/agent-instances/{inst['id']}")
+    assert response.status_code == 200
+    assert http.get("/admin/agent-instances?agent_name=my-agent").json() == []
+
+
+def test_delete_nonexistent_instance_returns_404():
+    response = http.delete("/admin/agent-instances/00000000-0000-0000-0000-000000000000")
+    assert response.status_code == 404

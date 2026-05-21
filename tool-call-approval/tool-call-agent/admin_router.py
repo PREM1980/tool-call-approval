@@ -1,6 +1,9 @@
 from fastapi import APIRouter, HTTPException, UploadFile, File
 
 from admin_models import (
+    AgentInstanceRequest,
+    AgentInstanceResponse,
+    AgentInstanceUpdateRequest,
     CredentialsRequest,
     CredentialsResponse,
     McpServerRequest,
@@ -123,4 +126,49 @@ async def update_persona(persona_id: str, request: PersonaRequest):
 async def delete_persona(persona_id: str):
     if not _get_repo().delete_persona(persona_id):
         raise HTTPException(status_code=404, detail="Persona not found")
+    return {"status": "ok"}
+
+
+# ── Agent Instances ────────────────────────────────────────────────────────
+
+@router.get("/agent-instances", response_model=list[AgentInstanceResponse])
+async def get_agent_instances(agent_name: str):
+    return _get_repo().get_agent_instances(agent_name)
+
+
+@router.post("/agent-instances", response_model=AgentInstanceResponse, status_code=201)
+async def create_agent_instance(request: AgentInstanceRequest):
+    try:
+        return _get_repo().create_agent_instance(
+            request.agent_name,
+            request.instance_name,
+            str(request.persona_id) if request.persona_id else None,
+            request.mcp_positions,
+        )
+    except Exception as e:
+        if "unique" in str(e).lower():
+            raise HTTPException(
+                status_code=409,
+                detail="Instance name already exists for this agent",
+            )
+        raise
+
+
+@router.put("/agent-instances/{instance_id}", response_model=AgentInstanceResponse)
+async def update_agent_instance(instance_id: str, request: AgentInstanceUpdateRequest):
+    instance = _get_repo().update_agent_instance(
+        instance_id,
+        request.instance_name,
+        str(request.persona_id) if request.persona_id else None,
+        request.mcp_positions,
+    )
+    if not instance:
+        raise HTTPException(status_code=404, detail="Agent instance not found")
+    return instance
+
+
+@router.delete("/agent-instances/{instance_id}")
+async def delete_agent_instance(instance_id: str):
+    if not _get_repo().delete_agent_instance(instance_id):
+        raise HTTPException(status_code=404, detail="Agent instance not found")
     return {"status": "ok"}

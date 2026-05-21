@@ -47,3 +47,26 @@ class PersonaResponse(BaseModel):
     skill_ids: list[str]
     created_at: datetime
     updated_at: datetime
+
+
+class AgentInstanceRequest(BaseModel):
+    agent_name: str
+    instance_name: str
+    persona_id: UUID | None = None
+    mcp_positions: list[int] = []
+
+
+class AgentInstanceUpdateRequest(BaseModel):
+    instance_name: str
+    persona_id: UUID | None = None
+    mcp_positions: list[int] = []
+
+
+class AgentInstanceResponse(BaseModel):
+    id: UUID
+    agent_name: str
+    instance_name: str
+    persona_id: UUID | None
+    mcp_positions: list[int]
+    created_at: datetime
+    updated_at: datetime
