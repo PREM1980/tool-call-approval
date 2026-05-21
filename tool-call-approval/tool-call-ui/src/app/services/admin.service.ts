@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 
-const API = 'http://localhost:8000/admin';
+const API = 'http://localhost:8080/api/admin';
 
 export interface CredentialsData {
   aws_access_key_id: string;
@@ -28,6 +28,16 @@ export interface PersonaData {
   id: string;
   name: string;
   skill_ids: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AgentInstance {
+  id: string;
+  agent_name: string;
+  instance_name: string;
+  persona_id: string | null;
+  mcp_positions: number[];
   created_at: string;
   updated_at: string;
 }
@@ -84,5 +94,48 @@ export class AdminService {
 
   deletePersona(id: string) {
     return firstValueFrom(this.http.delete(`${API}/personas/${id}`));
+  }
+
+  getAgentInstances(agentName: string) {
+    return firstValueFrom(
+      this.http.get<AgentInstance[]>(
+        `${API}/agent-instances?agent_name=${encodeURIComponent(agentName)}`
+      )
+    );
+  }
+
+  createAgentInstance(
+    agentName: string,
+    instanceName: string,
+    personaId: string | null,
+    mcpPositions: number[]
+  ) {
+    return firstValueFrom(
+      this.http.post<AgentInstance>(`${API}/agent-instances`, {
+        agent_name: agentName,
+        instance_name: instanceName,
+        persona_id: personaId,
+        mcp_positions: mcpPositions,
+      })
+    );
+  }
+
+  updateAgentInstance(
+    id: string,
+    instanceName: string,
+    personaId: string | null,
+    mcpPositions: number[]
+  ) {
+    return firstValueFrom(
+      this.http.put<AgentInstance>(`${API}/agent-instances/${id}`, {
+        instance_name: instanceName,
+        persona_id: personaId,
+        mcp_positions: mcpPositions,
+      })
+    );
+  }
+
+  deleteAgentInstance(id: string) {
+    return firstValueFrom(this.http.delete(`${API}/agent-instances/${id}`));
   }
 }
