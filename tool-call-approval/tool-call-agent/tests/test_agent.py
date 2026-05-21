@@ -51,10 +51,24 @@ class MockStorage(IAgentStorage):
         return MagicMock()
 
 
+class MockAdminRepo:
+    def get_agent_instance(self, instance_id):
+        return None
+
+    def get_persona(self, persona_id):
+        return None
+
+    def get_skill_content(self, skill_id):
+        return None
+
+    def get_all_agent_instances(self):
+        return []
+
+
 @pytest.fixture
 def service():
     with patch("agent_service.Agent"), patch("agent_service.AwsBedrock"):
-        svc = AgentService(repository=MockStorage())
+        svc = AgentService(repository=MockStorage(), admin_repository=MockAdminRepo())
     return svc
 
 
@@ -236,3 +250,63 @@ async def test_run_tool_rejected(service):
     types = [e["type"] for e in events]
     assert "tool_call_pending" in types
     assert "tool_rejected" in types
+
+
+def test_create_session_no_instance_has_no_tmpdir(service):
+    with patch("agent_service.Agent"), patch("agent_service.AwsBedrock"):
+        session = service.create_session(instance_id=None)
+    assert session.tmpdir is None
+
+
+def test_create_session_with_unknown_instance_has_no_tmpdir(service):
+    with patch("agent_service.Agent"), patch("agent_service.AwsBedrock"):
+        session = service.create_session(instance_id="nonexistent-uuid")
+    assert session.tmpdir is None
+
+
+def test_create_session_with_instance_writes_skills(service, tmp_path):
+    instance = {
+        "id": "inst-uuid",
+        "agent_name": "my-agent",
+        "instance_name": "test-instance",
+        "persona_id": "persona-uuid",
+        "mcp_positions": [],
+    }
+    persona = {"id": "persona-uuid", "name": "Test Persona", "skill_ids": ["skill-1"]}
+    skill_data = ("my-skill.md", "# My Skill\nDo things.")
+
+    service._admin_repository.get_agent_instance = MagicMock(return_value=instance)
+    service._admin_repository.get_persona = MagicMock(return_value=persona)
+    service._admin_repository.get_skill_content = MagicMock(return_value=skill_data)
+
+    with patch("agent_service.Agent"), patch("agent_service.AwsBedrock"), \
+         patch("agent_service.Skills"), patch("agent_service.LocalSkills"), \
+         patch("agent_service.tempfile.mkdtemp", return_value=str(tmp_path)):
+        session = service.create_session(instance_id="inst-uuid")
+
+    assert session.tmpdir == str(tmp_path)
+    skill_file = tmp_path / "my-skill" / "SKILL.md"
+    assert skill_file.exists()
+    assert skill_file.read_text() == "# My Skill\nDo things."
+
+
+def test_remove_session_deletes_tmpdir(service, tmp_path):
+    with patch("agent_service.Agent"), patch("agent_service.AwsBedrock"):
+        session = service.create_session()
+    session.tmpdir = str(tmp_path)
+    service._remove_session(session.id)
+    assert not tmp_path.exists()
+
+
+def test_create_session_skips_missing_skill(service, tmp_path):
+    instance = {"id": "i", "persona_id": "p", "mcp_positions": []}
+    persona = {"id": "p", "name": "P", "skill_ids": ["missing-skill"]}
+
+    service._admin_repository.get_agent_instance = MagicMock(return_value=instance)
+    service._admin_repository.get_persona = MagicMock(return_value=persona)
+    service._admin_repository.get_skill_content = MagicMock(return_value=None)
+
+    with patch("agent_service.Agent"), patch("agent_service.AwsBedrock"):
+        session = service.create_session(instance_id="i")
+
+    assert session.tmpdir is None

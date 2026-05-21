@@ -46,7 +46,7 @@ _repository = PostgresRepository(url=_postgres_url)
 _admin_repository = AdminRepository(_postgres_url)
 init_router(_admin_repository)
 
-service = AgentService(repository=_repository)
+service = AgentService(repository=_repository, admin_repository=_admin_repository)
 app.include_router(admin_router, prefix="/admin", tags=["admin"])
 
 

@@ -1,4 +1,7 @@
 import asyncio
+import shutil
+import tempfile
+from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
@@ -11,9 +14,11 @@ from agno.run.agent import (
     RunPausedEvent,
     ToolCallCompletedEvent,
 )
+from agno.skills import LocalSkills, Skills
 from agno.tools import tool
 from langfuse.decorators import langfuse_context, observe
 
+from admin_repository import AdminRepository
 from repository import IAgentStorage
 from session import Session
 from tools import execute_tool, reset_kubeconfig, set_kubeconfig
@@ -21,6 +26,67 @@ from tools import execute_tool, reset_kubeconfig, set_kubeconfig
 _MODEL_ID = "us.anthropic.claude-sonnet-4-20250514-v1:0"
 _THROTTLE_MAX_RETRIES = 3
 _THROTTLE_BASE_DELAY = 5  # seconds; backoff: 5s, 10s, 20s
+
+_DEFAULT_INSTRUCTIONS = (
+    "<agent>\n"
+    "  <identity>\n"
+    "    You are a Kubernetes operations agent. Your sole purpose is to help users\n"
+    "    manage, debug, and operate Kubernetes clusters.\n"
+    "  </identity>\n"
+    "\n"
+    "  <scope>\n"
+    "    <allowed>\n"
+    "      Pods, Deployments, StatefulSets, DaemonSets, ReplicaSets, Jobs, CronJobs,\n"
+    "      Services, Ingress, NetworkPolicies, ConfigMaps, Secrets, PersistentVolumes,\n"
+    "      PersistentVolumeClaims, StorageClasses, Namespaces, Nodes, ResourceQuotas,\n"
+    "      LimitRanges, HorizontalPodAutoscalers, ClusterRoles, Roles, RoleBindings,\n"
+    "      ServiceAccounts, CustomResourceDefinitions, Helm charts, kubeconfig,\n"
+    "      kubectl commands, cluster upgrades, and Kubernetes troubleshooting.\n"
+    "    </allowed>\n"
+    "    <context_resolution>\n"
+    "      Before deciding a request is off-topic, check the conversation history.\n"
+    "      Short or ambiguous messages ('can you diagnose it', 'check it', 'fix it')\n"
+    "      almost always refer to the Kubernetes resource or issue discussed just above.\n"
+    "      Resolve 'it' / 'that' / 'this' from context and proceed — do not refuse.\n"
+    "    </context_resolution>\n"
+    "    <prohibited>\n"
+    "      Only refuse when the request is unambiguously unrelated to Kubernetes\n"
+    "      (e.g. 'write me a poem', 'what is the weather', 'solve 2+2').\n"
+    "      When refusing, respond only with: 'I am a Kubernetes agent and cannot help with that.'\n"
+    "    </prohibited>\n"
+    "    <allowed_commands>\n"
+    "      Only the following kubectl subcommands are permitted. Any other command\n"
+    "      will be rejected by the system — do NOT attempt unlisted ones:\n"
+    "      Read/inspect: get, describe, logs, top, explain, version, cluster-info,\n"
+    "        api-resources, api-versions, config, events\n"
+    "      Mutating (developer-safe): apply, create, delete, edit, patch, replace,\n"
+    "        rollout, scale, autoscale, set, run, expose, label, annotate\n"
+    "      Interaction: exec, port-forward, cp, debug\n"
+    "      Other: diff, wait\n"
+    "      Exception: 'cluster-info dump' is blocked even though 'cluster-info' is allowed.\n"
+    "      Node management (drain, cordon, uncordon, taint) and cluster-admin\n"
+    "      operations are reserved for infrastructure engineers.\n"
+    "      When a user requests a blocked operation, explain the restriction and\n"
+    "      suggest a read-only alternative where one exists.\n"
+    "    </allowed_commands>\n"
+    "  </scope>\n"
+    "\n"
+    "  <tool_usage>\n"
+    "    <rule>Always call the relevant tool before composing your response.</rule>\n"
+    "    <rule>When the user asks about multiple Kubernetes resources, call the tool\n"
+    "      once for EACH resource before writing your final answer.</rule>\n"
+    "    <rule>Never assume, skip, or fabricate tool results.</rule>\n"
+    "    <rule>If a tool call is approved and returns a result, immediately call the\n"
+    "      tool for the next item if more items remain.</rule>\n"
+    "  </tool_usage>\n"
+    "\n"
+    "  <response_style>\n"
+    "    <rule>Be concise and precise. Kubernetes operators value accuracy over verbosity.</rule>\n"
+    "    <rule>Prefer kubectl command examples when explaining operations.</rule>\n"
+    "    <rule>When diagnosing issues, state the likely root cause first, then remediation steps.</rule>\n"
+    "  </response_style>\n"
+    "</agent>"
+)
 
 
 @tool(requires_confirmation=True)
@@ -48,8 +114,9 @@ def kubectl(args: str) -> str:
 
 
 class AgentService:
-    def __init__(self, repository: IAgentStorage) -> None:
+    def __init__(self, repository: IAgentStorage, admin_repository: AdminRepository) -> None:
         self._repository = repository
+        self._admin_repository = admin_repository
         self._sessions: dict[str, tuple[Session, Agent]] = {}
         self._handlers: dict[type, Any] = {
             RunPausedEvent: self._on_paused,
@@ -63,7 +130,8 @@ class AgentService:
 
     def create_session(self, instance_id: str | None = None) -> Session:
         session = Session(id=str(uuid4()))
-        agent = self._build_agent(session.id)
+        agent, tmpdir = self._build_agent(session.id, instance_id)
+        session.tmpdir = tmpdir
         self._sessions[session.id] = (session, agent)
         return session
 
@@ -77,75 +145,53 @@ class AgentService:
 
     # ── Factory ───────────────────────────────────────────────────────────
 
-    def _build_agent(self, session_id: str) -> Agent:
-        return Agent(
+    def _build_agent(self, session_id: str, instance_id: str | None = None) -> tuple[Agent, str | None]:
+        tmpdir, skills_obj = (
+            self._load_instance_skills(instance_id)
+            if instance_id
+            else (None, None)
+        )
+        agent_kwargs: dict[str, Any] = dict(
             model=AwsBedrock(id=_MODEL_ID),
             tools=[calculate, get_weather, search_web, kubectl],
-            instructions=(
-                "<agent>\n"
-                "  <identity>\n"
-                "    You are a Kubernetes operations agent. Your sole purpose is to help users\n"
-                "    manage, debug, and operate Kubernetes clusters.\n"
-                "  </identity>\n"
-                "\n"
-                "  <scope>\n"
-                "    <allowed>\n"
-                "      Pods, Deployments, StatefulSets, DaemonSets, ReplicaSets, Jobs, CronJobs,\n"
-                "      Services, Ingress, NetworkPolicies, ConfigMaps, Secrets, PersistentVolumes,\n"
-                "      PersistentVolumeClaims, StorageClasses, Namespaces, Nodes, ResourceQuotas,\n"
-                "      LimitRanges, HorizontalPodAutoscalers, ClusterRoles, Roles, RoleBindings,\n"
-                "      ServiceAccounts, CustomResourceDefinitions, Helm charts, kubeconfig,\n"
-                "      kubectl commands, cluster upgrades, and Kubernetes troubleshooting.\n"
-                "    </allowed>\n"
-                "    <context_resolution>\n"
-                "      Before deciding a request is off-topic, check the conversation history.\n"
-                "      Short or ambiguous messages ('can you diagnose it', 'check it', 'fix it')\n"
-                "      almost always refer to the Kubernetes resource or issue discussed just above.\n"
-                "      Resolve 'it' / 'that' / 'this' from context and proceed — do not refuse.\n"
-                "    </context_resolution>\n"
-                "    <prohibited>\n"
-                "      Only refuse when the request is unambiguously unrelated to Kubernetes\n"
-                "      (e.g. 'write me a poem', 'what is the weather', 'solve 2+2').\n"
-                "      When refusing, respond only with: 'I am a Kubernetes agent and cannot help with that.'\n"
-                "    </prohibited>\n"
-                "    <allowed_commands>\n"
-                "      Only the following kubectl subcommands are permitted. Any other command\n"
-                "      will be rejected by the system — do NOT attempt unlisted ones:\n"
-                "      Read/inspect: get, describe, logs, top, explain, version, cluster-info,\n"
-                "        api-resources, api-versions, config, events\n"
-                "      Mutating (developer-safe): apply, create, delete, edit, patch, replace,\n"
-                "        rollout, scale, autoscale, set, run, expose, label, annotate\n"
-                "      Interaction: exec, port-forward, cp, debug\n"
-                "      Other: diff, wait\n"
-                "      Exception: 'cluster-info dump' is blocked even though 'cluster-info' is allowed.\n"
-                "      Node management (drain, cordon, uncordon, taint) and cluster-admin\n"
-                "      operations are reserved for infrastructure engineers.\n"
-                "      When a user requests a blocked operation, explain the restriction and\n"
-                "      suggest a read-only alternative where one exists.\n"
-                "    </allowed_commands>\n"
-                "  </scope>\n"
-                "\n"
-                "  <tool_usage>\n"
-                "    <rule>Always call the relevant tool before composing your response.</rule>\n"
-                "    <rule>When the user asks about multiple Kubernetes resources, call the tool\n"
-                "      once for EACH resource before writing your final answer.</rule>\n"
-                "    <rule>Never assume, skip, or fabricate tool results.</rule>\n"
-                "    <rule>If a tool call is approved and returns a result, immediately call the\n"
-                "      tool for the next item if more items remain.</rule>\n"
-                "  </tool_usage>\n"
-                "\n"
-                "  <response_style>\n"
-                "    <rule>Be concise and precise. Kubernetes operators value accuracy over verbosity.</rule>\n"
-                "    <rule>Prefer kubectl command examples when explaining operations.</rule>\n"
-                "    <rule>When diagnosing issues, state the likely root cause first, then remediation steps.</rule>\n"
-                "  </response_style>\n"
-                "</agent>"
-            ),
+            instructions=_DEFAULT_INSTRUCTIONS,
             stream=True,
             session_id=session_id,
             user_id=session_id,
             db=self._repository.get_db(),
         )
+        if skills_obj is not None:
+            agent_kwargs["skills"] = skills_obj
+        return Agent(**agent_kwargs), tmpdir
+
+    def _load_instance_skills(self, instance_id: str) -> tuple[str | None, Any]:
+        """Resolve instance → persona → skills; write to tmpdir. Returns (tmpdir, Skills) or (None, None)."""
+        instance = self._admin_repository.get_agent_instance(instance_id)
+        if not instance or not instance.get("persona_id"):
+            return None, None
+
+        persona = self._admin_repository.get_persona(str(instance["persona_id"]))
+        if not persona or not persona.get("skill_ids"):
+            return None, None
+
+        tmpdir = tempfile.mkdtemp(prefix="agno_skills_")
+        loaded = 0
+        for skill_id in persona["skill_ids"]:
+            result = self._admin_repository.get_skill_content(skill_id)
+            if not result:
+                continue
+            filename, content = result
+            skill_name = Path(filename).stem
+            skill_dir = Path(tmpdir) / skill_name
+            skill_dir.mkdir(parents=True, exist_ok=True)
+            (skill_dir / "SKILL.md").write_text(content)
+            loaded += 1
+
+        if loaded == 0:
+            shutil.rmtree(tmpdir, ignore_errors=True)
+            return None, None
+
+        return tmpdir, Skills(loaders=[LocalSkills(tmpdir)])
 
     def get_history(self, session_id: str) -> list[dict]:
         db = self._repository.get_db()
@@ -162,7 +208,11 @@ class AgentService:
         return pair[1] if pair else None
 
     def _remove_session(self, session_id: str) -> None:
-        self._sessions.pop(session_id, None)
+        pair = self._sessions.pop(session_id, None)
+        if pair:
+            session = pair[0]
+            if session.tmpdir:
+                shutil.rmtree(session.tmpdir, ignore_errors=True)
 
     # ── Run loop ──────────────────────────────────────────────────────────
 
@@ -202,7 +252,7 @@ class AgentService:
                     done = await self._dispatch(session, event, tool_spans, response_parts)
                     if done and isinstance(event, RunCompletedEvent):
                         break
-                break  # success — exit retry loop
+                break
             except Exception as e:
                 error_str = str(e)
                 if "ThrottlingException" in error_str and attempt < _THROTTLE_MAX_RETRIES:
