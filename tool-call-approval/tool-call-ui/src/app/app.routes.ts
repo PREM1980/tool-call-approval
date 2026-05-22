@@ -10,7 +10,7 @@ export const routes: Routes = [
       {
         path: 'ai-engg',
         loadComponent: () =>
-          import('./components/chat/chat').then((m) => m.Chat),
+          import('./ai-engg/ai-engg').then((m) => m.AiEngg),
       },
       {
         path: 'admin',

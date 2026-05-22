@@ -1,0 +1,15 @@
+<div class="tabs">
+  <button type="button" class="tab" [class.active]="tab === 'chat'" (click)="tab = 'chat'">
+    Chat
+  </button>
+  <button type="button" class="tab" [class.active]="tab === 'sessions'" (click)="tab = 'sessions'">
+    Sessions
+  </button>
+</div>
+
+@if (tab === 'chat') {
+  <app-chat />
+}
+@if (tab === 'sessions') {
+  <app-sessions />
+}
