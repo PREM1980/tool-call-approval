@@ -1,32 +1,32 @@
-<h2>MCP Servers</h2>
-<p class="subtitle">Configure up to 5 MCP server connections.</p>
+<h2 class="h5 fw-semibold mb-1">MCP Servers</h2>
+<p class="text-secondary mb-4 mcp-subtitle">Configure up to 5 MCP server connections.</p>
 
-<div class="slots">
+<div class="d-flex flex-column gap-3 mcp-slots">
   @for (slot of slots; track $index) {
-    <div class="slot">
-      <div class="slot-header">
-        <span class="slot-num">{{ $index + 1 }}</span>
-        <input
-          type="text"
-          [(ngModel)]="slot.name"
-          placeholder="Server name"
-          class="name-input"
-        />
-      </div>
-      <textarea
-        [(ngModel)]="slot.config"
-        placeholder='{ "url": "http://localhost:3001" }'
-        rows="5"
-        class="config-input"
-        [class.invalid]="slot.error === 'Invalid JSON'"
-      ></textarea>
-      <div class="slot-actions">
-        <button class="btn-save" (click)="save($index)" [disabled]="slot.saving">
-          {{ slot.saving ? 'Saving…' : 'Save' }}
-        </button>
-        <button class="btn-clear" (click)="clear($index)">Clear</button>
-        @if (slot.saved) { <span class="success">Saved!</span> }
-        @if (slot.error) { <span class="error">{{ slot.error }}</span> }
+    <div class="card shadow-sm rounded-3">
+      <div class="card-body">
+        <div class="d-flex align-items-center gap-2 mb-3">
+          <span class="badge rounded-pill bg-light text-secondary border mcp-slot-num d-flex align-items-center justify-content-center">{{ $index + 1 }}</span>
+          <input
+            type="text"
+            class="form-control form-control-sm flex-grow-1"
+            [(ngModel)]="slot.name"
+            placeholder="Server name"
+          />
+        </div>
+        <textarea
+          class="form-control font-monospace mb-3 mcp-config"
+          [(ngModel)]="slot.config"
+          placeholder='{ "url": "http://localhost:3001" }'
+          rows="4"
+          [class.is-invalid]="slot.error === 'Invalid JSON'"
+        ></textarea>
+        <div class="d-flex align-items-center gap-2">
+          <button type="button" class="btn btn-primary btn-sm" (click)="save($index)" [disabled]="slot.saving">{{ slot.saving ? 'Saving…' : 'Save' }}</button>
+          <button type="button" class="btn btn-outline-secondary btn-sm" (click)="clear($index)">Clear</button>
+          @if (slot.saved) { <span class="text-success fw-medium mcp-status">Saved!</span> }
+          @if (slot.error) { <span class="text-danger mcp-status">{{ slot.error }}</span> }
+        </div>
       </div>
     </div>
   }

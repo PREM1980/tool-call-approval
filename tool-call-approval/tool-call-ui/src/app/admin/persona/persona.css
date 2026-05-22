@@ -1,85 +1,45 @@
-.layout { display: flex; gap: 24px; height: 100%; }
+:host {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
 
-.list-pane {
+.persona-list-pane {
   width: 240px;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
 }
-
-.list-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-
-h2 { font-size: 18px; font-weight: 600; color: #e6edf3; margin: 0; }
-h3 { font-size: 16px; font-weight: 600; color: #e6edf3; margin: 0 0 20px; }
-
-.btn-new {
-  background: #238636; border: 1px solid #2ea043; border-radius: 6px;
-  color: #fff; cursor: pointer; font-size: 13px; padding: 5px 12px;
-}
-.btn-new:hover { background: #2ea043; }
 
 .persona-item {
-  display: flex;
-  align-items: center;
-  padding: 10px 12px;
-  border-radius: 6px;
   cursor: pointer;
-  gap: 8px;
   border: 1px solid transparent;
-}
-.persona-item:hover { background: #1c2128; }
-.persona-item.active { background: #21262d; border-color: #30363d; }
-
-.persona-name { flex: 1; font-size: 14px; color: #e6edf3; }
-.skill-count { font-size: 12px; color: #8b949e; }
-
-.btn-delete-inline {
-  background: transparent; border: none; color: #8b949e; cursor: pointer;
-  font-size: 12px; padding: 2px 4px; line-height: 1;
-}
-.btn-delete-inline:hover { color: #f85149; }
-
-.form-pane { flex: 1; display: flex; flex-direction: column; gap: 20px; }
-
-.field { display: flex; flex-direction: column; gap: 6px; }
-
-label { font-size: 12px; font-weight: 500; color: #8b949e; text-transform: uppercase; letter-spacing: 0.05em; }
-
-input[type="text"] {
-  background: #161b22; border: 1px solid #30363d; border-radius: 6px;
-  color: #e6edf3; font-size: 14px; padding: 8px 12px; outline: none;
-}
-input[type="text"]:focus { border-color: #58a6ff; }
-
-.skill-list { display: flex; flex-direction: column; gap: 8px; }
-
-.skill-check {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 14px;
-  color: #e6edf3;
-  cursor: pointer;
-  text-transform: none;
-  letter-spacing: normal;
-  font-weight: normal;
+  background: #f3f4f6;
 }
 
-.empty, .empty-skills, .placeholder { color: #8b949e; font-size: 14px; }
-
-.actions { display: flex; align-items: center; gap: 12px; }
-
-.btn-save {
-  background: #238636; border: 1px solid #2ea043; border-radius: 6px;
-  color: #fff; cursor: pointer; font-size: 14px; padding: 8px 20px;
+.persona-item:hover {
+  background: #e5e7eb;
 }
-.btn-save:disabled { opacity: 0.6; cursor: not-allowed; }
-.btn-save:hover:not(:disabled) { background: #2ea043; }
 
-.error { color: #f85149; font-size: 14px; }
+.persona-item-active {
+  background: #ffffff !important;
+  border-color: #6366f1 !important;
+}
+
+.persona-name {
+  font-size: 0.875rem;
+}
+
+.persona-skill-count {
+  font-size: 0.75rem;
+}
+
+.persona-status {
+  font-size: 0.875rem;
+}
+
+.admin-label {
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+}
+
+.persona-check-label {
+  font-size: 0.875rem;
+}

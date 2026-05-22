@@ -1,64 +1,54 @@
-<div class="layout">
-  <div class="list-pane">
-    <div class="list-header">
-      <h2>Personas</h2>
-      <button class="btn-new" (click)="startNew()">+ New</button>
+<div class="d-flex gap-4 h-100">
+  <div class="flex-shrink-0 d-flex flex-column persona-list-pane">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+      <h2 class="h5 fw-semibold mb-0">Personas</h2>
+      <button type="button" class="btn btn-primary btn-sm" (click)="startNew()">+ New</button>
     </div>
-
     @if (personas.length === 0) {
-      <p class="empty">No personas yet.</p>
+      <p class="text-secondary persona-status">No personas yet.</p>
     } @else {
       @for (persona of personas; track persona.id) {
         <div
-          class="persona-item"
-          [class.active]="selected?.id === persona.id"
+          class="d-flex align-items-center px-3 py-2 rounded-2 gap-2 mb-1 persona-item"
+          [class.persona-item-active]="selected?.id === persona.id"
           (click)="selectPersona(persona)"
         >
-          <span class="persona-name">{{ persona.name }}</span>
-          <span class="skill-count">{{ persona.skill_ids.length }} skill{{ persona.skill_ids.length !== 1 ? 's' : '' }}</span>
-          <button class="btn-delete-inline" (click)="$event.stopPropagation(); deletePersona(persona)">✕</button>
+          <span class="flex-grow-1 persona-name">{{ persona.name }}</span>
+          <span class="text-secondary persona-skill-count">{{ persona.skill_ids.length }} skill{{ persona.skill_ids.length !== 1 ? 's' : '' }}</span>
+          <button type="button" class="btn btn-link btn-sm p-0 text-secondary lh-1" (click)="$event.stopPropagation(); deletePersona(persona)">✕</button>
         </div>
       }
     }
   </div>
 
-  <div class="form-pane">
+  <div class="flex-grow-1 d-flex flex-column gap-3">
     @if (showForm) {
-      <h3>{{ isNew ? 'New Persona' : 'Edit Persona' }}</h3>
-
-      <div class="field">
-        <label>Name</label>
-        <input type="text" [(ngModel)]="form.name" placeholder="e.g. DevOps Engineer" />
+      <h3 class="h6 fw-semibold mb-0">{{ isNew ? 'New Persona' : 'Edit Persona' }}</h3>
+      <div>
+        <label class="form-label text-uppercase text-secondary fw-semibold admin-label">Name</label>
+        <input type="text" class="form-control" [(ngModel)]="form.name" placeholder="e.g. DevOps Engineer" />
       </div>
-
-      <div class="field">
-        <label>Skills</label>
+      <div>
+        <label class="form-label text-uppercase text-secondary fw-semibold admin-label">Skills</label>
         @if (skills.length === 0) {
-          <p class="empty-skills">No skills uploaded yet. Upload skills first.</p>
+          <p class="text-secondary persona-status">No skills uploaded yet. Upload skills first.</p>
         } @else {
-          <div class="skill-list">
+          <div class="d-flex flex-column gap-2">
             @for (skill of skills; track skill.id) {
-              <label class="skill-check">
-                <input
-                  type="checkbox"
-                  [checked]="isSkillSelected(skill.id)"
-                  (change)="toggleSkill(skill.id)"
-                />
-                {{ skill.filename }}
-              </label>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" [id]="'skill-' + skill.id" [title]="skill.filename" [checked]="isSkillSelected(skill.id)" (change)="toggleSkill(skill.id)" />
+                <label class="form-check-label persona-check-label" [for]="'skill-' + skill.id">{{ skill.filename }}</label>
+              </div>
             }
           </div>
         }
       </div>
-
-      <div class="actions">
-        <button class="btn-save" (click)="save()" [disabled]="saving">
-          {{ saving ? 'Saving…' : 'Save' }}
-        </button>
-        @if (error) { <span class="error">{{ error }}</span> }
+      <div class="d-flex align-items-center gap-3">
+        <button type="button" class="btn btn-primary" (click)="save()" [disabled]="saving">{{ saving ? 'Saving…' : 'Save' }}</button>
+        @if (error) { <span class="text-danger persona-status">{{ error }}</span> }
       </div>
     } @else {
-      <p class="placeholder">Select a persona to edit, or create a new one.</p>
+      <p class="text-secondary persona-status">Select a persona to edit, or create a new one.</p>
     }
   </div>
 </div>
