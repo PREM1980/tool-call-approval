@@ -1,0 +1,59 @@
+@if (error) {
+  <p class="error">{{ error }}</p>
+}
+
+@if (loadingSessions) {
+  <p class="muted">Loading sessions…</p>
+}
+
+@if (!loadingSessions && sessions.length === 0 && !error) {
+  <p class="muted">No sessions yet.</p>
+}
+
+@if (sessions.length > 0) {
+  <table class="sessions-table">
+    <thead>
+      <tr>
+        <th>Session ID</th>
+        <th>Last Active</th>
+        <th>Turns</th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (s of sessions; track s.session_id) {
+        <tr
+          class="session-row"
+          [class.selected]="selectedId === s.session_id"
+          (click)="selectSession(s.session_id)"
+        >
+          <td class="session-id">{{ shortId(s.session_id) }}</td>
+          <td>{{ formatTimestamp(s.updated_at ?? s.created_at) }}</td>
+          <td>{{ s.turn_count }}</td>
+        </tr>
+        @if (selectedId === s.session_id) {
+          <tr class="detail-row">
+            <td colspan="3">
+              @if (loadingHistory) {
+                <p class="muted padded">Loading…</p>
+              }
+              @if (historyError) {
+                <p class="error padded">{{ historyError }}</p>
+              }
+              @if (!loadingHistory && history.length === 0 && !historyError) {
+                <p class="muted padded">No messages in this session.</p>
+              }
+              <div class="history">
+                @for (msg of history; track $index) {
+                  <div class="bubble" [class.user]="msg.role === 'user'" [class.assistant]="msg.role === 'assistant'">
+                    <span class="role-label">{{ msg.role }}</span>
+                    <p class="content">{{ msg.content }}</p>
+                  </div>
+                }
+              </div>
+            </td>
+          </tr>
+        }
+      }
+    </tbody>
+  </table>
+}
