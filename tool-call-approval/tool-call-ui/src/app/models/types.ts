@@ -11,6 +11,18 @@ export interface ToolCall {
   tool_input: Record<string, unknown>;
 }
 
+export interface SessionSummary {
+  session_id: string;
+  created_at: number;
+  updated_at: number | null;
+  turn_count: number;
+}
+
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
 export interface SseEvent {
   type:
     | 'thinking'
@@ -25,4 +37,7 @@ export interface SseEvent {
   tool_name?: string;
   tool_input?: Record<string, unknown>;
   result?: string;
+  input_tokens?: number;
+  output_tokens?: number;
+  total_tokens?: number;
 }

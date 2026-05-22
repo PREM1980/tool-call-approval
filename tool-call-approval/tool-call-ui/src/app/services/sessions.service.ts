@@ -1,0 +1,23 @@
+import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { firstValueFrom } from 'rxjs';
+import { ChatMessage, SessionSummary } from '../models/types';
+
+const API_URL = 'http://localhost:8080/api';
+
+@Injectable({ providedIn: 'root' })
+export class SessionsService {
+  constructor(private http: HttpClient) {}
+
+  getAll(): Promise<SessionSummary[]> {
+    return firstValueFrom(
+      this.http.get<SessionSummary[]>(`${API_URL}/sessions`)
+    );
+  }
+
+  getHistory(sessionId: string): Promise<ChatMessage[]> {
+    return firstValueFrom(
+      this.http.get<ChatMessage[]>(`${API_URL}/sessions/${sessionId}/history`)
+    );
+  }
+}
