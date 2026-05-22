@@ -1,9 +1,14 @@
-<div class="shell">
-  <nav class="tab-bar">
-    <a routerLink="/ai-engg" routerLinkActive="active" class="tab">AI-Engg</a>
-    <a routerLink="/admin" routerLinkActive="active" class="tab">Admin</a>
+<div class="d-flex flex-column vh-100">
+  <nav class="navbar navbar-expand navbar-light bg-white border-bottom py-2 flex-shrink-0">
+    <div class="container-fluid">
+      <span class="navbar-brand fw-bold text-primary fs-6">Tool Call Approval</span>
+      <div class="navbar-nav">
+        <a class="nav-link" routerLink="/ai-engg" routerLinkActive="active">AI Engineer</a>
+        <a class="nav-link" routerLink="/admin" routerLinkActive="active">Admin</a>
+      </div>
+    </div>
   </nav>
-  <div class="tab-content">
+  <div class="flex-grow-1 overflow-hidden d-flex flex-column">
     <router-outlet />
   </div>
 </div>
