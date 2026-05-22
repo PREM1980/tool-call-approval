@@ -1,13 +1,31 @@
-<div class="admin">
-  <nav class="sidebar">
-    <a routerLink="/admin/agent-ws" routerLinkActive="active" class="nav-item">Agent-WS</a>
-    <a routerLink="/admin/persona" routerLinkActive="active" class="nav-item">Persona</a>
-    <a routerLink="/admin/skills" routerLinkActive="active" class="nav-item">Skills</a>
-    <a routerLink="/admin/mcp-servers" routerLinkActive="active" class="nav-item">MCP Servers</a>
-    <a routerLink="/admin/credentials" routerLinkActive="active" class="nav-item">Credentials</a>
-    <a routerLink="/admin/agents" routerLinkActive="active" class="nav-item">Agents</a>
+<div class="d-flex h-100">
+  <nav class="bg-light border-end p-3 flex-shrink-0 overflow-y-auto admin-sidebar">
+    <div class="text-uppercase text-secondary fw-semibold mb-2 sidebar-section-label">Configuration</div>
+    <ul class="nav flex-column mb-3">
+      <li class="nav-item">
+        <a class="nav-link px-2 py-1 rounded text-dark sidebar-link" routerLink="/admin/credentials" routerLinkActive="active">Credentials</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link px-2 py-1 rounded text-dark sidebar-link" routerLink="/admin/mcp-servers" routerLinkActive="active">MCP Servers</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link px-2 py-1 rounded text-dark sidebar-link" routerLink="/admin/skills" routerLinkActive="active">Skills</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link px-2 py-1 rounded text-dark sidebar-link" routerLink="/admin/persona" routerLinkActive="active">Persona</a>
+      </li>
+    </ul>
+    <div class="text-uppercase text-secondary fw-semibold mb-2 sidebar-section-label">Agents</div>
+    <ul class="nav flex-column">
+      <li class="nav-item">
+        <a class="nav-link px-2 py-1 rounded text-dark sidebar-link" routerLink="/admin/agents" routerLinkActive="active">Agents</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link px-2 py-1 rounded text-dark sidebar-link" routerLink="/admin/agent-ws" routerLinkActive="active">Agent-WS</a>
+      </li>
+    </ul>
   </nav>
-  <div class="panel">
+  <div class="flex-grow-1 p-4 overflow-y-auto">
     <router-outlet />
   </div>
 </div>
