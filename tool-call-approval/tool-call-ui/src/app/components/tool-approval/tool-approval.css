@@ -1,114 +1,21 @@
 .approval-card {
-  background: #1e2433;
-  border: 1px solid #f59e0b;
-  border-radius: 10px;
-  padding: 16px;
-  margin: 8px 0;
   max-width: 540px;
 }
 
-.approval-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 12px;
-}
-
-.tool-icon {
+.approval-icon {
   font-size: 1.4rem;
 }
 
-.tool-info {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-}
-
-.label {
+.approval-label {
   font-size: 0.7rem;
-  color: #94a3b8;
-  text-transform: uppercase;
   letter-spacing: 0.08em;
 }
 
-.tool-name {
-  font-size: 1rem;
-  font-weight: 600;
-  color: #f1f5f9;
-  font-family: monospace;
+.approval-tool-name {
+  font-size: 0.95rem;
 }
 
-.badge {
-  font-size: 0.7rem;
-  padding: 3px 8px;
-  border-radius: 12px;
-  font-weight: 600;
-  text-transform: uppercase;
-}
-
-.badge.pending {
-  background: rgba(245, 158, 11, 0.15);
-  color: #f59e0b;
-  border: 1px solid #f59e0b;
-}
-
-.args-label {
-  font-size: 0.7rem;
-  color: #94a3b8;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  display: block;
-  margin-bottom: 6px;
-}
-
-.args-block {
-  background: #0f172a;
-  border-radius: 6px;
-  padding: 10px 14px;
-  font-size: 0.85rem;
-  color: #7dd3fc;
+.approval-args {
+  font-size: 0.82rem;
   overflow-x: auto;
-  margin: 0 0 14px;
-  font-family: 'Fira Code', 'Cascadia Code', monospace;
-}
-
-.approval-actions {
-  display: flex;
-  gap: 10px;
-  justify-content: flex-end;
-}
-
-.btn {
-  padding: 8px 20px;
-  border-radius: 6px;
-  border: none;
-  font-size: 0.85rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: opacity 0.15s;
-}
-
-.btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.btn-reject {
-  background: rgba(239, 68, 68, 0.15);
-  color: #f87171;
-  border: 1px solid #ef4444;
-}
-
-.btn-reject:not(:disabled):hover {
-  background: rgba(239, 68, 68, 0.3);
-}
-
-.btn-approve {
-  background: rgba(34, 197, 94, 0.15);
-  color: #4ade80;
-  border: 1px solid #22c55e;
-}
-
-.btn-approve:not(:disabled):hover {
-  background: rgba(34, 197, 94, 0.3);
 }

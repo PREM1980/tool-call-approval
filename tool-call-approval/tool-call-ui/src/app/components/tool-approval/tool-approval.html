@@ -1,24 +1,18 @@
-<div class="approval-card">
-  <div class="approval-header">
-    <span class="tool-icon">⚙️</span>
-    <div class="tool-info">
-      <span class="label">Tool Call Request</span>
-      <span class="tool-name">{{ toolCall.tool_name }}</span>
+<div class="card border-warning shadow-sm rounded-3 my-2 approval-card">
+  <div class="card-header bg-white d-flex align-items-center gap-2">
+    <span class="approval-icon">⚙️</span>
+    <div class="flex-grow-1">
+      <div class="text-uppercase text-secondary fw-semibold approval-label">Tool Call Request</div>
+      <div class="fw-bold font-monospace approval-tool-name">{{ toolCall.tool_name }}</div>
     </div>
-    <span class="badge pending">Awaiting Approval</span>
+    <span class="badge text-bg-warning">Awaiting Approval</span>
   </div>
-
-  <div class="approval-body">
-    <span class="args-label">Arguments</span>
-    <pre class="args-block"><code>{{ formattedInput }}</code></pre>
+  <div class="card-body">
+    <div class="text-uppercase text-secondary fw-semibold mb-2 approval-label">Arguments</div>
+    <pre class="bg-light border rounded-2 p-3 mb-0 approval-args"><code class="text-primary">{{ formattedInput }}</code></pre>
   </div>
-
-  <div class="approval-actions">
-    <button class="btn btn-reject" [disabled]="disabled" (click)="reject()">
-      ✕ Reject
-    </button>
-    <button class="btn btn-approve" [disabled]="disabled" (click)="approve()">
-      ✓ Approve
-    </button>
+  <div class="card-footer bg-white d-flex justify-content-end gap-2">
+    <button class="btn btn-outline-danger btn-sm" [disabled]="disabled" (click)="reject()">✕ Reject</button>
+    <button class="btn btn-outline-success btn-sm" [disabled]="disabled" (click)="approve()">✓ Approve</button>
   </div>
 </div>
