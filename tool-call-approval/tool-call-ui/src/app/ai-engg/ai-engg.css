@@ -1,26 +1,5 @@
-.tabs {
+:host {
   display: flex;
-  gap: 4px;
-  margin-bottom: 24px;
-  border-bottom: 1px solid #30363d;
-  padding-bottom: 0;
-}
-
-.tab {
-  background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
-  color: #8b949e;
-  cursor: pointer;
-  font-size: 14px;
-  margin-bottom: -1px;
-  padding: 8px 16px;
-  transition: color 0.15s, border-color 0.15s;
-}
-
-.tab:hover { color: #e6edf3; }
-
-.tab.active {
-  border-bottom-color: #58a6ff;
-  color: #58a6ff;
+  flex-direction: column;
+  height: 100%;
 }

@@ -1,15 +1,18 @@
-<div class="tabs">
-  <button type="button" class="tab" [class.active]="tab === 'chat'" (click)="tab = 'chat'">
-    Chat
-  </button>
-  <button type="button" class="tab" [class.active]="tab === 'sessions'" (click)="tab = 'sessions'">
-    Sessions
-  </button>
+<div class="d-flex flex-column h-100 px-4 pt-4">
+  <ul class="nav nav-tabs flex-shrink-0">
+    <li class="nav-item">
+      <button type="button" class="nav-link" [class.active]="tab === 'chat'" (click)="tab = 'chat'">Chat</button>
+    </li>
+    <li class="nav-item">
+      <button type="button" class="nav-link" [class.active]="tab === 'sessions'" (click)="tab = 'sessions'">Sessions</button>
+    </li>
+  </ul>
+  <div class="flex-grow-1 border border-top-0 rounded-bottom bg-white overflow-hidden d-flex flex-column">
+    @if (tab === 'chat') {
+      <app-chat />
+    }
+    @if (tab === 'sessions') {
+      <app-sessions />
+    }
+  </div>
 </div>
-
-@if (tab === 'chat') {
-  <app-chat />
-}
-@if (tab === 'sessions') {
-  <app-sessions />
-}
