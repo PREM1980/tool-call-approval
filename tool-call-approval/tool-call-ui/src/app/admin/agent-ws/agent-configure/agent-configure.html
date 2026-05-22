@@ -1,13 +1,13 @@
 @if (error) {
-  <p class="error">{{ error }}</p>
+  <div class="alert alert-danger py-2 px-3 mb-3 ac-alert">{{ error }}</div>
 }
 
-<div class="agent-selector">
-  <label class="field-label">Agent</label>
+<div class="d-flex align-items-center gap-3 mb-4">
+  <label class="text-uppercase text-secondary fw-semibold ac-field-label">Agent</label>
   @if (agents.length === 0) {
-    <p class="muted">No agents deployed. Deploy an agent first.</p>
+    <p class="text-secondary mb-0 ac-muted">No agents deployed. Deploy an agent first.</p>
   } @else {
-    <select [(ngModel)]="selectedAgent" (ngModelChange)="onAgentChange()">
+    <select class="form-select form-select-sm ac-agent-select" [(ngModel)]="selectedAgent" (ngModelChange)="onAgentChange()">
       @for (a of agents; track a.name) {
         <option [value]="a.name">{{ a.name }}</option>
       }
@@ -16,73 +16,78 @@
 </div>
 
 @if (selectedAgent) {
-  <div class="instances-header">
-    <span class="muted">{{ instances.length }} instance{{ instances.length !== 1 ? 's' : '' }}</span>
-    <button class="btn-add" (click)="addInstance()">+ Add Instance</button>
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <span class="text-secondary ac-muted">{{ instances.length }} instance{{ instances.length !== 1 ? 's' : '' }}</span>
+    <button type="button" class="btn btn-outline-primary btn-sm" (click)="addInstance()">+ Add Instance</button>
   </div>
 
   @if (loading) {
-    <p class="muted">Loading…</p>
+    <div class="d-flex justify-content-center py-3">
+      <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+    </div>
   }
 
-  <div class="instance-list">
+  <div class="d-flex flex-column gap-2">
     @for (form of instances; track $index; let i = $index) {
-      <div class="instance-row" [class.expanded]="form.expanded">
-        <div class="instance-header" (click)="toggle(form)">
-          <div class="instance-summary">
-            <span class="instance-name">{{ form.instance_name || 'New Instance' }}</span>
+      <div class="card rounded-3" [class.border-primary]="form.expanded">
+        <div class="card-header bg-white d-flex align-items-center justify-content-between ac-instance-header" (click)="toggle(form)">
+          <div class="d-flex align-items-center gap-3 flex-grow-1 overflow-hidden">
+            <span class="fw-medium ac-instance-name">{{ form.instance_name || 'New Instance' }}</span>
             @if (!form.expanded && form.id) {
-              <span class="muted summary-text">
+              <span class="text-secondary text-truncate ac-summary">
                 Persona: {{ personaName(form.persona_id) }} · MCP: {{ mcpSummary(form.mcp_positions) }}
               </span>
             }
           </div>
-          <div class="instance-actions">
-            <button class="btn-delete" (click)="deleteInstance(form, i); $event.stopPropagation()">Delete</button>
-            <span class="chevron">{{ form.expanded ? '▲' : '▼' }}</span>
+          <div class="d-flex align-items-center gap-2 flex-shrink-0">
+            <button type="button" class="btn btn-outline-danger btn-sm ac-action-btn" (click)="deleteInstance(form, i); $event.stopPropagation()">Delete</button>
+            <span class="text-secondary ac-chevron">{{ form.expanded ? '▲' : '▼' }}</span>
           </div>
         </div>
 
         @if (form.expanded) {
-          <div class="instance-body">
+          <div class="card-body">
             @if (form.error) {
-              <p class="error">{{ form.error }}</p>
+              <div class="alert alert-danger py-2 px-3 mb-3 ac-alert">{{ form.error }}</div>
             }
-            <div class="fields">
-              <div class="field">
-                <label class="field-label">Instance Name</label>
-                <input [(ngModel)]="form.instance_name" placeholder="e.g. Customer Support" />
+            <div class="row g-3 mb-3">
+              <div class="col-4">
+                <label class="form-label text-uppercase text-secondary fw-semibold ac-field-label">Instance Name</label>
+                <input class="form-control form-control-sm" [(ngModel)]="form.instance_name" placeholder="e.g. Customer Support" />
               </div>
-              <div class="field">
-                <label class="field-label">Persona</label>
-                <select [(ngModel)]="form.persona_id">
+              <div class="col-4">
+                <label class="form-label text-uppercase text-secondary fw-semibold ac-field-label">Persona</label>
+                <select class="form-select form-select-sm" title="Persona" [(ngModel)]="form.persona_id">
                   <option [ngValue]="null">— None —</option>
                   @for (p of personas; track p.id) {
                     <option [value]="p.id">{{ p.name }}</option>
                   }
                 </select>
               </div>
-              <div class="field">
-                <label class="field-label">MCP Servers</label>
-                <div class="mcp-list">
+              <div class="col-4">
+                <label class="form-label text-uppercase text-secondary fw-semibold ac-field-label">MCP Servers</label>
+                <div class="d-flex flex-column gap-1">
                   @for (s of mcpServers; track s.position) {
-                    <label class="mcp-item">
+                    <div class="form-check">
                       <input
+                        class="form-check-input"
                         type="checkbox"
+                        [id]="'mcp-' + i + '-' + s.position"
+                        [title]="s.name"
                         [checked]="isMcpSelected(form, s.position)"
                         (change)="toggleMcp(form, s.position)"
                       />
-                      {{ s.name }}
-                    </label>
+                      <label class="form-check-label ac-check-label" [for]="'mcp-' + i + '-' + s.position">{{ s.name }}</label>
+                    </div>
                   }
                   @if (mcpServers.length === 0) {
-                    <span class="muted">No MCP servers configured.</span>
+                    <span class="text-secondary ac-muted">No MCP servers configured.</span>
                   }
                 </div>
               </div>
             </div>
-            <div class="instance-footer">
-              <button class="btn-save" (click)="save(form)" [disabled]="form.saving">
+            <div class="d-flex justify-content-end">
+              <button type="button" class="btn btn-primary btn-sm" (click)="save(form)" [disabled]="form.saving">
                 {{ form.saving ? 'Saving…' : 'Save' }}
               </button>
             </div>

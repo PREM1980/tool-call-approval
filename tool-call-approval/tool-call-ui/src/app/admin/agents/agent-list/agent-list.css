@@ -1,75 +1,28 @@
-.muted { color: #8b949e; font-size: 14px; }
-.error { color: #f85149; font-size: 14px; }
-
-table {
-  border-collapse: collapse;
-  font-size: 13px;
-  width: 100%;
+.agent-list-alert,
+.agent-list-status {
+  font-size: 0.875rem;
 }
 
-th {
-  border-bottom: 1px solid #30363d;
-  color: #8b949e;
-  font-size: 11px;
-  font-weight: 600;
+.agent-list-table {
+  font-size: 0.875rem;
+}
+
+.agent-list-th {
+  font-size: 0.72rem;
   letter-spacing: 0.07em;
-  padding: 6px 12px;
-  text-align: left;
-  text-transform: uppercase;
 }
 
-td {
-  border-bottom: 1px solid #1c2128;
-  color: #e6edf3;
-  padding: 10px 12px;
-  vertical-align: middle;
+.agent-list-image {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-td.muted { color: #8b949e; }
-td.img { font-family: monospace; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-.scale-cell { align-items: center; display: flex; gap: 8px; }
-
-.scale-btns { display: flex; gap: 3px; }
-
-.scale-btns button {
-  background: none;
-  border: 1px solid #30363d;
-  border-radius: 4px;
-  color: #58a6ff;
-  cursor: pointer;
-  font-size: 13px;
-  line-height: 1;
-  padding: 2px 7px;
+.agent-scale-btn {
+  padding: 1px 7px;
 }
 
-.scale-btns button:hover { border-color: #58a6ff; }
-
-.status[data-status="Running"] { color: #3fb950; }
-.status[data-status="Pending"] { color: #d29922; }
-.status[data-status="Failed"]  { color: #f85149; }
-
-.action-cell { display: flex; gap: 6px; }
-
-.btn-restart, .btn-delete {
-  border-radius: 5px;
-  cursor: pointer;
-  font-size: 12px;
-  padding: 4px 10px;
+.agent-action-btn {
+  font-size: 0.75rem;
 }
-
-.btn-restart {
-  background: none;
-  border: 1px solid #d29922;
-  color: #d29922;
-}
-
-.btn-restart:hover { background: #2d2209; }
-
-.btn-delete {
-  background: none;
-  border: 1px solid #f85149;
-  color: #f85149;
-}
-
-.btn-delete:hover { background: #3d1f1f; }

@@ -48,9 +48,13 @@ export class AgentList implements OnInit, OnDestroy {
   }
 
   async restart(agent: AgentDeployment) {
+    const prev = agent.status;
+    agent.status = 'Restarting';
     try {
       await this.agentsService.restart(agent.name, agent.namespace);
+      setTimeout(() => this.load(), 3000);
     } catch (e: any) {
+      agent.status = prev;
       alert(e?.error?.detail ?? 'Restart failed');
     }
   }

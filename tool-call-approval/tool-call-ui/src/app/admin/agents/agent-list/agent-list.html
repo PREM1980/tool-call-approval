@@ -1,43 +1,55 @@
 @if (loading) {
-  <p class="muted">Loading…</p>
+  <div class="d-flex justify-content-center py-4">
+    <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading…</span></div>
+  </div>
 }
 @if (error) {
-  <p class="error">{{ error }}</p>
+  <div class="alert alert-danger py-2 px-3 agent-list-alert">{{ error }}</div>
 }
 @if (!loading && !error && agents.length === 0) {
-  <p class="muted">No agents deployed yet.</p>
+  <p class="text-secondary agent-list-status">No agents deployed yet.</p>
 }
 @if (agents.length > 0) {
-  <table>
-    <thead>
+  <table class="table table-hover align-middle agent-list-table">
+    <thead class="table-light">
       <tr>
-        <th>Name</th>
-        <th>Namespace</th>
-        <th>Image</th>
-        <th>Replicas</th>
-        <th>Status</th>
-        <th>Actions</th>
+        <th class="text-uppercase text-secondary fw-semibold agent-list-th">Name</th>
+        <th class="text-uppercase text-secondary fw-semibold agent-list-th">Namespace</th>
+        <th class="text-uppercase text-secondary fw-semibold agent-list-th">Image</th>
+        <th class="text-uppercase text-secondary fw-semibold agent-list-th">Replicas</th>
+        <th class="text-uppercase text-secondary fw-semibold agent-list-th">Status</th>
+        <th class="text-uppercase text-secondary fw-semibold agent-list-th">Actions</th>
       </tr>
     </thead>
     <tbody>
       @for (a of agents; track a.name) {
         <tr>
-          <td>{{ a.name }}</td>
-          <td class="muted">{{ a.namespace }}</td>
-          <td class="muted img">{{ a.image }}</td>
+          <td class="fw-medium">{{ a.name }}</td>
+          <td class="text-secondary">{{ a.namespace }}</td>
+          <td class="text-secondary font-monospace agent-list-image">{{ a.image }}</td>
           <td>
-            <span class="scale-cell">
+            <div class="d-flex align-items-center gap-2">
               {{ a.replicas }}
-              <span class="scale-btns">
-                <button (click)="scale(a, -1)">−</button>
-                <button (click)="scale(a, 1)">+</button>
-              </span>
-            </span>
+              <div class="btn-group btn-group-sm">
+                <button type="button" class="btn btn-outline-secondary agent-scale-btn" (click)="scale(a, -1)">−</button>
+                <button type="button" class="btn btn-outline-secondary agent-scale-btn" (click)="scale(a, 1)">+</button>
+              </div>
+            </div>
           </td>
-          <td><span class="status" [attr.data-status]="a.status">{{ a.status }}</span></td>
-          <td class="action-cell">
-            <button class="btn-restart" (click)="restart(a)">Restart</button>
-            <button class="btn-delete" (click)="delete(a)">Delete</button>
+          <td>
+            <span class="badge rounded-pill"
+              [class.text-bg-success]="a.status === 'Running'"
+              [class.text-bg-warning]="a.status === 'Pending'"
+              [class.text-bg-danger]="a.status === 'Failed'"
+              [class.text-bg-primary]="a.status === 'Restarting'"
+              [class.text-bg-secondary]="a.status !== 'Running' && a.status !== 'Pending' && a.status !== 'Failed' && a.status !== 'Restarting'"
+            >{{ a.status }}</span>
+          </td>
+          <td>
+            <div class="d-flex gap-1">
+              <button type="button" class="btn btn-outline-warning btn-sm agent-action-btn" (click)="restart(a)">Restart</button>
+              <button type="button" class="btn btn-outline-danger btn-sm agent-action-btn" (click)="delete(a)">Delete</button>
+            </div>
           </td>
         </tr>
       }

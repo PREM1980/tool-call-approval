@@ -1,47 +1,45 @@
-<div class="form">
-  <div class="row">
-    <div class="field">
-      <label>Name</label>
-      <input type="text" [(ngModel)]="form.name" placeholder="my-agent" />
+<div class="d-flex flex-column gap-4 deploy-form">
+  <div class="row g-3">
+    <div class="col-6">
+      <label class="form-label text-uppercase text-secondary fw-semibold deploy-label">Name</label>
+      <input type="text" class="form-control" [(ngModel)]="form.name" placeholder="my-agent" />
       @if (fullName) {
-        <span class="preview">→ {{ fullName }}</span>
+        <div class="text-primary mt-1 deploy-preview">→ {{ fullName }}</div>
       }
     </div>
-    <div class="field">
-      <label>Docker Image</label>
-      <input type="text" [(ngModel)]="form.image" placeholder="my-org/my-agent:latest" />
+    <div class="col-6">
+      <label class="form-label text-uppercase text-secondary fw-semibold deploy-label">Docker Image</label>
+      <input type="text" class="form-control" [(ngModel)]="form.image" placeholder="my-org/my-agent:latest" />
     </div>
   </div>
 
-  <div class="row">
-    <div class="field">
-      <label>Namespace</label>
-      <input type="text" [(ngModel)]="form.namespace" />
+  <div class="row g-3">
+    <div class="col-6">
+      <label class="form-label text-uppercase text-secondary fw-semibold deploy-label">Namespace</label>
+      <input type="text" class="form-control" [(ngModel)]="form.namespace" />
     </div>
-    <div class="field">
-      <label>Replicas</label>
-      <input type="number" [(ngModel)]="form.replicas" min="1" />
+    <div class="col-6">
+      <label class="form-label text-uppercase text-secondary fw-semibold deploy-label">Replicas</label>
+      <input type="number" class="form-control" [(ngModel)]="form.replicas" min="1" />
     </div>
   </div>
 
-  <div class="field">
-    <label>Environment Variables</label>
+  <div>
+    <label class="form-label text-uppercase text-secondary fw-semibold deploy-label">Environment Variables</label>
     @for (ev of env; track $index) {
-      <div class="env-row">
-        <input type="text" [(ngModel)]="ev.key" placeholder="KEY" />
-        <input type="text" [(ngModel)]="ev.value" placeholder="value" />
-        <button class="btn-remove" (click)="removeEnvVar($index)">✕</button>
+      <div class="d-flex gap-2 mb-2">
+        <input type="text" class="form-control form-control-sm" [(ngModel)]="ev.key" placeholder="KEY" />
+        <input type="text" class="form-control form-control-sm" [(ngModel)]="ev.value" placeholder="value" />
+        <button type="button" class="btn btn-outline-danger btn-sm" (click)="removeEnvVar($index)">✕</button>
       </div>
     }
-    <button class="btn-add" (click)="addEnvVar()">+ Add variable</button>
+    <button type="button" class="btn btn-link btn-sm p-0" (click)="addEnvVar()">+ Add variable</button>
   </div>
 
-  <div class="actions">
-    <button (click)="deploy()" [disabled]="deploying || !form.name || !form.image">
+  <div class="d-flex align-items-center gap-3">
+    <button type="button" class="btn btn-primary" (click)="deploy()" [disabled]="deploying || !form.name || !form.image">
       {{ deploying ? 'Deploying…' : 'Deploy' }}
     </button>
-    @if (error) {
-      <span class="error">{{ error }}</span>
-    }
+    @if (error) { <span class="text-danger deploy-status">{{ error }}</span> }
   </div>
 </div>

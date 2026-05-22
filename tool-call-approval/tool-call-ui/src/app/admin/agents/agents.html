@@ -1,17 +1,17 @@
-<h2>Agents</h2>
+<h2 class="h5 fw-semibold mb-3">Agents</h2>
 
 @if (kubeconfigError) {
-  <div class="banner">{{ kubeconfigError }}</div>
+  <div class="alert alert-danger py-2 px-3 mb-3 agents-alert">{{ kubeconfigError }}</div>
 }
 
-<div class="tabs">
-  <button type="button" class="tab" [class.active]="tab === 'deployments'" (click)="tab = 'deployments'">
-    Deployments
-  </button>
-  <button type="button" class="tab" [class.active]="tab === 'view'" (click)="tab = 'view'">
-    View
-  </button>
-</div>
+<ul class="nav nav-tabs mb-4">
+  <li class="nav-item">
+    <button type="button" class="nav-link" [class.active]="tab === 'deployments'" (click)="tab = 'deployments'">Deployments</button>
+  </li>
+  <li class="nav-item">
+    <button type="button" class="nav-link" [class.active]="tab === 'view'" (click)="tab = 'view'">View</button>
+  </li>
+</ul>
 
 @if (tab === 'deployments') {
   <app-deploy-form (deployed)="onDeployed()" />
