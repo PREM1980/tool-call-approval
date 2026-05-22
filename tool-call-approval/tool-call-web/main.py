@@ -65,6 +65,13 @@ async def _proxy(coro: Awaitable[httpx.Response]) -> JSONResponse:
     return JSONResponse(content=resp.json(), status_code=resp.status_code)
 
 
+@app.get("/api/sessions")
+async def list_sessions() -> JSONResponse:
+    return await _proxy(
+        _get_client().get(f"{_BACKEND}/sessions", timeout=30.0)
+    )
+
+
 @app.post("/api/sessions")
 async def create_session() -> JSONResponse:
     return await _proxy(
@@ -117,6 +124,7 @@ async def admin_proxy(path: str, request: Request) -> JSONResponse:
             f"{_BACKEND}/admin/{path}",
             content=body or None,
             headers=headers if headers else None,
+            params=dict(request.query_params),
             timeout=30.0,
         )
     )

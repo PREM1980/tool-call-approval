@@ -2,6 +2,9 @@ import socket
 from abc import ABC, abstractmethod
 from urllib.parse import urlparse
 
+import psycopg2
+import psycopg2.extras
+
 from agno.db.postgres.postgres import PostgresDb
 
 
@@ -20,6 +23,23 @@ class PostgresRepository(IAgentStorage):
             self._check_reachable()
             self._db = PostgresDb(db_url=self._url)
         return self._db
+
+    def list_sessions(self) -> list[dict]:
+        url = self._url.replace("postgresql+psycopg2://", "postgresql://")
+        conn = psycopg2.connect(url)
+        try:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute("""
+                    SELECT session_id,
+                           created_at,
+                           updated_at,
+                           COALESCE(jsonb_array_length(runs), 0) AS turn_count
+                    FROM ai.agno_sessions
+                    ORDER BY updated_at DESC NULLS LAST
+                """)
+                return [dict(r) for r in cur.fetchall()]
+        finally:
+            conn.close()
 
     def _check_reachable(self) -> None:
         parsed = urlparse(self._url)

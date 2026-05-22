@@ -20,3 +20,10 @@ class SessionResponse(BaseModel):
 
 class CreateSessionRequest(BaseModel):
     instance_id: str | None = None
+
+
+class SessionSummaryResponse(BaseModel):
+    session_id: str
+    created_at: int
+    updated_at: int | None
+    turn_count: int

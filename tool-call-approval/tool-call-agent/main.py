@@ -22,7 +22,7 @@ from fastapi.responses import StreamingResponse
 from admin_repository import AdminRepository
 from admin_router import init_router, router as admin_router
 from agent_service import AgentService
-from models import ApprovalRequest, ChatRequest, CreateSessionRequest, SessionResponse
+from models import ApprovalRequest, ChatRequest, CreateSessionRequest, SessionResponse, SessionSummaryResponse
 from repository import PostgresRepository
 
 @asynccontextmanager
@@ -48,6 +48,11 @@ init_router(_admin_repository)
 
 service = AgentService(repository=_repository, admin_repository=_admin_repository)
 app.include_router(admin_router, prefix="/admin", tags=["admin"])
+
+
+@app.get("/sessions", response_model=list[SessionSummaryResponse])
+async def list_sessions() -> list[dict]:
+    return _repository.list_sessions()
 
 
 @app.post("/sessions", response_model=SessionResponse)
