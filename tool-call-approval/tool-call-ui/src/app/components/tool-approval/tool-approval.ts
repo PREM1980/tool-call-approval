@@ -14,8 +14,12 @@ export class ToolApproval {
   @Input() disabled = false;
   @Output() approved = new EventEmitter<boolean>();
 
-  get formattedInput(): string {
-    return JSON.stringify(this.toolCall.tool_input, null, 2);
+  get formattedCommand(): string {
+    if (this.toolCall.tool_name === 'kubectl') {
+      return `kubectl ${this.toolCall.tool_input['args']}`;
+    }
+    const firstVal = Object.values(this.toolCall.tool_input)[0];
+    return `${this.toolCall.tool_name}: ${firstVal}`;
   }
 
   approve(): void {

@@ -1,21 +1,8 @@
-.approval-card {
-  max-width: 540px;
-}
-
 .approval-icon {
-  font-size: 1.4rem;
+  font-size: 1.1rem;
 }
 
-.approval-label {
-  font-size: 0.7rem;
-  letter-spacing: 0.08em;
-}
-
-.approval-tool-name {
-  font-size: 0.95rem;
-}
-
-.approval-args {
-  font-size: 0.82rem;
-  overflow-x: auto;
+.approval-command {
+  font-size: 0.87rem;
+  word-break: break-all;
 }
