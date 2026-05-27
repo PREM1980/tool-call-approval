@@ -50,6 +50,12 @@ class MockStorage(IAgentStorage):
     def get_db(self):
         return MagicMock()
 
+    def list_sessions(self):
+        return []
+
+    def save_report(self, report_id, session_id, s3_bucket, s3_key, title):
+        pass
+
 
 class MockAdminRepo:
     def get_agent_instance(self, instance_id):
@@ -252,16 +258,16 @@ async def test_run_tool_rejected(service):
     assert "tool_rejected" in types
 
 
-def test_create_session_no_instance_has_no_tmpdir(service):
+def test_create_session_no_instance_has_tmpdir(service):
     with patch("agent_service.Agent"), patch("agent_service.AwsBedrock"):
         session = service.create_session(instance_id=None)
-    assert session.tmpdir is None
+    assert session.tmpdir is not None
 
 
-def test_create_session_with_unknown_instance_has_no_tmpdir(service):
+def test_create_session_with_unknown_instance_has_tmpdir(service):
     with patch("agent_service.Agent"), patch("agent_service.AwsBedrock"):
         session = service.create_session(instance_id="nonexistent-uuid")
-    assert session.tmpdir is None
+    assert session.tmpdir is not None
 
 
 def test_create_session_with_instance_writes_skills(service, tmp_path):
@@ -309,4 +315,4 @@ def test_create_session_skips_missing_skill(service, tmp_path):
     with patch("agent_service.Agent"), patch("agent_service.AwsBedrock"):
         session = service.create_session(instance_id="i")
 
-    assert session.tmpdir is None
+    assert session.tmpdir is not None

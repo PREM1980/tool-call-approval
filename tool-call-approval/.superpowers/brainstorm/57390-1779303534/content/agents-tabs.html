@@ -1,0 +1,113 @@
+<h2>Agents panel — both tabs</h2>
+<p class="subtitle">Does this layout match what you have in mind?</p>
+
+<div class="section">
+  <div class="mockup">
+    <div class="mockup-header">Deployments tab — create a new agent</div>
+    <div class="mockup-body" style="padding:20px;background:#0f0f1a">
+      <div style="display:flex;gap:10px;margin-bottom:20px">
+        <div style="color:#60a5fa;padding:6px 16px;background:#1e3a5f;border-radius:4px;font-size:13px;font-weight:600;cursor:pointer">Deployments</div>
+        <div style="color:#aaa;padding:6px 16px;border:1px solid #333;border-radius:4px;font-size:13px;cursor:pointer">View</div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;max-width:600px">
+        <div>
+          <div style="color:#888;font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Name</div>
+          <div class="mock-input" style="font-size:12px">my-agent<span style="color:#555"> → my-agent-ui-agents</span></div>
+        </div>
+        <div>
+          <div style="color:#888;font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Docker Image</div>
+          <div class="mock-input" style="font-size:12px">my-org/my-agent:latest</div>
+        </div>
+        <div>
+          <div style="color:#888;font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Namespace</div>
+          <div class="mock-input" style="font-size:12px">default</div>
+        </div>
+        <div>
+          <div style="color:#888;font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Replicas</div>
+          <div class="mock-input" style="font-size:12px">1</div>
+        </div>
+        <div style="grid-column:1/-1">
+          <div style="color:#888;font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Environment Variables</div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <div style="display:flex;gap:8px">
+              <div class="mock-input" style="flex:1;font-size:12px">KEY</div>
+              <div class="mock-input" style="flex:2;font-size:12px">value</div>
+              <div style="color:#f87171;padding:4px 10px;border:1px solid #f87171;border-radius:4px;font-size:12px;cursor:pointer">✕</div>
+            </div>
+            <div style="color:#60a5fa;font-size:12px;cursor:pointer">+ Add variable</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top:16px">
+        <div class="mock-button" style="font-size:12px">Deploy</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="mockup">
+    <div class="mockup-header">View tab — running agents (suffix: -ui-agents)</div>
+    <div class="mockup-body" style="padding:20px;background:#0f0f1a">
+      <div style="display:flex;gap:10px;margin-bottom:20px">
+        <div style="color:#aaa;padding:6px 16px;border:1px solid #333;border-radius:4px;font-size:13px;cursor:pointer">Deployments</div>
+        <div style="color:#60a5fa;padding:6px 16px;background:#1e3a5f;border-radius:4px;font-size:13px;font-weight:600;cursor:pointer">View</div>
+      </div>
+
+      <table style="width:100%;border-collapse:collapse;font-size:12px;color:#ccc">
+        <thead>
+          <tr style="border-bottom:1px solid #333;color:#888;text-transform:uppercase;letter-spacing:1px;font-size:10px">
+            <th style="text-align:left;padding:6px 10px">Name</th>
+            <th style="text-align:left;padding:6px 10px">Namespace</th>
+            <th style="text-align:left;padding:6px 10px">Image</th>
+            <th style="text-align:center;padding:6px 10px">Replicas</th>
+            <th style="text-align:left;padding:6px 10px">Status</th>
+            <th style="text-align:left;padding:6px 10px">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom:1px solid #1e1e2e">
+            <td style="padding:8px 10px">my-agent-ui-agents</td>
+            <td style="padding:8px 10px;color:#888">default</td>
+            <td style="padding:8px 10px;color:#888">my-org/my-agent:latest</td>
+            <td style="padding:8px 10px;text-align:center">
+              <span style="display:inline-flex;align-items:center;gap:6px">
+                1
+                <span style="display:inline-flex;gap:2px">
+                  <span style="cursor:pointer;color:#60a5fa;padding:1px 6px;border:1px solid #60a5fa;border-radius:3px;font-size:10px">−</span>
+                  <span style="cursor:pointer;color:#60a5fa;padding:1px 6px;border:1px solid #60a5fa;border-radius:3px;font-size:10px">+</span>
+                </span>
+              </span>
+            </td>
+            <td style="padding:8px 10px"><span style="color:#4ade80">● Running</span></td>
+            <td style="padding:8px 10px;display:flex;gap:6px">
+              <span style="cursor:pointer;color:#facc15;padding:2px 8px;border:1px solid #facc15;border-radius:3px;font-size:10px">Restart</span>
+              <span style="cursor:pointer;color:#f87171;padding:2px 8px;border:1px solid #f87171;border-radius:3px;font-size:10px">Delete</span>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:8px 10px">search-ui-agents</td>
+            <td style="padding:8px 10px;color:#888">default</td>
+            <td style="padding:8px 10px;color:#888">my-org/search:v2</td>
+            <td style="padding:8px 10px;text-align:center">
+              <span style="display:inline-flex;align-items:center;gap:6px">
+                2
+                <span style="display:inline-flex;gap:2px">
+                  <span style="cursor:pointer;color:#60a5fa;padding:1px 6px;border:1px solid #60a5fa;border-radius:3px;font-size:10px">−</span>
+                  <span style="cursor:pointer;color:#60a5fa;padding:1px 6px;border:1px solid #60a5fa;border-radius:3px;font-size:10px">+</span>
+                </span>
+              </span>
+            </td>
+            <td style="padding:8px 10px"><span style="color:#fb923c">● Pending</span></td>
+            <td style="padding:8px 10px;display:flex;gap:6px">
+              <span style="cursor:pointer;color:#facc15;padding:2px 8px;border:1px solid #facc15;border-radius:3px;font-size:10px">Restart</span>
+              <span style="cursor:pointer;color:#f87171;padding:2px 8px;border:1px solid #f87171;border-radius:3px;font-size:10px">Delete</span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

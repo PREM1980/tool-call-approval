@@ -1,7 +1,10 @@
 import json
+import logging
 import psycopg2
 import psycopg2.extensions
 import psycopg2.extras
+
+logger = logging.getLogger(__name__)
 
 
 def _to_dsn(url: str) -> str:
@@ -11,7 +14,10 @@ def _to_dsn(url: str) -> str:
 class AdminRepository:
     def __init__(self, url: str) -> None:
         self._url = _to_dsn(url)
-        self._create_tables()
+        try:
+            self._create_tables()
+        except Exception as e:
+            logger.warning("AdminRepository: could not initialize tables (%s) — admin features disabled", e)
 
     def _connect(self) -> psycopg2.extensions.connection:
         return psycopg2.connect(self._url)

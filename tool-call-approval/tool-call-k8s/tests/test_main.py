@@ -8,7 +8,7 @@ from main import app
 client = TestClient(app)
 
 
-def _agent(name: str = "my-agent-ui-agents") -> dict:
+def _agent(name: str = "my-agent-agent") -> dict:
     return {
         "name": name,
         "namespace": "default",
@@ -43,7 +43,7 @@ def test_create_agent_returns_201():
             "namespace": "default", "replicas": 1, "env": [],
         })
     assert resp.status_code == 201
-    assert resp.json()["name"] == "my-agent-ui-agents"
+    assert resp.json()["name"] == "my-agent-agent"
 
 
 def test_create_agent_already_exists_returns_400():
@@ -78,14 +78,14 @@ def test_list_agents_no_kubeconfig_returns_503():
 
 def test_delete_agent():
     with patch("k8s_service.delete_deployment") as mock:
-        resp = client.delete("/agents/my-agent-ui-agents")
+        resp = client.delete("/agents/my-agent-agent")
     assert resp.status_code == 200
-    mock.assert_called_once_with("my-agent-ui-agents", "default")
+    mock.assert_called_once_with("my-agent-agent", "default")
 
 
 def test_delete_agent_not_found_returns_404():
     with patch("k8s_service.delete_deployment", side_effect=RuntimeError("not found")):
-        resp = client.delete("/agents/missing-ui-agents")
+        resp = client.delete("/agents/missing-agent")
     assert resp.status_code == 404
 
 
@@ -93,14 +93,14 @@ def test_delete_agent_not_found_returns_404():
 
 def test_restart_agent():
     with patch("k8s_service.restart_deployment") as mock:
-        resp = client.post("/agents/my-agent-ui-agents/restart")
+        resp = client.post("/agents/my-agent-agent/restart")
     assert resp.status_code == 200
-    mock.assert_called_once_with("my-agent-ui-agents", "default")
+    mock.assert_called_once_with("my-agent-agent", "default")
 
 
 def test_restart_agent_not_found_returns_404():
     with patch("k8s_service.restart_deployment", side_effect=RuntimeError("not found")):
-        resp = client.post("/agents/missing-ui-agents/restart")
+        resp = client.post("/agents/missing-agent/restart")
     assert resp.status_code == 404
 
 
@@ -108,12 +108,12 @@ def test_restart_agent_not_found_returns_404():
 
 def test_scale_agent():
     with patch("k8s_service.scale_deployment") as mock:
-        resp = client.patch("/agents/my-agent-ui-agents/scale", json={"replicas": 3})
+        resp = client.patch("/agents/my-agent-agent/scale", json={"replicas": 3})
     assert resp.status_code == 200
-    mock.assert_called_once_with("my-agent-ui-agents", "default", 3)
+    mock.assert_called_once_with("my-agent-agent", "default", 3)
 
 
 def test_scale_agent_not_found_returns_404():
     with patch("k8s_service.scale_deployment", side_effect=RuntimeError("not found")):
-        resp = client.patch("/agents/missing-ui-agents/scale", json={"replicas": 2})
+        resp = client.patch("/agents/missing-agent/scale", json={"replicas": 2})
     assert resp.status_code == 404

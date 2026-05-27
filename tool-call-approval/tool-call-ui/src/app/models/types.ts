@@ -3,6 +3,8 @@ export interface Message {
   role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp: Date;
+  reportUrl?: string;
+  reportTitle?: string;
 }
 
 export interface ToolCall {

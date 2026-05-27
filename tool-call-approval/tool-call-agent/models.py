@@ -12,6 +12,7 @@ class ChatRequest(BaseModel):
 
 class ApprovalRequest(BaseModel):
     approved: bool
+    tool_use_id: str | None = None
 
 
 class SessionResponse(BaseModel):

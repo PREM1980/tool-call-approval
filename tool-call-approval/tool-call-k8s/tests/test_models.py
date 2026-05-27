@@ -25,7 +25,7 @@ def test_scale_request():
 
 def test_agent_response():
     r = AgentResponse(
-        name="x-ui-agents",
+        name="x-agent",
         namespace="default",
         image="img:latest",
         replicas=2,

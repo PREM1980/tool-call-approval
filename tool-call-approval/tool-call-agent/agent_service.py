@@ -5,8 +5,12 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from fpdf import FPDF
+from os import getenv
+
 from agno.agent import Agent
 from agno.models.aws.bedrock import AwsBedrock
+from agno.models.vertexai.claude import Claude as VertexAIClaude
 from agno.run.agent import (
     RunCompletedEvent,
     RunContentEvent,
@@ -23,69 +27,74 @@ from repository import IAgentStorage
 from session import Session
 from tools import execute_tool, reset_kubeconfig, set_kubeconfig
 
-_MODEL_ID = "us.anthropic.claude-sonnet-4-20250514-v1:0"
+_AWS_MODEL_ID = "us.anthropic.claude-sonnet-4-20250514-v1:0"
+_GCP_MODEL_ID = "claude-sonnet-4-6"
 _THROTTLE_MAX_RETRIES = 3
 _THROTTLE_BASE_DELAY = 5  # seconds; backoff: 5s, 10s, 20s
+_AUTO_APPROVE = getenv("AUTO_APPROVE_TOOLS", "false").lower() == "true"
+_APPROVAL_TIMEOUT = float(getenv("APPROVAL_TIMEOUT_SECONDS", "300"))  # 5 minutes
+
+
+def _build_model() -> AwsBedrock | VertexAIClaude:
+    provider = getenv("LLM_PROVIDER", "AWS").upper()
+    if provider == "GCP":
+        return VertexAIClaude(
+            id=_GCP_MODEL_ID,
+            project_id=getenv("GOOGLE_CLOUD_PROJECT"),
+            region=getenv("GOOGLE_CLOUD_LOCATION", "us-east5"),
+            request_params={
+                "tool_choice": {"type": "auto", "disable_parallel_tool_use": False}
+            },
+        )
+    return AwsBedrock(
+        id=_AWS_MODEL_ID,
+        request_params={
+            "additionalModelRequestFields": {
+                "tool_choice": {"type": "auto", "disable_parallel_tool_use": False}
+            }
+        },
+    )
 
 _DEFAULT_INSTRUCTIONS = (
-    "<agent>\n"
-    "  <identity>\n"
-    "    You are a Kubernetes operations agent. Your sole purpose is to help users\n"
-    "    manage, debug, and operate Kubernetes clusters.\n"
-    "  </identity>\n"
+    "You are a Kubernetes operations agent.\n"
     "\n"
-    "  <scope>\n"
-    "    <allowed>\n"
-    "      Pods, Deployments, StatefulSets, DaemonSets, ReplicaSets, Jobs, CronJobs,\n"
-    "      Services, Ingress, NetworkPolicies, ConfigMaps, Secrets, PersistentVolumes,\n"
-    "      PersistentVolumeClaims, StorageClasses, Namespaces, Nodes, ResourceQuotas,\n"
-    "      LimitRanges, HorizontalPodAutoscalers, ClusterRoles, Roles, RoleBindings,\n"
-    "      ServiceAccounts, CustomResourceDefinitions, Helm charts, kubeconfig,\n"
-    "      kubectl commands, cluster upgrades, and Kubernetes troubleshooting.\n"
-    "    </allowed>\n"
-    "    <context_resolution>\n"
-    "      Before deciding a request is off-topic, check the conversation history.\n"
-    "      Short or ambiguous messages ('can you diagnose it', 'check it', 'fix it')\n"
-    "      almost always refer to the Kubernetes resource or issue discussed just above.\n"
-    "      Resolve 'it' / 'that' / 'this' from context and proceed — do not refuse.\n"
-    "    </context_resolution>\n"
-    "    <prohibited>\n"
-    "      Only refuse when the request is unambiguously unrelated to Kubernetes\n"
-    "      (e.g. 'write me a poem', 'what is the weather', 'solve 2+2').\n"
-    "      When refusing, respond only with: 'I am a Kubernetes agent and cannot help with that.'\n"
-    "    </prohibited>\n"
-    "    <allowed_commands>\n"
-    "      Only the following kubectl subcommands are permitted. Any other command\n"
-    "      will be rejected by the system — do NOT attempt unlisted ones:\n"
-    "      Read/inspect: get, describe, logs, top, explain, version, cluster-info,\n"
+    "MANDATORY BEHAVIOR — READ THIS FIRST:\n"
+    "NEVER describe or list kubectl commands as text. Always execute them using the kubectl tool.\n"
+    "ALWAYS call ALL relevant kubectl commands simultaneously in a single batch — do not call one,\n"
+    "wait for the result, then call the next. Identify every command you need upfront and issue them all at once.\n"
+    "NEVER write a prose response after fewer tool calls than the investigation depth below requires.\n"
+    "\n"
+    "INVESTIGATION DEPTH — call all commands for the relevant category simultaneously:\n"
+    "  Cluster status → cluster-info, get nodes -o wide, get namespaces, get pods --all-namespaces -o wide,\n"
+    "                   get deployments --all-namespaces, get services --all-namespaces,\n"
+    "                   get persistentvolumeclaims --all-namespaces, top nodes, top pods --all-namespaces,\n"
+    "                   get events --all-namespaces --sort-by=.lastTimestamp --field-selector type=Warning\n"
+    "  Pod issue      → get pod -o yaml, describe pod, logs, logs --previous (if restarted), events\n"
+    "  Deployment     → describe deployment, get pods for it, describe failing pods, events\n"
+    "  Service/net    → describe service, get endpoints, describe ingress, networkpolicies\n"
+    "  Node issue     → describe node, get pods on node, top node\n"
+    "  Namespace      → get pods, deployments, services, configmaps, pvcs, events in namespace\n"
+    "  Failing thing  → always include: Warning events + logs of the failing container\n"
+    "\n"
+    "ALLOWED kubectl subcommands:\n"
+    "  Read: get, describe, logs, top, explain, version, cluster-info,\n"
     "        api-resources, api-versions, config, events\n"
-    "      Mutating (developer-safe): apply, create, delete, edit, patch, replace,\n"
-    "        rollout, scale, autoscale, set, run, expose, label, annotate\n"
-    "      Interaction: exec, port-forward, cp, debug\n"
-    "      Other: diff, wait\n"
-    "      Exception: 'cluster-info dump' is blocked even though 'cluster-info' is allowed.\n"
-    "      Node management (drain, cordon, uncordon, taint) and cluster-admin\n"
-    "      operations are reserved for infrastructure engineers.\n"
-    "      When a user requests a blocked operation, explain the restriction and\n"
-    "      suggest a read-only alternative where one exists.\n"
-    "    </allowed_commands>\n"
-    "  </scope>\n"
+    "  Mutating: apply, create, delete, edit, patch, replace,\n"
+    "            rollout, scale, autoscale, set, run, expose, label, annotate\n"
+    "  Interaction: exec, port-forward, cp, debug\n"
+    "  Other: diff, wait\n"
+    "  Blocked: cluster-info dump, delete node/namespace/pv/clusterrole\n"
     "\n"
-    "  <tool_usage>\n"
-    "    <rule>Always call the relevant tool before composing your response.</rule>\n"
-    "    <rule>When the user asks about multiple Kubernetes resources, call the tool\n"
-    "      once for EACH resource before writing your final answer.</rule>\n"
-    "    <rule>Never assume, skip, or fabricate tool results.</rule>\n"
-    "    <rule>If a tool call is approved and returns a result, immediately call the\n"
-    "      tool for the next item if more items remain.</rule>\n"
-    "  </tool_usage>\n"
+    "SCOPE: Only help with Kubernetes. Resolve ambiguous pronouns ('it', 'that', 'this')\n"
+    "from context — do not refuse short follow-ups. Refuse only for clearly non-Kubernetes\n"
+    "requests with: 'I am a Kubernetes agent and cannot help with that.'\n"
     "\n"
-    "  <response_style>\n"
-    "    <rule>Be concise and precise. Kubernetes operators value accuracy over verbosity.</rule>\n"
-    "    <rule>Prefer kubectl command examples when explaining operations.</rule>\n"
-    "    <rule>When diagnosing issues, state the likely root cause first, then remediation steps.</rule>\n"
-    "  </response_style>\n"
-    "</agent>"
+    "If any tool call is rejected by the user, do not retry it. Proceed with the results\n"
+    "you have and clearly note in your response which commands were skipped and what\n"
+    "information is therefore unavailable.\n"
+    "\n"
+    "RESPONSE FORMAT: findings → root cause (if applicable) → next steps with exact kubectl commands.\n"
+    "Never introduce yourself or list your capabilities unless asked."
 )
 
 
@@ -108,9 +117,20 @@ def search_web(query: str) -> str:
 
 
 @tool(requires_confirmation=True)
-def kubectl(args: str) -> str:
+async def kubectl(args: str) -> str:
     """Execute a kubectl command. Provide arguments after 'kubectl', e.g. 'get pods -n default'."""
-    return execute_tool("kubectl", {"args": args})
+    return await asyncio.to_thread(execute_tool, "kubectl", {"args": args})
+
+
+def _build_pdf(title: str, content: str) -> bytes:
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Helvetica", "B", 16)
+    pdf.cell(0, 10, title, new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(4)
+    pdf.set_font("Helvetica", size=11)
+    pdf.multi_cell(0, 6, content)
+    return bytes(pdf.output())
 
 
 class AgentService:
@@ -139,27 +159,46 @@ class AgentService:
         pair = self._sessions.get(session_id)
         return pair[0] if pair else None
 
-    def approve(self, session: Session, approved: bool) -> None:
-        session.approval_result = approved
-        session.approval_event.set()
+    def approve(self, session: Session, tool_use_id: str, approved: bool) -> None:
+        if tool_use_id in session.pending_approvals:
+            session.approval_results[tool_use_id] = approved
+            session.pending_approvals[tool_use_id].set()
 
     # ── Factory ───────────────────────────────────────────────────────────
 
-    def _build_agent(self, session_id: str, instance_id: str | None = None) -> tuple[Agent, str | None]:
-        tmpdir, skills_obj = (
-            self._load_instance_skills(instance_id)
-            if instance_id
-            else (None, None)
-        )
+    def _save_report_local(self, tmpdir: str, session_id: str, title: str, content: str) -> str:
+        report_id = str(uuid4())
+        Path(tmpdir, f"{report_id}.pdf").write_bytes(_build_pdf(title, content))
+        return f"/sessions/{session_id}/reports/{report_id}"
+
+    def _build_agent(self, session_id: str, instance_id: str | None = None) -> tuple[Agent, str]:
+        if instance_id:
+            tmpdir, skills_obj = self._load_instance_skills(instance_id)
+        else:
+            tmpdir, skills_obj = None, None
+
+        if tmpdir is None:
+            tmpdir = tempfile.mkdtemp(prefix="agno_session_")
+
+        db = self._repository.get_db()
+
+        @tool(requires_confirmation=True)
+        async def save_report(title: str, content: str) -> str:
+            """Generate a PDF report for this session and return a download URL."""
+            return await asyncio.to_thread(
+                self._save_report_local, tmpdir, session_id, title, content
+            )
+
         agent_kwargs: dict[str, Any] = dict(
-            model=AwsBedrock(id=_MODEL_ID),
-            tools=[calculate, get_weather, search_web, kubectl],
+            model=_build_model(),
+            tools=[calculate, get_weather, search_web, kubectl, save_report],
             instructions=_DEFAULT_INSTRUCTIONS,
             stream=True,
             session_id=session_id,
             user_id=session_id,
-            db=self._repository.get_db(),
         )
+        if db is not None:
+            agent_kwargs["db"] = db
         if skills_obj is not None:
             agent_kwargs["skills"] = skills_obj
         return Agent(**agent_kwargs), tmpdir
@@ -236,6 +275,13 @@ class AgentService:
         langfuse_context.update_current_observation(input=message)
         await session.queue.put({"type": "thinking", "content": "Thinking..."})
 
+        final_output = await self._run_agent(session, agent, message)
+
+        langfuse_context.update_current_observation(output=final_output)
+        langfuse_context.update_current_trace(output=final_output)
+
+    async def _run_agent(self, session: Session, agent: Any, message: str) -> str:
+        """Run one agent turn, handling throttle retries. Returns the final text response."""
         tool_spans: list = []
         response_parts: list = []
 
@@ -250,7 +296,7 @@ class AgentService:
                     yield_run_output=True,
                 ):
                     done = await self._dispatch(session, event, tool_spans, response_parts)
-                    if done and isinstance(event, RunCompletedEvent):
+                    if done and isinstance(event, (RunCompletedEvent, RunErrorEvent)):
                         break
                 break
             except Exception as e:
@@ -262,14 +308,12 @@ class AgentService:
                 await session.queue.put({"type": "error", "content": f"Unexpected error: {error_str}"})
                 await session.queue.put({"type": "done"})
                 self._remove_session(session.id)
-                return
+                return ""
 
-        final_output = "".join(response_parts)
         langfuse_context.update_current_observation(
-            output=final_output,
             metadata={"tool_calls": tool_spans},
         )
-        langfuse_context.update_current_trace(output=final_output)
+        return "".join(response_parts)
 
     # ── Strategy dispatch ─────────────────────────────────────────────────
 
@@ -284,58 +328,77 @@ class AgentService:
     async def _on_paused(
         self, session: Session, event: RunPausedEvent, tool_spans: list, response_parts: list
     ) -> bool:
-        requirements = event.requirements or []
-        requirement = next((r for r in requirements if r.needs_confirmation), None)
-        if requirement is None or requirement.tool_execution is None:
+        pending = [
+            r for r in (event.requirements or [])
+            if r.needs_confirmation and r.tool_execution is not None
+        ]
+        if not pending:
             return False
 
-        tool_execution = requirement.tool_execution
-        await session.queue.put({
-            "type": "tool_call_pending",
-            "tool_use_id": tool_execution.tool_call_id,
-            "tool_name": tool_execution.tool_name,
-            "tool_input": tool_execution.tool_args or {},
-        })
+        for req in pending:
+            tid = req.tool_execution.tool_call_id
+            session.pending_approvals[tid] = asyncio.Event()
 
-        session.approval_event.clear()
-        await session.approval_event.wait()
+        if _AUTO_APPROVE:
+            for req in pending:
+                tid = req.tool_execution.tool_call_id
+                del session.pending_approvals[tid]
+                req.confirm()
+        else:
+            # Send ALL approval requests to the UI at once.
+            for req in pending:
+                await session.queue.put({
+                    "type": "tool_call_pending",
+                    "tool_use_id": req.tool_execution.tool_call_id,
+                    "tool_name": req.tool_execution.tool_name,
+                    "tool_input": req.tool_execution.tool_args or {},
+                })
+            # Wait for every decision concurrently — user can approve/reject in any order.
+            try:
+                await asyncio.gather(*[
+                    asyncio.wait_for(
+                        session.pending_approvals[req.tool_execution.tool_call_id].wait(),
+                        timeout=_APPROVAL_TIMEOUT,
+                    )
+                    for req in pending
+                ])
+            except asyncio.TimeoutError:
+                for req in pending:
+                    tid = req.tool_execution.tool_call_id
+                    session.approval_results.setdefault(tid, False)
+                    session.pending_approvals[tid].set()
 
-        if not session.approval_result:
-            requirement.reject()
-            await session.queue.put({
-                "type": "tool_rejected",
-                "tool_use_id": tool_execution.tool_call_id,
-                "tool_name": tool_execution.tool_name,
-            })
-            return False
+            # Apply decisions and clean up.
+            for req in pending:
+                tid = req.tool_execution.tool_call_id
+                approved = session.approval_results.pop(tid, False)
+                del session.pending_approvals[tid]
+                if approved:
+                    req.confirm()
+                else:
+                    req.reject()
+                    await session.queue.put({
+                        "type": "tool_rejected",
+                        "tool_use_id": tid,
+                        "tool_name": req.tool_execution.tool_name,
+                    })
 
-        requirement.confirm()
         agent = self._get_agent(session.id)
         if agent is None:
             return False
 
         async for resumed_event in agent.acontinue_run(
             run_id=event.run_id,
-            requirements=[requirement],
+            requirements=pending,
             stream=True,
             stream_events=True,
             yield_run_output=True,
         ):
-            if isinstance(resumed_event, ToolCallCompletedEvent) and resumed_event.tool:
-                result = str(resumed_event.content)
-                tool_spans.append({"tool": tool_execution.tool_name, "result": result})
-                await session.queue.put({
-                    "type": "tool_result",
-                    "tool_use_id": resumed_event.tool.tool_call_id,
-                    "tool_name": resumed_event.tool.tool_name,
-                    "result": result,
-                })
-            else:
-                done = await self._dispatch(session, resumed_event, tool_spans, response_parts)
-                if done:
-                    return True
+            done = await self._dispatch(session, resumed_event, tool_spans, response_parts)
+            if done and isinstance(resumed_event, (RunCompletedEvent, RunErrorEvent)):
+                return True
 
-        return True
+        return False
 
     async def _on_content(
         self, session: Session, event: RunContentEvent, tool_spans: list, response_parts: list
@@ -348,7 +411,12 @@ class AgentService:
     async def _on_completed(
         self, session: Session, event: RunCompletedEvent, tool_spans: list, response_parts: list
     ) -> bool:
-        await session.queue.put({"type": "done"})
+        payload: dict = {"type": "done"}
+        if event.metrics:
+            payload["input_tokens"] = event.metrics.input_tokens
+            payload["output_tokens"] = event.metrics.output_tokens
+            payload["total_tokens"] = event.metrics.total_tokens
+        await session.queue.put(payload)
         return True
 
     async def _on_error(
@@ -363,10 +431,12 @@ class AgentService:
         self, session: Session, event: ToolCallCompletedEvent, tool_spans: list, response_parts: list
     ) -> bool:
         if event.tool:
+            result = str(event.content)
+            tool_spans.append({"tool": event.tool.tool_name, "result": result})
             await session.queue.put({
                 "type": "tool_result",
                 "tool_use_id": event.tool.tool_call_id,
                 "tool_name": event.tool.tool_name,
-                "result": str(event.content),
+                "result": result,
             })
         return False

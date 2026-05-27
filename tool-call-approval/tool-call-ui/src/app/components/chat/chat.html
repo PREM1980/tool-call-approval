@@ -1,40 +1,30 @@
-<div class="d-flex flex-column h-100">
-  <div class="d-flex align-items-center gap-2 px-4 py-3 bg-white border-bottom flex-shrink-0">
-    <span class="fs-4">🤖</span>
-    <div class="flex-grow-1">
-      <div class="fw-bold text-dark header-title">Tool Call Approval</div>
-      <div class="text-secondary header-subtitle">Claude agent with human-in-the-loop</div>
-    </div>
-    <button
-      type="button"
-      class="btn btn-outline-secondary btn-sm"
+<div class="chat-shell">
+
+  <div class="chat-topbar">
+    <div class="topbar-spacer"></div>
+    <button type="button" class="chat-btn-new"
       [disabled]="isSwitching || isWaiting"
-      (click)="newSession()"
-    >+ New</button>
-    <div class="btn-group btn-group-sm">
-      <button type="button" class="btn"
-        [class.btn-primary]="mode === 'sse'"
-        [class.btn-outline-secondary]="mode !== 'sse'"
+      (click)="newSession()">+ New</button>
+    <div class="mode-toggle">
+      <button type="button" class="mode-btn"
+        [class.active]="mode === 'sse'"
         [disabled]="isSwitching"
         (click)="switchMode('sse')">SSE</button>
-      <button type="button" class="btn"
-        [class.btn-primary]="mode === 'websocket'"
-        [class.btn-outline-secondary]="mode !== 'websocket'"
+      <button type="button" class="mode-btn"
+        [class.active]="mode === 'websocket'"
         [disabled]="isSwitching"
         (click)="switchMode('websocket')">WebSocket</button>
     </div>
   </div>
 
   @if (instances.length > 0) {
-    <div class="d-flex align-items-center gap-2 px-4 py-2 bg-light border-bottom flex-shrink-0">
-      <label class="text-secondary fw-medium instance-label">Agent instance</label>
-      <select
-        class="form-select form-select-sm"
+    <div class="chat-instance-bar">
+      <label class="instance-label">Agent instance</label>
+      <select class="instance-select"
         [(ngModel)]="selectedInstanceId"
         (ngModelChange)="onInstanceChange()"
         name="instanceSelect"
-        title="Agent instance"
-      >
+        title="Agent instance">
         <option [ngValue]="null">— none —</option>
         @for (inst of instances; track inst.id) {
           <option [ngValue]="inst.id">{{ inst.agent_name }} / {{ inst.instance_name }}</option>
@@ -43,48 +33,64 @@
     </div>
   }
 
-  <div class="message-list p-4 d-flex flex-column gap-2" #messageList>
+  <div class="chat-messages" #messageList>
     @if (messages.length === 0) {
-      <div class="text-center text-secondary my-auto">
-        <p class="mb-2">Try asking:</p>
-        <div class="d-flex flex-column gap-1 align-items-center">
-          <span class="badge bg-light text-secondary border px-3 py-2 fw-normal">"What is 1234 × 5678?"</span>
-          <span class="badge bg-light text-secondary border px-3 py-2 fw-normal">"What's the weather in London?"</span>
-          <span class="badge bg-light text-secondary border px-3 py-2 fw-normal">"Search for information about black holes"</span>
+      <div class="chat-empty">
+        <p class="chat-empty-prompt">Try asking:</p>
+        <div class="chat-empty-chips">
+          <span class="suggestion-chip">"List all pods in the default namespace"</span>
+          <span class="suggestion-chip">"Scale the frontend deployment to 3 replicas"</span>
+          <span class="suggestion-chip">"Show me recent events in the kube-system namespace"</span>
         </div>
       </div>
     }
 
     @for (message of messages; track message.id) {
-      <div class="d-flex flex-column"
-        [class.align-items-end]="message.role === 'user'"
-        [class.align-items-start]="message.role !== 'user' && message.role !== 'system'"
-        [class.align-items-center]="message.role === 'system'">
-        <div class="message-wrapper">
-          <div class="px-3 py-2 rounded-3 message-bubble"
-            [class.bg-primary]="message.role === 'user'"
-            [class.text-white]="message.role === 'user'"
-            [class.bg-white]="message.role === 'assistant'"
-            [class.border]="message.role === 'assistant'"
-            [class.bg-light]="message.role === 'system'"
-            [class.text-secondary]="message.role === 'system'"
-            [class.fst-italic]="message.role === 'system'"
-          >{{ message.content }}</div>
-          <div class="text-secondary mt-1 message-timestamp">{{ message.timestamp | date: 'HH:mm' }}</div>
+      @if (message.reportUrl) {
+        <div class="msg-row msg-system">
+          <div class="report-card">
+            <div class="report-card-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="16" y1="13" x2="8" y2="13"/>
+                <line x1="16" y1="17" x2="8" y2="17"/>
+                <polyline points="10 9 9 9 8 9"/>
+              </svg>
+            </div>
+            <div class="report-card-body">
+              <span class="report-card-label">Report ready</span>
+              <span class="report-card-title">{{ message.reportTitle }}</span>
+            </div>
+            <a class="report-card-download" [href]="message.reportUrl" target="_blank" rel="noopener">
+              Download
+            </a>
+          </div>
+          <div class="msg-time">{{ message.timestamp | date: 'HH:mm' }}</div>
         </div>
-      </div>
+      } @else {
+        <div class="msg-row"
+          [class.msg-user]="message.role === 'user'"
+          [class.msg-assistant]="message.role === 'assistant'"
+          [class.msg-system]="message.role === 'system'">
+          <div class="msg-wrap">
+            <div class="msg-bubble">{{ message.content }}</div>
+            <div class="msg-time">{{ message.timestamp | date: 'HH:mm' }}</div>
+          </div>
+        </div>
+      }
     }
 
-    @if (pendingToolCall) {
+    @for (tc of pendingToolCalls; track tc.tool_use_id) {
       <app-tool-approval
-        [toolCall]="pendingToolCall"
+        [toolCall]="tc"
         [disabled]="isWaiting"
-        (approved)="handleApproval($event)"
+        (approved)="handleApproval(tc.tool_use_id, $event)"
       />
     }
 
-    @if (isWaiting && !pendingToolCall) {
-      <div class="d-flex gap-1 align-self-start ps-1">
+    @if (isWaiting && pendingToolCalls.length === 0) {
+      <div class="thinking-row">
         <span class="thinking-dot"></span>
         <span class="thinking-dot"></span>
         <span class="thinking-dot"></span>
@@ -92,20 +98,18 @@
     }
   </div>
 
-  <form class="d-flex gap-2 p-3 bg-white border-top flex-shrink-0" (ngSubmit)="sendMessage()">
+  <form class="chat-input-bar" (ngSubmit)="sendMessage()">
     <input
-      class="form-control"
+      class="chat-input"
       type="text"
       [(ngModel)]="userInput"
       name="userInput"
-      placeholder="Ask the agent something..."
-      [disabled]="isWaiting || !!pendingToolCall"
+      placeholder="Ask about your Kubernetes cluster..."
+      [disabled]="isWaiting || pendingToolCalls.length > 0"
       autocomplete="off"
     />
-    <button
-      class="btn btn-primary"
-      type="submit"
-      [disabled]="isWaiting || !!pendingToolCall || !userInput.trim()"
-    >Send</button>
+    <button class="chat-send" type="submit"
+      [disabled]="isWaiting || pendingToolCalls.length > 0 || !userInput.trim()">Send</button>
   </form>
+
 </div>

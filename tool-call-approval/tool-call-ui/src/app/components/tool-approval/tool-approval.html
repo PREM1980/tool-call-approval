@@ -1,8 +1,8 @@
-<div class="card border-warning shadow-sm rounded-3 my-2">
-  <div class="d-flex align-items-center px-3 py-2 gap-3">
+<div class="approval-card">
+  <div class="approval-body">
     <span class="approval-icon">⚙️</span>
-    <code class="flex-grow-1 font-monospace text-primary approval-command">{{ formattedCommand }}</code>
-    <button type="button" class="btn btn-outline-danger btn-sm" [disabled]="disabled" (click)="reject()">✕ Deny</button>
-    <button type="button" class="btn btn-outline-success btn-sm" [disabled]="disabled" (click)="approve()">✓ Allow</button>
+    <code class="approval-command">{{ formattedCommand }}</code>
+    <button type="button" class="approval-btn deny" [disabled]="disabled" (click)="reject()">✕ Deny</button>
+    <button type="button" class="approval-btn allow" [disabled]="disabled" (click)="approve()">✓ Allow</button>
   </div>
 </div>

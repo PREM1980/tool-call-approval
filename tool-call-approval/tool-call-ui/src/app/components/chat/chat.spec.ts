@@ -123,7 +123,7 @@ describe('Chat', () => {
     expect(assistantMsg?.content).toBe('Hi there!');
   });
 
-  it('should set pendingToolCall on tool_call_pending event', () => {
+  it('should add to pendingToolCalls on tool_call_pending event', () => {
     sseSubject.next({
       type: 'tool_call_pending',
       tool_use_id: 'abc',
@@ -131,18 +131,18 @@ describe('Chat', () => {
       tool_input: { expression: '2+2' },
     });
     fixture.detectChanges();
-    expect(component.pendingToolCall).not.toBeNull();
-    expect(component.pendingToolCall?.tool_name).toBe('calculate');
+    expect(component.pendingToolCalls.length).toBe(1);
+    expect(component.pendingToolCalls[0].tool_name).toBe('calculate');
   });
 
-  it('should clear pendingToolCall after approval', async () => {
-    component.pendingToolCall = {
+  it('should remove tool call from pendingToolCalls after approval', async () => {
+    component.pendingToolCalls = [{
       tool_use_id: 'abc',
       tool_name: 'calculate',
       tool_input: { expression: '2+2' },
-    };
-    await component.handleApproval(true);
-    expect(chatService.approveTool).toHaveBeenCalledWith(true);
-    expect(component.pendingToolCall).toBeNull();
+    }];
+    await component.handleApproval('abc', true);
+    expect(chatService.approveTool).toHaveBeenCalledWith('abc', true);
+    expect(component.pendingToolCalls.length).toBe(0);
   });
 });

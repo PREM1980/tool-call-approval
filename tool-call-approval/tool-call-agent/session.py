@@ -6,7 +6,8 @@ from dataclasses import dataclass, field
 class Session:
     id: str
     queue: asyncio.Queue = field(default_factory=asyncio.Queue)
-    approval_event: asyncio.Event = field(default_factory=asyncio.Event)
-    approval_result: bool = False
+    # Per-tool approval used by the HITL batch path
+    pending_approvals: dict[str, asyncio.Event] = field(default_factory=dict)
+    approval_results: dict[str, bool] = field(default_factory=dict)
     kubeconfig: str | None = None
     tmpdir: str | None = None

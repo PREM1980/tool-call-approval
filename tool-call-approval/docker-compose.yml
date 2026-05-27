@@ -149,10 +149,10 @@ services:
       timeout: 3s
       retries: 10
 
-  tool-call-agent:
+  tool-calling-k8s-agent:
     build:
       context: ./tool-call-agent
-    image: tool-call-agent:latest
+    image: tool-calling-k8s-agent:latest
     ports:
       - "8000:8000"
     env_file:
@@ -160,6 +160,9 @@ services:
     environment:
       POSTGRES_URL: postgresql+psycopg2://postgres:postgres@postgres:5432/postgres
       LANGFUSE_HOST: http://langfuse-web:3000
+      GOOGLE_APPLICATION_CREDENTIALS: /etc/gcp/service-account.json
+    volumes:
+      - /Users/premlakshmanan/.config/gcloud/provs-487517-sa.json:/etc/gcp/service-account.json:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -173,11 +176,11 @@ services:
     ports:
       - "8080:8080"
     environment:
-      AGENT_BACKEND_URL: http://tool-call-agent:8000
+      AGENT_BACKEND_URL: http://tool-calling-k8s-agent:8000
       CORS_ORIGIN: http://localhost:4200
       K8S_BACKEND_URL: http://tool-call-k8s:8001
     depends_on:
-      - tool-call-agent
+      - tool-calling-k8s-agent
       - tool-call-k8s
 
   tool-call-k8s:

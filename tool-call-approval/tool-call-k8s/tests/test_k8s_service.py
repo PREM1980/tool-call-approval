@@ -65,9 +65,9 @@ def test_run_raises_on_nonzero_exit():
 
 # ── create_deployment ────────────────────────────────────────────────────────
 
-def test_create_deployment_uses_ui_agents_suffix():
+def test_create_deployment_uses_k8s_agent_suffix():
     _existing_kubeconfig()
-    dep = _dep_json("my-agent-ui-agents")
+    dep = _dep_json("my-agent-agent")
     manifests = []
     def fake_run(cmd, input=None, **kwargs):
         if "apply" in cmd:
@@ -76,14 +76,14 @@ def test_create_deployment_uses_ui_agents_suffix():
     with patch("subprocess.run", side_effect=fake_run):
         result = k8s_service.create_deployment("my-agent", "img:latest", "default", 1, [])
     assert len(manifests) == 1
-    assert "my-agent-ui-agents" in manifests[0]
-    assert result["name"] == "my-agent-ui-agents"
+    assert "my-agent-agent" in manifests[0]
+    assert result["name"] == "my-agent-agent"
     assert result["status"] == "Running"
 
 
 def test_create_deployment_sets_env_vars():
     _existing_kubeconfig()
-    dep = _dep_json("x-ui-agents")
+    dep = _dep_json("x-agent")
     manifests = []
     def fake_run(cmd, input=None, **kwargs):
         if "apply" in cmd:
@@ -98,7 +98,7 @@ def test_create_deployment_sets_env_vars():
 
 def test_create_deployment_skips_set_env_when_no_env():
     _existing_kubeconfig()
-    dep = _dep_json("x-ui-agents")
+    dep = _dep_json("x-agent")
     manifests = []
     def fake_run(cmd, input=None, **kwargs):
         if "apply" in cmd:
@@ -116,14 +116,14 @@ def test_list_deployments_filters_by_suffix():
     _existing_kubeconfig()
     items = {
         "items": [
-            _dep_json("my-agent-ui-agents"),
+            _dep_json("my-agent-agent"),
             _dep_json("unrelated-deployment"),
         ]
     }
     with patch("subprocess.run", return_value=_make_proc(json.dumps(items))):
         result = k8s_service.list_deployments()
     assert len(result) == 1
-    assert result[0]["name"] == "my-agent-ui-agents"
+    assert result[0]["name"] == "my-agent-agent"
 
 
 def test_list_deployments_empty():
@@ -137,10 +137,10 @@ def test_list_deployments_empty():
 def test_delete_deployment_calls_kubectl_delete():
     _existing_kubeconfig()
     with patch("subprocess.run", return_value=_make_proc("deleted")) as mock:
-        k8s_service.delete_deployment("my-agent-ui-agents", "default")
+        k8s_service.delete_deployment("my-agent-agent", "default")
     cmd = mock.call_args[0][0]
     assert "delete" in cmd
-    assert "my-agent-ui-agents" in cmd
+    assert "my-agent-agent" in cmd
     assert "--namespace" in cmd
 
 
@@ -149,11 +149,11 @@ def test_delete_deployment_calls_kubectl_delete():
 def test_restart_deployment_calls_rollout_restart():
     _existing_kubeconfig()
     with patch("subprocess.run", return_value=_make_proc("restarted")) as mock:
-        k8s_service.restart_deployment("my-agent-ui-agents", "default")
+        k8s_service.restart_deployment("my-agent-agent", "default")
     cmd = mock.call_args[0][0]
     assert "rollout" in cmd
     assert "restart" in cmd
-    assert "deployment/my-agent-ui-agents" in cmd
+    assert "deployment/my-agent-agent" in cmd
 
 
 # ── scale_deployment ─────────────────────────────────────────────────────────
@@ -161,26 +161,26 @@ def test_restart_deployment_calls_rollout_restart():
 def test_scale_deployment_calls_kubectl_scale():
     _existing_kubeconfig()
     with patch("subprocess.run", return_value=_make_proc("scaled")) as mock:
-        k8s_service.scale_deployment("my-agent-ui-agents", "default", 3)
+        k8s_service.scale_deployment("my-agent-agent", "default", 3)
     cmd = mock.call_args[0][0]
     assert "scale" in cmd
     assert "--replicas=3" in cmd
-    assert "my-agent-ui-agents" in cmd
+    assert "my-agent-agent" in cmd
 
 
 # ── status derivation ────────────────────────────────────────────────────────
 
 def test_status_running():
-    dep = _dep_json("x-ui-agents", replicas=2, ready=2)
+    dep = _dep_json("x-agent", replicas=2, ready=2)
     assert k8s_service._derive_status(dep) == "Running"
 
 
 def test_status_pending():
-    dep = _dep_json("x-ui-agents", replicas=2, ready=0)
+    dep = _dep_json("x-agent", replicas=2, ready=0)
     assert k8s_service._derive_status(dep) == "Pending"
 
 
 def test_status_failed():
-    dep = _dep_json("x-ui-agents", replicas=1, ready=0)
+    dep = _dep_json("x-agent", replicas=1, ready=0)
     dep["status"]["conditions"] = [{"type": "Available", "status": "False"}]
     assert k8s_service._derive_status(dep) == "Failed"

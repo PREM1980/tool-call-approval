@@ -1,0 +1,131 @@
+<h2>Agent Row — Detail Level</h2>
+<p class="subtitle">How much should each agent row show?</p>
+
+<style>
+  .ops-header { display: flex; gap: 12px; margin-bottom: 14px; }
+  .ops-stat { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 18px; flex: 1; }
+  .ops-stat-num { font-size: 22px; font-weight: 800; line-height: 1; }
+  .ops-stat-label { font-size: 10px; color: #94a3b8; text-transform: uppercase; letter-spacing: .06em; margin-top: 3px; }
+  .ops-stat.running .ops-stat-num { color: #16a34a; }
+  .ops-stat.failed  .ops-stat-num { color: #dc2626; }
+  .ops-stat.total   .ops-stat-num { color: #0f172a; }
+
+  /* Flat row */
+  .ops-row { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 18px; margin-bottom: 8px; display: flex; align-items: center; gap: 14px; }
+  .ops-name { font-weight: 700; font-size: 13px; color: #0f172a; flex: 0 0 150px; }
+  .ops-info { flex: 1; }
+  .ops-image { font-family: monospace; font-size: 11px; color: #64748b; }
+  .ops-ns    { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+  .ops-right { display: flex; align-items: center; gap: 10px; }
+  .ops-badge-running { background: #dcfce7; color: #16a34a; border-radius: 20px; padding: 3px 11px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+  .ops-replicas { display: flex; align-items: center; gap: 5px; font-weight: 600; font-size: 13px; }
+  .ops-scale { border: 1px solid #e2e8f0; background: #f8fafc; border-radius: 4px; width: 20px; height: 20px; font-size: 12px; display: flex; align-items: center; justify-content: center; color: #475569; }
+  .ops-actions { display: flex; gap: 4px; }
+  .ops-act { border: none; border-radius: 6px; padding: 4px 10px; font-size: 11px; font-weight: 500; cursor: pointer; }
+  .ops-act.restart { background: #fef3c7; color: #d97706; }
+  .ops-act.delete  { background: #fee2e2; color: #dc2626; }
+
+  /* Expandable row */
+  .exp-row { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; margin-bottom: 8px; overflow: hidden; }
+  .exp-row-header { padding: 14px 18px; display: flex; align-items: center; gap: 14px; cursor: pointer; }
+  .exp-row-header:hover { background: #f8fafc; }
+  .chevron { color: #94a3b8; font-size: 12px; margin-left: auto; transition: transform .15s; }
+  .exp-detail { background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 12px 18px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .detail-item { }
+  .detail-label { font-size: 10px; text-transform: uppercase; letter-spacing: .07em; color: #94a3b8; margin-bottom: 2px; }
+  .detail-value { font-size: 12px; color: #334155; font-weight: 500; }
+  .detail-value.mono { font-family: monospace; font-size: 11px; }
+  .ready-bar { display: flex; align-items: center; gap: 6px; }
+  .ready-dot { width: 8px; height: 8px; background: #22c55e; border-radius: 50%; }
+</style>
+
+<div class="options">
+
+  <!-- Option A: Flat -->
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Flat Row</h3>
+      <p>All key info visible at once — no clicks needed. Fast to scan. Best when you rarely need deep details.</p>
+      <div style="margin-top:14px; background:#f8fafc; border-radius:10px; padding:14px;">
+        <div class="ops-header">
+          <div class="ops-stat running"><div class="ops-stat-num">1</div><div class="ops-stat-label">Running</div></div>
+          <div class="ops-stat total"><div class="ops-stat-num">1</div><div class="ops-stat-label">Total</div></div>
+          <div class="ops-stat failed"><div class="ops-stat-num">0</div><div class="ops-stat-label">Failed</div></div>
+        </div>
+        <div class="ops-row">
+          <div class="ops-name">tool-call-agent</div>
+          <div class="ops-info">
+            <div class="ops-image">tool-call-agent:latest</div>
+            <div class="ops-ns">namespace: default</div>
+          </div>
+          <div class="ops-right">
+            <div class="ops-replicas">
+              <span class="ops-scale">−</span>
+              <span>1</span>
+              <span class="ops-scale">+</span>
+            </div>
+            <span class="ops-badge-running">● Running</span>
+            <div class="ops-actions">
+              <button class="ops-act restart">Restart</button>
+              <button class="ops-act delete">Delete</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Option B: Expandable -->
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Expandable Row</h3>
+      <p>Row shows essentials; click to reveal ready replicas, age, full image name. Cleaner when you have many agents.</p>
+      <div style="margin-top:14px; background:#f8fafc; border-radius:10px; padding:14px;">
+        <div class="ops-header">
+          <div class="ops-stat running"><div class="ops-stat-num">1</div><div class="ops-stat-label">Running</div></div>
+          <div class="ops-stat total"><div class="ops-stat-num">1</div><div class="ops-stat-label">Total</div></div>
+          <div class="ops-stat failed"><div class="ops-stat-num">0</div><div class="ops-stat-label">Failed</div></div>
+        </div>
+        <div class="exp-row">
+          <div class="exp-row-header">
+            <div class="ops-name">tool-call-agent</div>
+            <div class="ops-info">
+              <div class="ops-image">tool-call-agent:latest</div>
+              <div class="ops-ns">namespace: default</div>
+            </div>
+            <div class="ops-right">
+              <div class="ops-replicas">
+                <span class="ops-scale">−</span>
+                <span>1</span>
+                <span class="ops-scale">+</span>
+              </div>
+              <span class="ops-badge-running">● Running</span>
+              <div class="ops-actions">
+                <button class="ops-act restart">Restart</button>
+                <button class="ops-act delete">Delete</button>
+              </div>
+            </div>
+            <span class="chevron">▾</span>
+          </div>
+          <div class="exp-detail">
+            <div class="detail-item">
+              <div class="detail-label">Ready</div>
+              <div class="detail-value"><span class="ready-bar"><span class="ready-dot"></span>1 / 1</span></div>
+            </div>
+            <div class="detail-item">
+              <div class="detail-label">Full Image</div>
+              <div class="detail-value mono">tool-call-agent:latest</div>
+            </div>
+            <div class="detail-item">
+              <div class="detail-label">Age</div>
+              <div class="detail-value">2 hours</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>

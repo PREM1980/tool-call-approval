@@ -1,0 +1,82 @@
+<h2>Configure tab layout</h2>
+<p class="subtitle">One deployment, multiple named instances — each with its own persona and MCP servers</p>
+
+<div class="mockup">
+  <div class="mockup-header">Admin → Agents → Configure</div>
+  <div class="mockup-body" style="padding:0">
+
+    <!-- Deployment selector -->
+    <div style="padding:14px 16px;border-bottom:1px solid #30363d;display:flex;align-items:center;gap:12px">
+      <span style="font-size:11px;color:#8b949e;text-transform:uppercase;letter-spacing:.06em;white-space:nowrap">Deployment</span>
+      <select style="background:#161b22;border:1px solid #30363d;color:#e6edf3;padding:5px 8px;font-size:13px;border-radius:5px;flex:1;max-width:320px">
+        <option>tool-call-agent-ui-agents</option>
+      </select>
+      <span style="font-size:11px;color:#3fb950;margin-left:4px">● Running (1/1)</span>
+    </div>
+
+    <!-- Instance list + add button -->
+    <div style="padding:12px 16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #1c2128">
+      <span style="font-size:12px;color:#8b949e">2 instances</span>
+      <button style="background:none;border:1px solid #238636;color:#3fb950;border-radius:5px;padding:4px 12px;font-size:12px;cursor:pointer">+ Add Instance</button>
+    </div>
+
+    <!-- Instance rows -->
+    <div style="padding:8px 16px;display:flex;flex-direction:column;gap:6px">
+
+      <!-- Instance 1 — expanded/editing -->
+      <div style="border:1px solid #58a6ff;border-radius:6px;overflow:hidden">
+        <div style="padding:10px 12px;background:#161b22;display:flex;align-items:center;justify-content:space-between;cursor:pointer">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="color:#58a6ff;font-size:13px;font-weight:500">Customer Support</span>
+            <span style="font-size:11px;color:#8b949e">Persona: Sales Agent · MCP: Slack, GitHub</span>
+          </div>
+          <div style="display:flex;gap:6px">
+            <button style="background:none;border:1px solid #f85149;color:#f85149;border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer">Delete</button>
+            <span style="color:#8b949e;font-size:12px">▲</span>
+          </div>
+        </div>
+        <div style="padding:12px;background:#0d1117;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+          <div>
+            <div style="font-size:10px;color:#8b949e;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Instance Name</div>
+            <input value="Customer Support" style="background:#161b22;border:1px solid #30363d;color:#e6edf3;padding:6px 8px;font-size:12px;border-radius:4px;width:100%;box-sizing:border-box">
+          </div>
+          <div>
+            <div style="font-size:10px;color:#8b949e;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Persona</div>
+            <select style="background:#161b22;border:1px solid #30363d;color:#e6edf3;padding:6px 8px;font-size:12px;border-radius:4px;width:100%">
+              <option>Sales Agent</option>
+              <option>Support Bot</option>
+            </select>
+          </div>
+          <div>
+            <div style="font-size:10px;color:#8b949e;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">MCP Servers</div>
+            <div style="font-size:12px;display:flex;flex-direction:column;gap:4px">
+              <label style="display:flex;align-items:center;gap:6px"><input type="checkbox" checked> Slack</label>
+              <label style="display:flex;align-items:center;gap:6px"><input type="checkbox" checked> GitHub</label>
+              <label style="display:flex;align-items:center;gap:6px"><input type="checkbox"> Jira</label>
+            </div>
+          </div>
+        </div>
+        <div style="padding:8px 12px;background:#0d1117;border-top:1px solid #1c2128;display:flex;justify-content:flex-end">
+          <button style="background:#238636;border:none;color:#fff;border-radius:5px;padding:5px 14px;font-size:12px;cursor:pointer">Save</button>
+        </div>
+      </div>
+
+      <!-- Instance 2 — collapsed -->
+      <div style="border:1px solid #30363d;border-radius:6px;overflow:hidden">
+        <div style="padding:10px 12px;background:#161b22;display:flex;align-items:center;justify-content:space-between;cursor:pointer">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="color:#e6edf3;font-size:13px;font-weight:500">Sales Bot</span>
+            <span style="font-size:11px;color:#8b949e">Persona: Sales Agent · MCP: Jira</span>
+          </div>
+          <div style="display:flex;gap:6px">
+            <button style="background:none;border:1px solid #f85149;color:#f85149;border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer">Delete</button>
+            <span style="color:#8b949e;font-size:12px">▼</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:12px">Does this layout work? Each instance is a collapsible row — click to expand and edit.</p>

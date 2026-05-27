@@ -19,7 +19,7 @@ export class DeployForm {
   error = '';
 
   get fullName(): string {
-    return this.form.name ? `${this.form.name}-ui-agents` : '';
+    return this.form.name ? `${this.form.name}-agent` : '';
   }
 
   constructor(private agentsService: AgentsService) {}

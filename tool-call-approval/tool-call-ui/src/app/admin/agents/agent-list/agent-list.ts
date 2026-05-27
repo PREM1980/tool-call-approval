@@ -68,4 +68,8 @@ export class AgentList implements OnInit, OnDestroy {
       alert(e?.error?.detail ?? 'Delete failed');
     }
   }
+
+  countByStatus(status: string): number {
+    return this.agents.filter(a => a.status === status).length;
+  }
 }

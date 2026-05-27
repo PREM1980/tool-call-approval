@@ -4,6 +4,7 @@ import logging
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from dotenv import load_dotenv
 
@@ -11,13 +12,13 @@ load_dotenv()
 
 from logging_config import reconfigure_uvicorn_loggers, setup_logging  # noqa: E402
 
-setup_logging("tool-call-agent")
+setup_logging("tool-calling-k8s-agent")
 
 logger = logging.getLogger(__name__)
 
 from fastapi import Body, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
 
 from admin_repository import AdminRepository
 from admin_router import init_router, router as admin_router
@@ -27,7 +28,7 @@ from repository import PostgresRepository
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    reconfigure_uvicorn_loggers("tool-call-agent")
+    reconfigure_uvicorn_loggers("tool-calling-k8s-agent")
     yield
 
 
@@ -48,6 +49,11 @@ init_router(_admin_repository)
 
 service = AgentService(repository=_repository, admin_repository=_admin_repository)
 app.include_router(admin_router, prefix="/admin", tags=["admin"])
+
+
+@app.get("/health")
+async def health() -> dict:
+    return {"status": "ok"}
 
 
 @app.get("/sessions", response_model=list[SessionSummaryResponse])
@@ -103,14 +109,25 @@ async def get_history(session_id: str) -> list[dict]:
     return service.get_history(session_id)
 
 
+@app.get("/sessions/{session_id}/reports/{report_id}")
+async def get_report(session_id: str, report_id: str) -> FileResponse:
+    session = service.get_session(session_id)
+    if not session or not session.tmpdir:
+        raise HTTPException(status_code=404, detail="Session not found")
+    path = Path(session.tmpdir) / f"{report_id}.pdf"
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Report not found")
+    return FileResponse(path, media_type="application/pdf", filename=f"{report_id}.pdf")
+
+
 @app.post("/sessions/{session_id}/approve")
 async def approve_tool(session_id: str, request: ApprovalRequest) -> dict:
     session = service.get_session(session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
-    service.approve(session, request.approved)
+    service.approve(session, request.tool_use_id, request.approved)
     logger.info(
         "tool approval received",
-        extra={"session_id": session_id, "approved": request.approved},
+        extra={"session_id": session_id, "tool_use_id": request.tool_use_id, "approved": request.approved},
     )
     return {"status": "ok"}

@@ -1,58 +1,116 @@
 @if (loading) {
   <div class="d-flex justify-content-center py-4">
-    <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading…</span></div>
+    <div class="spinner-border text-primary" role="status">
+      <span class="visually-hidden">Loading…</span>
+    </div>
   </div>
 }
+
 @if (error) {
   <div class="alert alert-danger py-2 px-3 agent-list-alert">{{ error }}</div>
 }
-@if (!loading && !error && agents.length === 0) {
-  <p class="text-secondary agent-list-status">No agents deployed yet.</p>
-}
-@if (agents.length > 0) {
-  <table class="table table-hover align-middle agent-list-table">
-    <thead class="table-light">
-      <tr>
-        <th class="text-uppercase text-secondary fw-semibold agent-list-th">Name</th>
-        <th class="text-uppercase text-secondary fw-semibold agent-list-th">Namespace</th>
-        <th class="text-uppercase text-secondary fw-semibold agent-list-th">Image</th>
-        <th class="text-uppercase text-secondary fw-semibold agent-list-th">Replicas</th>
-        <th class="text-uppercase text-secondary fw-semibold agent-list-th">Status</th>
-        <th class="text-uppercase text-secondary fw-semibold agent-list-th">Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      @for (a of agents; track a.name) {
-        <tr>
-          <td class="fw-medium">{{ a.name }}</td>
-          <td class="text-secondary">{{ a.namespace }}</td>
-          <td class="text-secondary font-monospace agent-list-image">{{ a.image }}</td>
-          <td>
-            <div class="d-flex align-items-center gap-2">
-              {{ a.replicas }}
-              <div class="btn-group btn-group-sm">
-                <button type="button" class="btn btn-outline-secondary agent-scale-btn" (click)="scale(a, -1)">−</button>
-                <button type="button" class="btn btn-outline-secondary agent-scale-btn" (click)="scale(a, 1)">+</button>
-              </div>
-            </div>
-          </td>
-          <td>
-            <span class="badge rounded-pill"
-              [class.text-bg-success]="a.status === 'Running'"
-              [class.text-bg-warning]="a.status === 'Pending'"
-              [class.text-bg-danger]="a.status === 'Failed'"
-              [class.text-bg-primary]="a.status === 'Restarting'"
-              [class.text-bg-secondary]="a.status !== 'Running' && a.status !== 'Pending' && a.status !== 'Failed' && a.status !== 'Restarting'"
-            >{{ a.status }}</span>
-          </td>
-          <td>
-            <div class="d-flex gap-1">
-              <button type="button" class="btn btn-outline-warning btn-sm agent-action-btn" (click)="restart(a)">Restart</button>
-              <button type="button" class="btn btn-outline-danger btn-sm agent-action-btn" (click)="delete(a)">Delete</button>
-            </div>
-          </td>
-        </tr>
-      }
-    </tbody>
-  </table>
+
+@if (!loading && !error) {
+  <!-- Stats bar -->
+  <div class="stats-bar">
+    <div class="stat-card running">
+      <div class="stat-icon running">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <circle cx="8" cy="8" r="6" fill="#16a34a" opacity=".2"/>
+          <circle cx="8" cy="8" r="3" fill="#16a34a"/>
+        </svg>
+      </div>
+      <div class="stat-body">
+        <div class="stat-num running">{{ countByStatus('Running') }}</div>
+        <div class="stat-label">Running</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon total">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <rect x="2" y="2" width="12" height="12" rx="3" fill="#6366f1" opacity=".2"/>
+          <rect x="5" y="5" width="6" height="6" rx="1.5" fill="#6366f1"/>
+        </svg>
+      </div>
+      <div class="stat-body">
+        <div class="stat-num">{{ agents.length }}</div>
+        <div class="stat-label">Total</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon pending">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <circle cx="8" cy="8" r="6" fill="#f59e0b" opacity=".2"/>
+          <path d="M8 5v3.5l2 2" stroke="#f59e0b" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="stat-body">
+        <div class="stat-num pending">{{ countByStatus('Pending') }}</div>
+        <div class="stat-label">Pending</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon failed">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <circle cx="8" cy="8" r="6" fill="#ef4444" opacity=".2"/>
+          <path d="M5.5 5.5l5 5M10.5 5.5l-5 5" stroke="#ef4444" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="stat-body">
+        <div class="stat-num failed">{{ countByStatus('Failed') }}</div>
+        <div class="stat-label">Failed</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Agent rows -->
+  @if (agents.length === 0) {
+    <div class="agent-empty">
+      <div class="agent-empty-icon">⬡</div>
+      <p>No agents deployed yet.</p>
+    </div>
+  }
+
+  <div class="agents-list">
+    @for (a of agents; track a.name) {
+      <div class="agent-row">
+        <div class="agent-name-col">
+          <div class="agent-name">{{ a.name }}</div>
+          <span class="agent-ns">{{ a.namespace }}</span>
+        </div>
+
+        <div class="agent-image-col">
+          <div class="col-label">Image</div>
+          <div class="agent-image" [title]="a.image">{{ a.image }}</div>
+        </div>
+
+        <div class="agent-replicas-col">
+          <div class="col-label">Replicas</div>
+          <div class="replica-stepper">
+            <button type="button" class="step-btn" (click)="scale(a, -1)">−</button>
+            <span class="rep-count">{{ a.replicas }}</span>
+            <button type="button" class="step-btn" (click)="scale(a, 1)">+</button>
+          </div>
+        </div>
+
+        <div class="agent-status-col">
+          <span class="status-badge"
+            [class.running]="a.status === 'Running'"
+            [class.pending]="a.status === 'Pending'"
+            [class.failed]="a.status === 'Failed'"
+            [class.restarting]="a.status === 'Restarting'"
+          ><span class="status-dot"></span>{{ a.status }}</span>
+        </div>
+
+        <div class="agent-actions-col">
+          <button type="button" class="act-btn act-restart" (click)="restart(a)">Restart</button>
+          <button type="button" class="act-btn act-delete"  (click)="delete(a)">Delete</button>
+        </div>
+      </div>
+    }
+  </div>
+
+  @if (agents.length > 0) {
+    <div class="refresh-hint">Auto-refreshes every 10s</div>
+  }
 }

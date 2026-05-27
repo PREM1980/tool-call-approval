@@ -30,7 +30,7 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
 
   messages: Message[] = [];
   userInput = '';
-  pendingToolCall: ToolCall | null = null;
+  pendingToolCalls: ToolCall[] = [];
   isWaiting = false;
   mode: ConnectionMode = 'sse';
   isSwitching = false;
@@ -40,6 +40,7 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
   private sseSubscription!: Subscription;
   private shouldScrollToBottom = false;
   private kubeconfig: string | null = null;
+  private pendingReportTitles = new Map<string, string>();
 
   constructor(
     private chatService: ChatService,
@@ -81,7 +82,7 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
     this.sseSubscription?.unsubscribe();
     this.activeService.closeStream();
     this.messages = [];
-    this.pendingToolCall = null;
+    this.pendingToolCalls = [];
     this.isWaiting = false;
     await this.initConnection();
     this.isSwitching = false;
@@ -97,7 +98,7 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
     this.sseSubscription?.unsubscribe();
     this.activeService.closeStream();
     this.messages = [];
-    this.pendingToolCall = null;
+    this.pendingToolCalls = [];
     this.isWaiting = false;
     this.mode = newMode;
     await this.initConnection();
@@ -114,10 +115,13 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
     await this.activeService.sendMessage(text, platformContext);
   }
 
-  async handleApproval(approved: boolean): Promise<void> {
-    this.pendingToolCall = null;
-    this.isWaiting = true;
-    await this.activeService.approveTool(approved);
+  async handleApproval(tool_use_id: string, approved: boolean): Promise<void> {
+    this.pendingToolCalls = this.pendingToolCalls.filter(tc => tc.tool_use_id !== tool_use_id);
+    if (this.pendingToolCalls.length === 0) {
+      this.isWaiting = true;
+    }
+    this.cdr.detectChanges();
+    await this.activeService.approveTool(tool_use_id, approved);
   }
 
   private async initConnection(): Promise<void> {
@@ -130,18 +134,31 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
           break;
         case 'tool_call_pending':
           this.isWaiting = false;
-          this.pendingToolCall = {
+          if (event.tool_name === 'save_report') {
+            this.pendingReportTitles.set(
+              event.tool_use_id!,
+              String(event.tool_input?.['title'] ?? 'Report'),
+            );
+          }
+          this.pendingToolCalls.push({
             tool_use_id: event.tool_use_id!,
             tool_name: event.tool_name!,
             tool_input: event.tool_input ?? {},
-          };
+          });
           break;
         case 'tool_result':
-          this.addSystemMessage(
-            `Tool "${event.tool_name}" returned: ${event.result}`
-          );
+          if (event.tool_name === 'save_report' && event.result) {
+            const title = this.pendingReportTitles.get(event.tool_use_id!) ?? 'Report';
+            this.pendingReportTitles.delete(event.tool_use_id!);
+            this.addReportMessage(title, event.result);
+          } else {
+            this.addSystemMessage(
+              `Tool "${event.tool_name}" returned: ${event.result}`
+            );
+          }
           break;
         case 'tool_rejected':
+          this.pendingReportTitles.delete(event.tool_use_id!);
           this.addSystemMessage(`Tool "${event.tool_name}" was rejected.`);
           break;
         case 'message':
@@ -150,6 +167,11 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
           break;
         case 'done':
           this.isWaiting = false;
+          if (event.total_tokens) {
+            this.addSystemMessage(
+              `Tokens: ${event.total_tokens.toLocaleString()} total (${event.input_tokens?.toLocaleString()} in / ${event.output_tokens?.toLocaleString()} out)`
+            );
+          }
           if (this.mode === 'sse') {
             this.activeService.connectStream();
           }
@@ -187,6 +209,17 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
       id: crypto.randomUUID(),
       role: 'system',
       content,
+      timestamp: new Date(),
+    });
+  }
+
+  private addReportMessage(title: string, reportUrl: string): void {
+    this.messages.push({
+      id: crypto.randomUUID(),
+      role: 'system',
+      content: '',
+      reportUrl,
+      reportTitle: title,
       timestamp: new Date(),
     });
   }

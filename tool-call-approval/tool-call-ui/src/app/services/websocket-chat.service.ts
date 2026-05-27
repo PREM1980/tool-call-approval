@@ -43,11 +43,11 @@ export class WebsocketChatService {
     this.ws.send(JSON.stringify({ type: 'chat', message, platform_context: platformContext ?? null }));
   }
 
-  async approveTool(approved: boolean): Promise<void> {
+  async approveTool(tool_use_id: string, approved: boolean): Promise<void> {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       throw new Error('No active WebSocket connection');
     }
-    this.ws.send(JSON.stringify({ type: 'approve', approved }));
+    this.ws.send(JSON.stringify({ type: 'approve', tool_use_id, approved }));
   }
 
   closeStream(): void {

@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { ChatMessage, SessionSummary } from '../models/types';
@@ -7,7 +7,7 @@ const API_URL = 'http://localhost:8080/api';
 
 @Injectable({ providedIn: 'root' })
 export class SessionsService {
-  constructor(private http: HttpClient) {}
+  private http = inject(HttpClient);
 
   getAll(): Promise<SessionSummary[]> {
     return firstValueFrom(

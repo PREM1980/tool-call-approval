@@ -181,7 +181,7 @@ async def test_admin_delete_proxied(ac):
 
 async def test_agents_get_proxied(ac):
     mock_client = AsyncMock()
-    mock_client.request.return_value = _resp(200, [{"name": "x-ui-agents", "namespace": "default",
+    mock_client.request.return_value = _resp(200, [{"name": "x-agent", "namespace": "default",
         "image": "img", "replicas": 1, "ready_replicas": 1, "status": "Running"}])
     with patch("main._client", mock_client):
         resp = await ac.get("/api/agents")
@@ -193,7 +193,7 @@ async def test_agents_get_proxied(ac):
 
 async def test_agents_post_proxied(ac):
     mock_client = AsyncMock()
-    mock_client.request.return_value = _resp(201, {"name": "x-ui-agents", "namespace": "default",
+    mock_client.request.return_value = _resp(201, {"name": "x-agent", "namespace": "default",
         "image": "img", "replicas": 1, "ready_replicas": 0, "status": "Pending"})
     with patch("main._client", mock_client):
         resp = await ac.post("/api/agents/", json={"name": "x", "image": "img"})

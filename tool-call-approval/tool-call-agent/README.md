@@ -1,6 +1,6 @@
 # tool-call-agent
 
-FastAPI backend for the tool-call-approval demo. Runs a Claude agent (via AWS Bedrock) with human-in-the-loop tool approval, streaming events over SSE and WebSocket. Includes Langfuse tracing and a mock mode that requires no API keys.
+FastAPI backend for the tool-call-approval demo. Runs an LLM agent (AWS Bedrock or GCP Vertex AI) with human-in-the-loop tool approval, streaming events over SSE and WebSocket. Includes Langfuse tracing and a mock mode that requires no API keys.
 
 ---
 
@@ -29,10 +29,19 @@ cp .env.example .env
 Edit `.env`:
 
 ```env
-# AWS Bedrock (required for real agent)
+# LLM provider: AWS (default) or GCP
+LLM_PROVIDER=AWS
+
+# AWS Bedrock — required when LLM_PROVIDER=AWS
 AWS_ACCESS_KEY_ID=your_access_key
 AWS_SECRET_ACCESS_KEY=your_secret_key
 AWS_DEFAULT_REGION=us-east-1
+
+# Vertex AI / Gemini — required when LLM_PROVIDER=GCP
+# Download a GCP service account JSON key and point to it on disk
+GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
+GOOGLE_CLOUD_PROJECT=your-gcp-project-id
+GOOGLE_CLOUD_LOCATION=us-central1   # optional, defaults to us-central1
 
 # Langfuse (auto-set if using docker compose)
 LANGFUSE_PUBLIC_KEY=pk-lf-local-tool-call-approval

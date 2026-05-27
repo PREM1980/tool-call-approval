@@ -1,4 +1,4 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ComponentFixture, TestBed, fakeAsync, tick, discardPeriodicTasks } from '@angular/core/testing';
 import { AgentList } from './agent-list';
 import { AgentsService } from '../../../services/agents.service';
 
@@ -10,86 +10,120 @@ function makeService(agents: any[] = []) {
   return { list: () => Promise.resolve(agents), scale: () => Promise.resolve(), restart: () => Promise.resolve(), delete: () => Promise.resolve() };
 }
 
-async function build(agents: any[]) {
-  await TestBed.configureTestingModule({
-    imports: [AgentList],
-    providers: [{ provide: AgentsService, useValue: makeService(agents) }],
-  }).compileComponents();
-  const fixture: ComponentFixture<AgentList> = TestBed.createComponent(AgentList);
-  fixture.detectChanges();
-  await fixture.whenStable();
-  fixture.detectChanges();
-  return fixture;
+function setupFixture(agents: any[]): { get: () => ComponentFixture<AgentList> } {
+  const ref = { fixture: null as unknown as ComponentFixture<AgentList> };
+  beforeEach(fakeAsync(() => {
+    TestBed.configureTestingModule({
+      imports: [AgentList],
+      providers: [{ provide: AgentsService, useValue: makeService(agents) }],
+    }).compileComponents();
+    ref.fixture = TestBed.createComponent(AgentList);
+    ref.fixture.detectChanges();
+    tick();
+    ref.fixture.detectChanges();
+  }));
+  afterEach(fakeAsync(() => discardPeriodicTasks()));
+  return { get: () => ref.fixture };
 }
 
-describe('AgentList', () => {
+describe('AgentList — empty', () => {
+  const { get } = setupFixture([]);
   afterEach(() => TestBed.resetTestingModule());
 
-  it('shows empty state when no agents', async () => {
-    const f = await build([]);
-    expect(f.nativeElement.querySelector('.agent-empty')).toBeTruthy();
-    expect(f.nativeElement.querySelector('.agent-row')).toBeNull();
+  it('shows empty state', () => {
+    expect(get().nativeElement.querySelector('.agent-empty')).toBeTruthy();
+    expect(get().nativeElement.querySelector('.agent-row')).toBeNull();
+  });
+});
+
+describe('AgentList — with agents', () => {
+  const { get } = setupFixture([RUNNING, PENDING, FAILED]);
+  afterEach(() => TestBed.resetTestingModule());
+
+  it('renders one row per agent', () => {
+    expect(get().nativeElement.querySelectorAll('.agent-row').length).toBe(3);
   });
 
-  it('renders one row per agent', async () => {
-    const f = await build([RUNNING, PENDING]);
-    expect(f.nativeElement.querySelectorAll('.agent-row').length).toBe(2);
-  });
-
-  it('stat card shows correct running count', async () => {
-    const f = await build([RUNNING, PENDING, FAILED]);
-    const cards = f.nativeElement.querySelectorAll('.stat-card');
-    // Running card is first
+  it('stat card shows correct running count', () => {
+    const cards = get().nativeElement.querySelectorAll('.stat-card');
     expect(cards[0].querySelector('.stat-num').textContent.trim()).toBe('1');
   });
 
-  it('stat card shows correct total count', async () => {
-    const f = await build([RUNNING, PENDING, FAILED]);
-    const cards = f.nativeElement.querySelectorAll('.stat-card');
-    // Total card is second
+  it('stat card shows correct total count', () => {
+    const cards = get().nativeElement.querySelectorAll('.stat-card');
     expect(cards[1].querySelector('.stat-num').textContent.trim()).toBe('3');
   });
 
-  it('stat card shows correct pending count', async () => {
-    const f = await build([RUNNING, PENDING, FAILED]);
-    const cards = f.nativeElement.querySelectorAll('.stat-card');
+  it('stat card shows correct pending count', () => {
+    const cards = get().nativeElement.querySelectorAll('.stat-card');
     expect(cards[2].querySelector('.stat-num').textContent.trim()).toBe('1');
   });
 
-  it('stat card shows correct failed count', async () => {
-    const f = await build([RUNNING, PENDING, FAILED]);
-    const cards = f.nativeElement.querySelectorAll('.stat-card');
+  it('stat card shows correct failed count', () => {
+    const cards = get().nativeElement.querySelectorAll('.stat-card');
     expect(cards[3].querySelector('.stat-num').textContent.trim()).toBe('1');
   });
+});
 
-  it('Running row has running status badge', async () => {
-    const f = await build([RUNNING]);
+describe('AgentList — status badges', () => {
+  afterEach(() => TestBed.resetTestingModule());
+
+  it('Running row has running status badge', fakeAsync(() => {
+    TestBed.configureTestingModule({
+      imports: [AgentList],
+      providers: [{ provide: AgentsService, useValue: makeService([RUNNING]) }],
+    }).compileComponents();
+    const f = TestBed.createComponent(AgentList);
+    f.detectChanges(); tick(); f.detectChanges();
     const badge = f.nativeElement.querySelector('.status-badge');
     expect(badge.classList).toContain('running');
     expect(badge.textContent).toContain('Running');
-  });
+    discardPeriodicTasks();
+  }));
 
-  it('Pending row has pending status badge', async () => {
-    const f = await build([PENDING]);
-    const badge = f.nativeElement.querySelector('.status-badge');
-    expect(badge.classList).toContain('pending');
-  });
+  it('Pending row has pending status badge', fakeAsync(() => {
+    TestBed.configureTestingModule({
+      imports: [AgentList],
+      providers: [{ provide: AgentsService, useValue: makeService([PENDING]) }],
+    }).compileComponents();
+    const f = TestBed.createComponent(AgentList);
+    f.detectChanges(); tick(); f.detectChanges();
+    expect(f.nativeElement.querySelector('.status-badge').classList).toContain('pending');
+    discardPeriodicTasks();
+  }));
 
-  it('Failed row has failed status badge', async () => {
-    const f = await build([FAILED]);
-    const badge = f.nativeElement.querySelector('.status-badge');
-    expect(badge.classList).toContain('failed');
-  });
+  it('Failed row has failed status badge', fakeAsync(() => {
+    TestBed.configureTestingModule({
+      imports: [AgentList],
+      providers: [{ provide: AgentsService, useValue: makeService([FAILED]) }],
+    }).compileComponents();
+    const f = TestBed.createComponent(AgentList);
+    f.detectChanges(); tick(); f.detectChanges();
+    expect(f.nativeElement.querySelector('.status-badge').classList).toContain('failed');
+    discardPeriodicTasks();
+  }));
 
-  it('shows agent name and namespace pill', async () => {
-    const f = await build([RUNNING]);
+  it('shows agent name and namespace pill', fakeAsync(() => {
+    TestBed.configureTestingModule({
+      imports: [AgentList],
+      providers: [{ provide: AgentsService, useValue: makeService([RUNNING]) }],
+    }).compileComponents();
+    const f = TestBed.createComponent(AgentList);
+    f.detectChanges(); tick(); f.detectChanges();
     const row = f.nativeElement.querySelector('.agent-row');
     expect(row.querySelector('.agent-name').textContent.trim()).toBe('alpha-agent');
     expect(row.querySelector('.agent-ns').textContent.trim()).toBe('default');
-  });
+    discardPeriodicTasks();
+  }));
 
-  it('shows replica count', async () => {
-    const f = await build([RUNNING]);
+  it('shows replica count', fakeAsync(() => {
+    TestBed.configureTestingModule({
+      imports: [AgentList],
+      providers: [{ provide: AgentsService, useValue: makeService([RUNNING]) }],
+    }).compileComponents();
+    const f = TestBed.createComponent(AgentList);
+    f.detectChanges(); tick(); f.detectChanges();
     expect(f.nativeElement.querySelector('.rep-count').textContent.trim()).toBe('2');
-  });
+    discardPeriodicTasks();
+  }));
 });

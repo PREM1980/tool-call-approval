@@ -1,0 +1,55 @@
+<h2>How should "Agents" appear in the Admin sidebar?</h2>
+<p class="subtitle">The existing sidebar has flat links: Agent-WS, Persona, Skills, MCP Servers, Credentials</p>
+
+<div class="cards">
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="display:flex;height:180px;font-size:12px;border:1px solid #333;border-radius:6px;overflow:hidden">
+        <div style="width:140px;background:#1a1a2e;padding:12px;display:flex;flex-direction:column;gap:6px">
+          <div style="color:#888;font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Admin</div>
+          <div style="color:#aaa;padding:4px 8px;border-radius:4px">Agent-WS</div>
+          <div style="color:#aaa;padding:4px 8px;border-radius:4px">Persona</div>
+          <div style="color:#aaa;padding:4px 8px;border-radius:4px">Skills</div>
+          <div style="color:#aaa;padding:4px 8px;border-radius:4px">MCP Servers</div>
+          <div style="color:#aaa;padding:4px 8px;border-radius:4px">Credentials</div>
+          <div style="border-top:1px solid #333;margin:4px 0"></div>
+          <div style="color:#60a5fa;font-weight:600;padding:4px 8px;border-radius:4px;background:#1e3a5f">▾ Agents</div>
+          <div style="color:#aaa;padding:4px 8px 4px 20px;border-radius:4px;font-size:11px">— Deployments</div>
+          <div style="color:#aaa;padding:4px 8px 4px 20px;border-radius:4px;font-size:11px">— View</div>
+        </div>
+        <div style="flex:1;background:#0f0f1a;padding:12px;color:#666;font-size:11px">panel content</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A — Expandable group in sidebar</h3>
+      <p>Agents appears as a collapsible section in the existing sidebar. Click to expand/collapse Deployments and View sub-links.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="display:flex;height:180px;font-size:12px;border:1px solid #333;border-radius:6px;overflow:hidden">
+        <div style="width:140px;background:#1a1a2e;padding:12px;display:flex;flex-direction:column;gap:6px">
+          <div style="color:#888;font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Admin</div>
+          <div style="color:#aaa;padding:4px 8px;border-radius:4px">Agent-WS</div>
+          <div style="color:#aaa;padding:4px 8px;border-radius:4px">Persona</div>
+          <div style="color:#aaa;padding:4px 8px;border-radius:4px">Skills</div>
+          <div style="color:#aaa;padding:4px 8px;border-radius:4px">MCP Servers</div>
+          <div style="color:#aaa;padding:4px 8px;border-radius:4px">Credentials</div>
+          <div style="color:#60a5fa;font-weight:600;padding:4px 8px;border-radius:4px;background:#1e3a5f">Agents</div>
+        </div>
+        <div style="flex:1;background:#0f0f1a;padding:12px">
+          <div style="display:flex;gap:8px;margin-bottom:10px">
+            <div style="color:#60a5fa;padding:4px 10px;background:#1e3a5f;border-radius:4px;font-size:11px;font-weight:600">Deployments</div>
+            <div style="color:#aaa;padding:4px 10px;border:1px solid #333;border-radius:4px;font-size:11px">View</div>
+          </div>
+          <div style="color:#666;font-size:11px">tab content here</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — Agents as one nav item, tabs inside the panel</h3>
+      <p>Agents is a single sidebar link. When selected, the panel shows Deployments / View as tab toggles at the top.</p>
+    </div>
+  </div>
+</div>

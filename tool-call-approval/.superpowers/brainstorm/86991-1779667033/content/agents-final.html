@@ -1,0 +1,174 @@
+<h2>Agents View — Final Design</h2>
+<p class="subtitle">Ops Dashboard with flat rows. Does this look right?</p>
+
+<style>
+  .page-wrap { background: #f1f5f9; border-radius: 14px; padding: 24px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+
+  /* Page header */
+  .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+  .page-title { font-size: 22px; font-weight: 800; color: #0f172a; letter-spacing: -.02em; }
+  .tab-bar { display: flex; gap: 2px; background: #e2e8f0; border-radius: 8px; padding: 3px; margin-bottom: 20px; }
+  .tab { padding: 6px 18px; border-radius: 6px; font-size: 13px; font-weight: 500; color: #64748b; cursor: pointer; }
+  .tab.active { background: #fff; color: #0f172a; font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+
+  /* Stats bar */
+  .stats-bar { display: flex; gap: 12px; margin-bottom: 20px; }
+  .stat-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px 20px; flex: 1; display: flex; align-items: center; gap: 14px; }
+  .stat-icon { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+  .stat-icon.running { background: #dcfce7; }
+  .stat-icon.pending { background: #fef3c7; }
+  .stat-icon.failed  { background: #fee2e2; }
+  .stat-icon.total   { background: #e0e7ff; }
+  .stat-body { }
+  .stat-num   { font-size: 22px; font-weight: 800; line-height: 1; color: #0f172a; }
+  .stat-label { font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: .06em; margin-top: 2px; }
+  .stat-card.running .stat-num { color: #16a34a; }
+  .stat-card.failed  .stat-num { color: #dc2626; }
+  .stat-card.pending .stat-num { color: #d97706; }
+
+  /* Agent rows */
+  .agents-list { display: flex; flex-direction: column; gap: 8px; }
+  .agent-row { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px 18px; display: flex; align-items: center; gap: 16px; transition: box-shadow .15s; }
+  .agent-row:hover { box-shadow: 0 4px 12px rgba(0,0,0,.07); border-color: #cbd5e1; }
+
+  .agent-name-col { flex: 0 0 170px; }
+  .agent-name { font-weight: 700; font-size: 14px; color: #0f172a; }
+  .agent-ns   { display: inline-block; background: #f1f5f9; color: #64748b; border-radius: 4px; padding: 1px 7px; font-size: 10.5px; margin-top: 4px; }
+
+  .agent-image-col { flex: 1; }
+  .agent-image { font-family: 'SF Mono', 'Fira Mono', monospace; font-size: 11.5px; color: #475569; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
+  .image-label { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: #94a3b8; margin-bottom: 2px; }
+
+  .agent-replicas-col { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; }
+  .rep-label { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: #94a3b8; margin-bottom: 2px; }
+  .replica-stepper { display: flex; align-items: center; gap: 6px; }
+  .step-btn { border: 1px solid #e2e8f0; background: #f8fafc; border-radius: 5px; width: 24px; height: 24px; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #475569; flex-shrink: 0; }
+  .step-btn:hover { background: #e2e8f0; }
+  .rep-count { font-size: 16px; font-weight: 700; color: #0f172a; min-width: 18px; text-align: center; }
+
+  .agent-status-col { flex: 0 0 110px; }
+  .status-badge { display: inline-flex; align-items: center; gap: 6px; border-radius: 20px; padding: 4px 12px; font-size: 12px; font-weight: 600; }
+  .status-badge.running { background: #dcfce7; color: #16a34a; }
+  .status-badge.pending { background: #fef3c7; color: #d97706; }
+  .status-badge.failed  { background: #fee2e2; color: #dc2626; }
+  .status-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+
+  .agent-actions-col { flex: 0 0 auto; display: flex; gap: 6px; }
+  .act-btn { border: none; border-radius: 7px; padding: 6px 14px; font-size: 12px; font-weight: 600; cursor: pointer; transition: opacity .1s; }
+  .act-btn:hover { opacity: .85; }
+  .act-restart { background: #fef3c7; color: #b45309; }
+  .act-delete  { background: #fee2e2; color: #b91c1c; }
+
+  /* Empty state */
+  .empty-state { text-align: center; padding: 48px 0; color: #94a3b8; }
+  .empty-state .empty-icon { font-size: 32px; margin-bottom: 8px; }
+  .empty-state p { font-size: 14px; }
+
+  /* Refresh hint */
+  .refresh-hint { font-size: 11px; color: #94a3b8; text-align: right; margin-top: 10px; }
+</style>
+
+<div class="page-wrap">
+
+  <div class="page-header">
+    <div class="page-title">Agents</div>
+  </div>
+
+  <div class="tab-bar">
+    <div class="tab">Deployments</div>
+    <div class="tab active">View</div>
+  </div>
+
+  <!-- Stats bar -->
+  <div class="stats-bar">
+    <div class="stat-card running">
+      <div class="stat-icon running">✦</div>
+      <div class="stat-body">
+        <div class="stat-num">1</div>
+        <div class="stat-label">Running</div>
+      </div>
+    </div>
+    <div class="stat-card total">
+      <div class="stat-icon total">⬡</div>
+      <div class="stat-body">
+        <div class="stat-num">1</div>
+        <div class="stat-label">Total</div>
+      </div>
+    </div>
+    <div class="stat-card pending">
+      <div class="stat-icon pending">◌</div>
+      <div class="stat-body">
+        <div class="stat-num">0</div>
+        <div class="stat-label">Pending</div>
+      </div>
+    </div>
+    <div class="stat-card failed">
+      <div class="stat-icon failed">✕</div>
+      <div class="stat-body">
+        <div class="stat-num">0</div>
+        <div class="stat-label">Failed</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Agent rows -->
+  <div class="agents-list">
+
+    <div class="agent-row">
+      <div class="agent-name-col">
+        <div class="agent-name">tool-call-agent</div>
+        <span class="agent-ns">default</span>
+      </div>
+      <div class="agent-image-col">
+        <div class="image-label">Image</div>
+        <div class="agent-image">tool-call-agent:latest</div>
+      </div>
+      <div class="agent-replicas-col">
+        <div class="rep-label">Replicas</div>
+        <div class="replica-stepper">
+          <button class="step-btn">−</button>
+          <span class="rep-count">1</span>
+          <button class="step-btn">+</button>
+        </div>
+      </div>
+      <div class="agent-status-col">
+        <span class="status-badge running"><span class="status-dot"></span>Running</span>
+      </div>
+      <div class="agent-actions-col">
+        <button class="act-btn act-restart">Restart</button>
+        <button class="act-btn act-delete">Delete</button>
+      </div>
+    </div>
+
+    <!-- Second agent (Pending) to show status variation -->
+    <div class="agent-row" style="opacity:.6">
+      <div class="agent-name-col">
+        <div class="agent-name">inference-agent</div>
+        <span class="agent-ns">staging</span>
+      </div>
+      <div class="agent-image-col">
+        <div class="image-label">Image</div>
+        <div class="agent-image">inference-agent:v2.1</div>
+      </div>
+      <div class="agent-replicas-col">
+        <div class="rep-label">Replicas</div>
+        <div class="replica-stepper">
+          <button class="step-btn">−</button>
+          <span class="rep-count">2</span>
+          <button class="step-btn">+</button>
+        </div>
+      </div>
+      <div class="agent-status-col">
+        <span class="status-badge pending"><span class="status-dot"></span>Pending</span>
+      </div>
+      <div class="agent-actions-col">
+        <button class="act-btn act-restart">Restart</button>
+        <button class="act-btn act-delete">Delete</button>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="refresh-hint">Auto-refreshes every 10s</div>
+
+</div>

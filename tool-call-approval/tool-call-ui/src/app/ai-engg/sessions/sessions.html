@@ -1,71 +1,57 @@
 @if (error) {
-  <div class="alert alert-danger py-2 px-3 m-3 sessions-alert">{{ error }}</div>
+  <div class="sessions-error">{{ error }}</div>
 }
 
 @if (loadingSessions) {
-  <div class="d-flex justify-content-center py-5">
-    <div class="spinner-border text-primary" role="status">
-      <span class="visually-hidden">Loading…</span>
-    </div>
+  <div class="sessions-loading">
+    <div class="spinner"></div>
   </div>
 }
 
 @if (!loadingSessions && sessions.length === 0 && !error) {
-  <div class="text-center text-secondary py-5 sessions-empty">No sessions yet.</div>
+  <div class="sessions-empty">No sessions yet.</div>
 }
 
 @if (sessions.length > 0) {
-  <div class="p-3">
-    <table class="table table-hover align-middle sessions-table">
-      <thead class="table-light">
-        <tr>
-          <th class="text-uppercase text-secondary fw-semibold sessions-th">Session ID</th>
-          <th class="text-uppercase text-secondary fw-semibold sessions-th">Last Active</th>
-          <th class="text-uppercase text-secondary fw-semibold sessions-th">Turns</th>
-        </tr>
-      </thead>
-      <tbody>
-        @for (s of sessions; track s.session_id) {
-          <tr class="session-row" [class.table-active]="selectedId === s.session_id" (click)="selectSession(s.session_id)">
-            <td class="font-monospace text-primary session-id-cell">{{ shortId(s.session_id) }}</td>
-            <td class="text-secondary">{{ formatTimestamp(s.updated_at ?? s.created_at) }}</td>
-            <td>{{ s.turn_count }}</td>
-          </tr>
-          @if (selectedId === s.session_id) {
-            <tr>
-              <td colspan="3" class="p-0 bg-light">
-                @if (loadingHistory) {
-                  <div class="d-flex justify-content-center py-3">
-                    <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
-                  </div>
-                }
-                @if (historyError) {
-                  <div class="alert alert-danger m-3 py-2 px-3 sessions-alert">{{ historyError }}</div>
-                }
-                @if (!loadingHistory && history.length === 0 && !historyError) {
-                  <p class="text-secondary text-center py-3 mb-0 sessions-empty">No messages in this session.</p>
-                }
-                <div class="d-flex flex-column gap-2 p-3 history-scroll">
-                  @for (msg of history; track $index) {
-                    <div class="d-flex" [class.justify-content-end]="msg.role === 'user'" [class.justify-content-start]="msg.role !== 'user'">
-                      <div class="px-3 py-2 rounded-3 history-bubble"
-                        [class.bg-primary]="msg.role === 'user'"
-                        [class.text-white]="msg.role === 'user'"
-                        [class.bg-white]="msg.role !== 'user'"
-                        [class.border]="msg.role !== 'user'">
-                        <div class="text-uppercase fw-semibold mb-1 history-role"
-                          [class.text-white-50]="msg.role === 'user'"
-                          [class.text-secondary]="msg.role !== 'user'">{{ msg.role }}</div>
-                        <p class="mb-0 history-content">{{ msg.content }}</p>
-                      </div>
-                    </div>
-                  }
-                </div>
-              </td>
-            </tr>
+  <div class="sessions-list">
+    <div class="sessions-header">
+      <span class="col-id">Session ID</span>
+      <span class="col-time">Last Active</span>
+      <span class="col-turns">Turns</span>
+    </div>
+
+    @for (s of sessions; track s.session_id) {
+      <div class="session-row" [class.active]="selectedId === s.session_id" (click)="selectSession(s.session_id)">
+        <span class="col-id session-id">{{ shortId(s.session_id) }}</span>
+        <span class="col-time session-time">{{ formatTimestamp(s.updated_at ?? s.created_at) }}</span>
+        <span class="col-turns session-turns">{{ s.turn_count }}</span>
+      </div>
+
+      @if (selectedId === s.session_id) {
+        <div class="session-history">
+          @if (loadingHistory) {
+            <div class="sessions-loading history-loading">
+              <div class="spinner spinner-sm"></div>
+            </div>
           }
-        }
-      </tbody>
-    </table>
+          @if (historyError) {
+            <div class="sessions-error">{{ historyError }}</div>
+          }
+          @if (!loadingHistory && history.length === 0 && !historyError) {
+            <p class="sessions-empty">No messages in this session.</p>
+          }
+          <div class="history-messages">
+            @for (msg of history; track $index) {
+              <div class="hist-row" [class.hist-user]="msg.role === 'user'" [class.hist-other]="msg.role !== 'user'">
+                <div class="hist-bubble">
+                  <div class="hist-role">{{ msg.role }}</div>
+                  <p class="hist-content">{{ msg.content }}</p>
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+      }
+    }
   </div>
 }

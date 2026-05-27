@@ -1,0 +1,108 @@
+<h2>Where does the agent config page live?</h2>
+<p class="subtitle">Pick the layout that feels right for configuring persona + MCP servers per instance</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Detail page — click agent name to configure</h3>
+      <p>Agent list row has a clickable name. Opens <code>/admin/agents/tool-call-agent-ui-agents</code> — a full page with persona picker and MCP server checkboxes. Back button returns to list.</p>
+      <div class="mockup" style="margin-top:10px">
+        <div class="mockup-header">Admin → Agents → tool-call-agent-ui-agents</div>
+        <div class="mockup-body" style="font-size:12px;padding:10px">
+          <div style="display:flex;gap:16px;margin-bottom:8px;align-items:center">
+            <span style="color:#58a6ff;cursor:pointer">← Back</span>
+            <strong>tool-call-agent-ui-agents</strong>
+            <span style="color:#3fb950;font-size:11px">● Running</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div style="border:1px solid #30363d;border-radius:6px;padding:10px">
+              <div style="font-size:10px;color:#8b949e;text-transform:uppercase;margin-bottom:6px">Persona</div>
+              <div style="background:#161b22;border-radius:4px;padding:6px;font-size:12px">▼ Customer Support</div>
+            </div>
+            <div style="border:1px solid #30363d;border-radius:6px;padding:10px">
+              <div style="font-size:10px;color:#8b949e;text-transform:uppercase;margin-bottom:6px">MCP Servers</div>
+              <div style="font-size:12px;display:flex;flex-direction:column;gap:4px">
+                <label><input type="checkbox" checked> Slack</label>
+                <label><input type="checkbox"> Jira</label>
+                <label><input type="checkbox" checked> GitHub</label>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Inline drawer — config expands below each row</h3>
+      <p>Clicking a row in the agent list expands an inline panel below it with the persona picker and MCP server list. No navigation required.</p>
+      <div class="mockup" style="margin-top:10px">
+        <div class="mockup-header">Admin → Agents → View</div>
+        <div class="mockup-body" style="font-size:12px;padding:10px">
+          <div style="border:1px solid #30363d;border-radius:4px;margin-bottom:4px">
+            <div style="padding:8px;display:flex;justify-content:space-between;background:#161b22">
+              <span style="color:#58a6ff">tool-call-agent-ui-agents</span>
+              <span style="color:#3fb950">Running</span>
+            </div>
+            <div style="padding:10px;border-top:1px solid #30363d;background:#0d1117;display:grid;grid-template-columns:1fr 1fr;gap:12px">
+              <div>
+                <div style="font-size:10px;color:#8b949e;margin-bottom:4px">PERSONA</div>
+                <select style="background:#161b22;border:1px solid #30363d;color:#e6edf3;padding:4px;font-size:11px;width:100%"><option>Customer Support</option></select>
+              </div>
+              <div>
+                <div style="font-size:10px;color:#8b949e;margin-bottom:4px">MCP SERVERS</div>
+                <div style="font-size:11px;display:flex;flex-direction:column;gap:3px">
+                  <label><input type="checkbox" checked> Slack</label>
+                  <label><input type="checkbox"> Jira</label>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div style="padding:8px;border:1px solid #30363d;border-radius:4px;background:#161b22;display:flex;justify-content:space-between">
+            <span>tool-call-agent-2-ui-agents</span>
+            <span style="color:#d29922">Pending</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Third tab — "Configure" alongside Deploy and View</h3>
+      <p>The Agents panel gets a third tab. You pick an instance from a dropdown, then set its persona and MCP servers. Simple, flat, no navigation.</p>
+      <div class="mockup" style="margin-top:10px">
+        <div class="mockup-header">Admin → Agents</div>
+        <div class="mockup-body" style="font-size:12px;padding:10px">
+          <div style="display:flex;gap:0;margin-bottom:12px;border-bottom:1px solid #30363d">
+            <span style="padding:6px 14px;color:#8b949e;font-size:12px">Deploy</span>
+            <span style="padding:6px 14px;color:#8b949e;font-size:12px">View</span>
+            <span style="padding:6px 14px;color:#58a6ff;border-bottom:2px solid #58a6ff;font-size:12px">Configure</span>
+          </div>
+          <div style="margin-bottom:10px">
+            <div style="font-size:10px;color:#8b949e;margin-bottom:4px">AGENT INSTANCE</div>
+            <select style="background:#161b22;border:1px solid #30363d;color:#e6edf3;padding:6px;font-size:12px;width:100%"><option>tool-call-agent-ui-agents</option></select>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div>
+              <div style="font-size:10px;color:#8b949e;margin-bottom:4px">PERSONA</div>
+              <select style="background:#161b22;border:1px solid #30363d;color:#e6edf3;padding:6px;font-size:12px;width:100%"><option>Customer Support</option></select>
+            </div>
+            <div>
+              <div style="font-size:10px;color:#8b949e;margin-bottom:4px">MCP SERVERS</div>
+              <div style="font-size:11px;display:flex;flex-direction:column;gap:4px">
+                <label><input type="checkbox" checked> Slack</label>
+                <label><input type="checkbox"> Jira</label>
+                <label><input type="checkbox" checked> GitHub</label>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

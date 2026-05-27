@@ -4,7 +4,7 @@ import sys
 import httpx
 
 BASE_URL = "http://localhost:8000"
-DEFAULT_MESSAGE = "What is the capital of France and why is it historically significant?"
+DEFAULT_MESSAGE = "command to list all my pods?"
 
 
 def run(message: str = DEFAULT_MESSAGE) -> None:

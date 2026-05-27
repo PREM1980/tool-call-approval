@@ -1,7 +1,7 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ChatMessage, SessionSummary } from '../../../models/types';
-import { SessionsService } from '../../../services/sessions.service';
+import { ChatMessage, SessionSummary } from '../../models/types';
+import { SessionsService } from '../../services/sessions.service';
 
 @Component({
   selector: 'app-sessions',
@@ -11,6 +11,8 @@ import { SessionsService } from '../../../services/sessions.service';
   styleUrl: './sessions.css',
 })
 export class Sessions implements OnInit {
+  private sessionsService = inject(SessionsService);
+
   sessions: SessionSummary[] = [];
   selectedId: string | null = null;
   history: ChatMessage[] = [];
@@ -18,8 +20,6 @@ export class Sessions implements OnInit {
   loadingHistory = false;
   error = '';
   historyError = '';
-
-  constructor(private sessionsService: SessionsService) {}
 
   async ngOnInit(): Promise<void> {
     this.loadingSessions = true;

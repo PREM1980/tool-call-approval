@@ -1,0 +1,4 @@
+{"type":"server-started","port":52532,"host":"127.0.0.1","url_host":"localhost","url":"http://localhost:52532","screen_dir":"/Users/premlakshmanan/scratch/python/tool-call-approval/.superpowers/brainstorm/44374-1779317484/content","state_dir":"/Users/premlakshmanan/scratch/python/tool-call-approval/.superpowers/brainstorm/44374-1779317484/state"}
+{"type":"screen-added","file":"/Users/premlakshmanan/scratch/python/tool-call-approval/.superpowers/brainstorm/44374-1779317484/content/agent-config-location.html"}
+{"type":"screen-added","file":"/Users/premlakshmanan/scratch/python/tool-call-approval/.superpowers/brainstorm/44374-1779317484/content/configure-tab-layout.html"}
+{"type":"server-stopped","reason":"idle timeout"}

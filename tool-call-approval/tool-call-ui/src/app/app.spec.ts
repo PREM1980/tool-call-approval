@@ -34,10 +34,10 @@ describe('App', () => {
     expect(app).toBeTruthy();
   });
 
-  it('should render the chat component', () => {
+  it('should render the router outlet', () => {
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
     const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('app-chat')).toBeTruthy();
+    expect(compiled.querySelector('router-outlet')).toBeTruthy();
   });
 });

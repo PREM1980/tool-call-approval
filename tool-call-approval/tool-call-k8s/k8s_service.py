@@ -5,7 +5,7 @@ from pathlib import Path
 
 _KUBECONFIG_PATH = os.getenv("KUBECONFIG_PATH", "/data/kubeconfig.yaml")
 _KUBECTL_TIMEOUT = 30
-_SUFFIX = "-ui-agents"
+_SUFFIX = "-agent"
 
 
 def write_kubeconfig(content: str) -> None:

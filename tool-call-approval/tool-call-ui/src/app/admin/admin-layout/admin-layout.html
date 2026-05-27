@@ -1,31 +1,72 @@
 <div class="d-flex h-100">
-  <nav class="bg-light border-end p-3 flex-shrink-0 overflow-y-auto admin-sidebar">
-    <div class="text-uppercase text-secondary fw-semibold mb-2 sidebar-section-label">Configuration</div>
-    <ul class="nav flex-column mb-3">
-      <li class="nav-item">
-        <a class="nav-link px-2 py-1 rounded text-dark sidebar-link" routerLink="/admin/credentials" routerLinkActive="active">Credentials</a>
+  <nav class="admin-sidebar">
+    <div class="sidebar-section-label">Configuration</div>
+    <ul class="sidebar-nav">
+      <li>
+        <a class="sidebar-link" routerLink="/admin/credentials" routerLinkActive="active">
+          <svg class="sidebar-icon" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="6" cy="8" r="3.25" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M8.75 8h4.5M11.25 8v2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          Credentials
+        </a>
       </li>
-      <li class="nav-item">
-        <a class="nav-link px-2 py-1 rounded text-dark sidebar-link" routerLink="/admin/mcp-servers" routerLinkActive="active">MCP Servers</a>
+      <li>
+        <a class="sidebar-link" routerLink="/admin/mcp-servers" routerLinkActive="active">
+          <svg class="sidebar-icon" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="2" y="3" width="12" height="4" rx="1.5" stroke="currentColor" stroke-width="1.5"/>
+            <rect x="2" y="9" width="12" height="4" rx="1.5" stroke="currentColor" stroke-width="1.5"/>
+            <circle cx="11.5" cy="5" r="0.75" fill="currentColor"/>
+            <circle cx="11.5" cy="11" r="0.75" fill="currentColor"/>
+          </svg>
+          MCP Servers
+        </a>
       </li>
-      <li class="nav-item">
-        <a class="nav-link px-2 py-1 rounded text-dark sidebar-link" routerLink="/admin/skills" routerLinkActive="active">Skills</a>
+      <li>
+        <a class="sidebar-link" routerLink="/admin/skills" routerLinkActive="active">
+          <svg class="sidebar-icon" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M9 2L5.5 9h4L6 14l5.5-7.5H8L9 2z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+          </svg>
+          Skills
+        </a>
       </li>
-      <li class="nav-item">
-        <a class="nav-link px-2 py-1 rounded text-dark sidebar-link" routerLink="/admin/persona" routerLinkActive="active">Persona</a>
+      <li>
+        <a class="sidebar-link" routerLink="/admin/persona" routerLinkActive="active">
+          <svg class="sidebar-icon" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="8" cy="5.5" r="2.5" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M2.5 13.5c0-2.485 2.462-4.5 5.5-4.5s5.5 2.015 5.5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          Persona
+        </a>
       </li>
     </ul>
-    <div class="text-uppercase text-secondary fw-semibold mb-2 sidebar-section-label">Agents</div>
-    <ul class="nav flex-column">
-      <li class="nav-item">
-        <a class="nav-link px-2 py-1 rounded text-dark sidebar-link" routerLink="/admin/agents" routerLinkActive="active">Agents</a>
+
+    <div class="sidebar-section-label">Agents</div>
+    <ul class="sidebar-nav">
+      <li>
+        <a class="sidebar-link" routerLink="/admin/agents" routerLinkActive="active">
+          <svg class="sidebar-icon" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="2" y="2" width="5" height="5" rx="1.2" stroke="currentColor" stroke-width="1.5"/>
+            <rect x="9" y="2" width="5" height="5" rx="1.2" stroke="currentColor" stroke-width="1.5"/>
+            <rect x="2" y="9" width="5" height="5" rx="1.2" stroke="currentColor" stroke-width="1.5"/>
+            <rect x="9" y="9" width="5" height="5" rx="1.2" stroke="currentColor" stroke-width="1.5"/>
+          </svg>
+          Agents
+        </a>
       </li>
-      <li class="nav-item">
-        <a class="nav-link px-2 py-1 rounded text-dark sidebar-link" routerLink="/admin/agent-ws" routerLinkActive="active">Agent-WS</a>
+      <li>
+        <a class="sidebar-link" routerLink="/admin/agent-ws" routerLinkActive="active">
+          <svg class="sidebar-icon" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M5.17 5.17a4 4 0 0 0 0 5.66M10.83 5.17a4 4 0 0 1 0 5.66" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            <path d="M3.05 3.05a7 7 0 0 0 0 9.9M12.95 3.05a7 7 0 0 1 0 9.9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          Agent-WS
+        </a>
       </li>
     </ul>
   </nav>
-  <div class="flex-grow-1 p-4 overflow-y-auto">
+  <div class="admin-content">
     <router-outlet />
   </div>
 </div>

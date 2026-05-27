@@ -1,28 +1,211 @@
-.agent-list-alert,
-.agent-list-status {
+/* ── Alert ─────────────────────────────────────────── */
+.agent-list-alert { font-size: 0.875rem; }
+
+/* ── Stats bar ─────────────────────────────────────── */
+.stats-bar {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.stat-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 10px 16px;
+  min-width: 110px;
+  flex: 1 1 110px;
+}
+
+.stat-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  background: #f1f5f9;
+  flex-shrink: 0;
+}
+
+.stat-body { display: flex; flex-direction: column; }
+
+.stat-num {
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: #111827;
+}
+.stat-num.running  { color: #16a34a; }
+.stat-num.pending  { color: #d97706; }
+.stat-num.failed   { color: #dc2626; }
+
+.stat-label {
+  font-size: 0.7rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #6b7280;
+  margin-top: 1px;
+}
+
+/* ── Agent rows ────────────────────────────────────── */
+.agents-list { display: flex; flex-direction: column; gap: 6px; }
+
+.agent-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 10px 14px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.agent-row:hover {
+  border-color: #c7d2fe;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.06);
+}
+
+/* columns */
+.agent-name-col   { flex: 0 0 180px; min-width: 0; }
+.agent-image-col  { flex: 1 1 0;    min-width: 0; }
+.agent-replicas-col { flex: 0 0 110px; }
+.agent-status-col   { flex: 0 0 100px; }
+.agent-actions-col  { flex: 0 0 130px; display: flex; gap: 6px; justify-content: flex-end; }
+
+.agent-name {
   font-size: 0.875rem;
-}
-
-.agent-list-table {
-  font-size: 0.875rem;
-}
-
-.agent-list-th {
-  font-size: 0.72rem;
-  letter-spacing: 0.07em;
-}
-
-.agent-list-image {
-  max-width: 200px;
+  font-weight: 600;
+  color: #111827;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.agent-ns {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 500;
+  color: #6366f1;
+  background: #eef2ff;
+  border-radius: 4px;
+  padding: 1px 6px;
+  margin-top: 3px;
+}
+
+.col-label {
+  font-size: 0.65rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #9ca3af;
+  margin-bottom: 2px;
+}
+
+.agent-image {
+  font-size: 0.8rem;
+  color: #374151;
+  font-family: ui-monospace, monospace;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.agent-scale-btn {
-  padding: 1px 7px;
+/* replica stepper */
+.replica-stepper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.step-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  background: #f9fafb;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  color: #374151;
+  padding: 0;
+  transition: background 0.12s, border-color 0.12s;
+}
+.step-btn:hover { background: #f3f4f6; border-color: #9ca3af; }
+
+.rep-count {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #111827;
+  min-width: 16px;
+  text-align: center;
 }
 
-.agent-action-btn {
+/* status badge */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   font-size: 0.75rem;
+  font-weight: 500;
+  border-radius: 999px;
+  padding: 3px 9px;
+  background: #f1f5f9;
+  color: #64748b;
+}
+.status-badge.running    { background: #dcfce7; color: #15803d; }
+.status-badge.pending    { background: #fef9c3; color: #a16207; }
+.status-badge.failed     { background: #fee2e2; color: #b91c1c; }
+.status-badge.restarting { background: #e0e7ff; color: #4338ca; }
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+/* action buttons */
+.act-btn {
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 5px;
+  border: 1px solid #d1d5db;
+  background: #f9fafb;
+  color: #374151;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+.act-btn:hover { background: #f3f4f6; border-color: #9ca3af; }
+.act-delete { border-color: #fca5a5; color: #b91c1c; background: #fff5f5; }
+.act-delete:hover { background: #fee2e2; border-color: #f87171; }
+
+/* ── Empty state ───────────────────────────────────── */
+.agent-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 0;
+  color: #9ca3af;
+  gap: 8px;
+}
+.agent-empty-icon { font-size: 2rem; opacity: 0.5; }
+.agent-empty p   { font-size: 0.875rem; margin: 0; }
+
+/* ── Refresh hint ──────────────────────────────────── */
+.refresh-hint {
+  font-size: 0.7rem;
+  color: #9ca3af;
+  text-align: right;
+  margin-top: 8px;
 }
