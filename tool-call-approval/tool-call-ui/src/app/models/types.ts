@@ -18,6 +18,7 @@ export interface SessionSummary {
   created_at: number;
   updated_at: number | null;
   turn_count: number;
+  first_message?: string | null;
 }
 
 export interface ChatMessage {

@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ChatMessage, SessionSummary } from '../../models/types';
 import { SessionsService } from '../../services/sessions.service';
@@ -12,6 +12,8 @@ import { SessionsService } from '../../services/sessions.service';
 })
 export class Sessions implements OnInit {
   private sessionsService = inject(SessionsService);
+
+  @Output() openChat = new EventEmitter<string>();
 
   sessions: SessionSummary[] = [];
   selectedId: string | null = null;

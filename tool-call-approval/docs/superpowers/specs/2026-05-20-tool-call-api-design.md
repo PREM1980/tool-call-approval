@@ -1,17 +1,17 @@
-# tool-call-web — API Gateway Design
+# tool-call-api — API Gateway Design
 
 **Date:** 2026-05-20
 **Status:** Approved
 
 ## Overview
 
-Add a new FastAPI service `tool-call-web` that sits between the Angular UI (`tool-call-ui`) and the agent backend (`tool-call-fastapi`). It acts as an API gateway: the UI talks only to `tool-call-web`, which routes requests to `tool-call-fastapi`.
+Add a new FastAPI service `tool-call-api` that sits between the Angular UI (`tool-call-ui`) and the agent backend (`tool-call-fastapi`). It acts as an API gateway: the UI talks only to `tool-call-api`, which routes requests to `tool-call-fastapi`.
 
 ```
 tool-call-ui (Angular :4200)
        │  HTTP + SSE
        ▼
-tool-call-web (FastAPI :8080)   ← new service
+tool-call-api (FastAPI :8080)   ← new service
        │  HTTP + SSE (httpx async)
        ▼
 tool-call-fastapi (FastAPI :8000)   ← agent backend, unchanged internals
@@ -19,12 +19,12 @@ tool-call-fastapi (FastAPI :8000)   ← agent backend, unchanged internals
 
 ## Architecture
 
-`tool-call-web` is a new top-level directory alongside `tool-call-ui` and `tool-call-fastapi`. It is a standalone FastAPI application — no shared code with the other services.
+`tool-call-api` is a new top-level directory alongside `tool-call-ui` and `tool-call-fastapi`. It is a standalone FastAPI application — no shared code with the other services.
 
-**Stateless by design.** `tool-call-web` holds no user data, session state, or conversation history between requests. Every request is self-contained: `session_id` comes from the URL, payloads come from the request body. This makes it trivially horizontally scalable — any instance can handle any request.
+**Stateless by design.** `tool-call-api` holds no user data, session state, or conversation history between requests. Every request is self-contained: `session_id` comes from the URL, payloads come from the request body. This makes it trivially horizontally scalable — any instance can handle any request.
 
 **CORS boundaries:**
-- `tool-call-web` allows `http://localhost:4200` (the Angular UI)
+- `tool-call-api` allows `http://localhost:4200` (the Angular UI)
 - `tool-call-fastapi` CORS is updated to allow `http://localhost:8080` only (no longer directly accessible from the browser)
 
 **Backend URL** is configurable via `AGENT_BACKEND_URL` env var (default: `http://localhost:8000`).
@@ -33,7 +33,7 @@ tool-call-fastapi (FastAPI :8000)   ← agent backend, unchanged internals
 
 All routes are exposed under the `/api` prefix. Admin routes are not exposed.
 
-| tool-call-web | → tool-call-fastapi | Notes |
+| tool-call-api | → tool-call-fastapi | Notes |
 |---|---|---|
 | `POST /api/sessions` | `POST /sessions` | Create a new session |
 | `POST /api/sessions/{id}/chat` | `POST /sessions/{id}/chat` | Send a message |
@@ -69,14 +69,14 @@ async with client.stream("GET", ...) as resp:
 **Why one client:**
 - SSE connections hold a pool slot open for the entire chat duration
 - Separating into two clients (stream vs regular) adds complexity with no meaningful benefit at current scale
-- Horizontal scaling of `tool-call-web` (stateless) naturally distributes pool pressure across instances
+- Horizontal scaling of `tool-call-api` (stateless) naturally distributes pool pressure across instances
 
-**Scalability path:** When concurrent users grow, `tool-call-web` scales horizontally — each instance gets its own client with its own pool. The real scaling bottleneck is `tool-call-fastapi`'s in-memory session store, which requires either sticky-session routing or externalising session state to Redis (out of scope for this spec).
+**Scalability path:** When concurrent users grow, `tool-call-api` scales horizontally — each instance gets its own client with its own pool. The real scaling bottleneck is `tool-call-fastapi`'s in-memory session store, which requires either sticky-session routing or externalising session state to Redis (out of scope for this spec).
 
 ## Project Structure
 
 ```
-tool-call-web/
+tool-call-api/
   main.py           # FastAPI app: lifespan, CORS, routes
   requirements.txt  # fastapi, uvicorn, httpx, python-dotenv, pytest, pytest-asyncio
   .env.example      # AGENT_BACKEND_URL=http://localhost:8000
@@ -85,7 +85,7 @@ tool-call-web/
     test_main.py    # pytest-asyncio, httpx mock transport
 ```
 
-**No `models.py`.** Request bodies are forwarded verbatim using FastAPI's raw `Request` object (`await request.body()`). This means `tool-call-web` never needs to change when `tool-call-fastapi` adds or removes fields from its request models.
+**No `models.py`.** Request bodies are forwarded verbatim using FastAPI's raw `Request` object (`await request.body()`). This means `tool-call-api` never needs to change when `tool-call-fastapi` adds or removes fields from its request models.
 
 ## SSE Pass-Through
 
@@ -109,7 +109,7 @@ async def stream(session_id: str) -> StreamingResponse:
 ## Error Handling
 
 - 4xx responses from `tool-call-fastapi` (e.g., 404 session not found) are surfaced to the UI with the same status code and body.
-- If `tool-call-fastapi` is unreachable, `tool-call-web` returns 502 Bad Gateway.
+- If `tool-call-fastapi` is unreachable, `tool-call-api` returns 502 Bad Gateway.
 - Short-lived route timeouts (30s) raise a 504 Gateway Timeout to the UI.
 
 ## Testing

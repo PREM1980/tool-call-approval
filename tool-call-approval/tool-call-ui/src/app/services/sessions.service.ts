@@ -3,7 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { ChatMessage, SessionSummary } from '../models/types';
 
-const API_URL = 'http://localhost:8080/api';
+const API_URL = '/api';
 
 @Injectable({ providedIn: 'root' })
 export class SessionsService {

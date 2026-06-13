@@ -1,10 +1,10 @@
-# tool-call-web Implementation Plan
+# tool-call-api Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build a new FastAPI API gateway service `tool-call-web` that sits between the Angular UI and the agent backend, routing `/api/*` requests to `tool-call-fastapi`.
+**Goal:** Build a new FastAPI API gateway service `tool-call-api` that sits between the Angular UI and the agent backend, routing `/api/*` requests to `tool-call-fastapi`.
 
-**Architecture:** `tool-call-web` is a stateless FastAPI proxy on port 8080. It owns a single shared `httpx.AsyncClient` (created at lifespan startup) with a 500-connection pool. All five session routes are forwarded verbatim; request bodies are passed as raw bytes so the gateway never needs updating when `tool-call-fastapi` changes its models. The SSE stream route uses `client.stream()` to forward chunks as they arrive.
+**Architecture:** `tool-call-api` is a stateless FastAPI proxy on port 8080. It owns a single shared `httpx.AsyncClient` (created at lifespan startup) with a 500-connection pool. All five session routes are forwarded verbatim; request bodies are passed as raw bytes so the gateway never needs updating when `tool-call-fastapi` changes its models. The SSE stream route uses `client.stream()` to forward chunks as they arrive.
 
 **Tech Stack:** FastAPI 0.115, uvicorn, httpx 0.28, python-dotenv, pytest 8.3, pytest-asyncio 0.25 (asyncio_mode=auto), unittest.mock for backend mocking.
 
@@ -14,13 +14,13 @@
 
 | Action | Path | Responsibility |
 |---|---|---|
-| Create | `tool-call-web/main.py` | App factory, lifespan, CORS, `_proxy` helper, all 5 routes |
-| Create | `tool-call-web/requirements.txt` | Runtime + test dependencies |
-| Create | `tool-call-web/.env.example` | `AGENT_BACKEND_URL` template |
-| Create | `tool-call-web/pytest.ini` | `asyncio_mode = auto` |
-| Create | `tool-call-web/tests/__init__.py` | Empty, marks package |
-| Create | `tool-call-web/tests/test_main.py` | All route + error tests |
-| Create | `tool-call-web/README.md` | Usage, env vars, run commands |
+| Create | `tool-call-api/main.py` | App factory, lifespan, CORS, `_proxy` helper, all 5 routes |
+| Create | `tool-call-api/requirements.txt` | Runtime + test dependencies |
+| Create | `tool-call-api/.env.example` | `AGENT_BACKEND_URL` template |
+| Create | `tool-call-api/pytest.ini` | `asyncio_mode = auto` |
+| Create | `tool-call-api/tests/__init__.py` | Empty, marks package |
+| Create | `tool-call-api/tests/test_main.py` | All route + error tests |
+| Create | `tool-call-api/README.md` | Usage, env vars, run commands |
 | Modify | `tool-call-fastapi/main.py:21-27` | Update CORS origin from `:4200` to `:8080` |
 
 ---
@@ -28,19 +28,19 @@
 ## Task 1: Project Scaffold
 
 **Files:**
-- Create: `tool-call-web/requirements.txt`
-- Create: `tool-call-web/.env.example`
-- Create: `tool-call-web/pytest.ini`
-- Create: `tool-call-web/tests/__init__.py`
-- Create: `tool-call-web/main.py`
+- Create: `tool-call-api/requirements.txt`
+- Create: `tool-call-api/.env.example`
+- Create: `tool-call-api/pytest.ini`
+- Create: `tool-call-api/tests/__init__.py`
+- Create: `tool-call-api/main.py`
 
 - [ ] **Step 1: Create directory and support files**
 
 ```bash
-mkdir -p tool-call-web/tests
+mkdir -p tool-call-api/tests
 ```
 
-Create `tool-call-web/requirements.txt`:
+Create `tool-call-api/requirements.txt`:
 ```
 fastapi==0.115.12
 uvicorn[standard]==0.34.2
@@ -50,32 +50,32 @@ pytest==8.3.5
 pytest-asyncio==0.25.3
 ```
 
-Create `tool-call-web/.env.example`:
+Create `tool-call-api/.env.example`:
 ```
 AGENT_BACKEND_URL=http://localhost:8000
 ```
 
-Create `tool-call-web/pytest.ini`:
+Create `tool-call-api/pytest.ini`:
 ```ini
 [pytest]
 asyncio_mode = auto
 ```
 
-Create `tool-call-web/tests/__init__.py`:
+Create `tool-call-api/tests/__init__.py`:
 ```python
 ```
 
 - [ ] **Step 2: Install dependencies**
 
 ```bash
-cd tool-call-web && pip install -r requirements.txt
+cd tool-call-api && pip install -r requirements.txt
 ```
 
 Expected: all packages install without errors.
 
 - [ ] **Step 3: Write main.py skeleton (lifespan, CORS, _proxy helper — no routes yet)**
 
-Create `tool-call-web/main.py`:
+Create `tool-call-api/main.py`:
 ```python
 import os
 from collections.abc import AsyncIterator
@@ -138,7 +138,7 @@ async def _proxy(coro: Awaitable[httpx.Response]) -> JSONResponse:
 - [ ] **Step 4: Verify the app imports cleanly**
 
 ```bash
-cd tool-call-web && python -c "from main import app; print('ok')"
+cd tool-call-api && python -c "from main import app; print('ok')"
 ```
 
 Expected: `ok`
@@ -146,8 +146,8 @@ Expected: `ok`
 - [ ] **Step 5: Commit scaffold**
 
 ```bash
-git add tool-call-web/
-git commit -m "feat(tool-call-web): scaffold FastAPI gateway with lifespan and proxy helper"
+git add tool-call-api/
+git commit -m "feat(tool-call-api): scaffold FastAPI gateway with lifespan and proxy helper"
 ```
 
 ---
@@ -155,12 +155,12 @@ git commit -m "feat(tool-call-web): scaffold FastAPI gateway with lifespan and p
 ## Task 2: Session Creation Route (TDD)
 
 **Files:**
-- Modify: `tool-call-web/main.py` — add `POST /api/sessions`
-- Modify: `tool-call-web/tests/test_main.py` — add `test_create_session`
+- Modify: `tool-call-api/main.py` — add `POST /api/sessions`
+- Modify: `tool-call-api/tests/test_main.py` — add `test_create_session`
 
 - [ ] **Step 1: Write the failing test**
 
-Create `tool-call-web/tests/test_main.py`:
+Create `tool-call-api/tests/test_main.py`:
 ```python
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -192,14 +192,14 @@ async def test_create_session(ac):
 - [ ] **Step 2: Run test to confirm it fails**
 
 ```bash
-cd tool-call-web && pytest tests/test_main.py::test_create_session -v
+cd tool-call-api && pytest tests/test_main.py::test_create_session -v
 ```
 
 Expected: FAIL — `404 Not Found` (route doesn't exist yet).
 
 - [ ] **Step 3: Add the route to main.py**
 
-Append to `tool-call-web/main.py`:
+Append to `tool-call-api/main.py`:
 ```python
 
 @app.post("/api/sessions")
@@ -212,7 +212,7 @@ async def create_session() -> JSONResponse:
 - [ ] **Step 4: Run test to confirm it passes**
 
 ```bash
-cd tool-call-web && pytest tests/test_main.py::test_create_session -v
+cd tool-call-api && pytest tests/test_main.py::test_create_session -v
 ```
 
 Expected: PASS.
@@ -220,8 +220,8 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add tool-call-web/main.py tool-call-web/tests/test_main.py
-git commit -m "feat(tool-call-web): add POST /api/sessions route"
+git add tool-call-api/main.py tool-call-api/tests/test_main.py
+git commit -m "feat(tool-call-api): add POST /api/sessions route"
 ```
 
 ---
@@ -229,12 +229,12 @@ git commit -m "feat(tool-call-web): add POST /api/sessions route"
 ## Task 3: Chat Route (TDD)
 
 **Files:**
-- Modify: `tool-call-web/main.py` — add `POST /api/sessions/{session_id}/chat`
-- Modify: `tool-call-web/tests/test_main.py` — add `test_chat`
+- Modify: `tool-call-api/main.py` — add `POST /api/sessions/{session_id}/chat`
+- Modify: `tool-call-api/tests/test_main.py` — add `test_chat`
 
 - [ ] **Step 1: Write the failing test**
 
-Append to `tool-call-web/tests/test_main.py`:
+Append to `tool-call-api/tests/test_main.py`:
 ```python
 
 async def test_chat(ac):
@@ -257,14 +257,14 @@ async def test_chat(ac):
 - [ ] **Step 2: Run test to confirm it fails**
 
 ```bash
-cd tool-call-web && pytest tests/test_main.py::test_chat -v
+cd tool-call-api && pytest tests/test_main.py::test_chat -v
 ```
 
 Expected: FAIL — `404 Not Found`.
 
 - [ ] **Step 3: Add the route to main.py**
 
-Append to `tool-call-web/main.py`:
+Append to `tool-call-api/main.py`:
 ```python
 
 @app.post("/api/sessions/{session_id}/chat")
@@ -283,7 +283,7 @@ async def chat(session_id: str, request: Request) -> JSONResponse:
 - [ ] **Step 4: Run test to confirm it passes**
 
 ```bash
-cd tool-call-web && pytest tests/test_main.py::test_chat -v
+cd tool-call-api && pytest tests/test_main.py::test_chat -v
 ```
 
 Expected: PASS.
@@ -291,8 +291,8 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add tool-call-web/main.py tool-call-web/tests/test_main.py
-git commit -m "feat(tool-call-web): add POST /api/sessions/{id}/chat route"
+git add tool-call-api/main.py tool-call-api/tests/test_main.py
+git commit -m "feat(tool-call-api): add POST /api/sessions/{id}/chat route"
 ```
 
 ---
@@ -300,12 +300,12 @@ git commit -m "feat(tool-call-web): add POST /api/sessions/{id}/chat route"
 ## Task 4: History Route (TDD)
 
 **Files:**
-- Modify: `tool-call-web/main.py` — add `GET /api/sessions/{session_id}/history`
-- Modify: `tool-call-web/tests/test_main.py` — add `test_history`
+- Modify: `tool-call-api/main.py` — add `GET /api/sessions/{session_id}/history`
+- Modify: `tool-call-api/tests/test_main.py` — add `test_history`
 
 - [ ] **Step 1: Write the failing test**
 
-Append to `tool-call-web/tests/test_main.py`:
+Append to `tool-call-api/tests/test_main.py`:
 ```python
 
 async def test_history(ac):
@@ -327,14 +327,14 @@ async def test_history(ac):
 - [ ] **Step 2: Run test to confirm it fails**
 
 ```bash
-cd tool-call-web && pytest tests/test_main.py::test_history -v
+cd tool-call-api && pytest tests/test_main.py::test_history -v
 ```
 
 Expected: FAIL — `404 Not Found`.
 
 - [ ] **Step 3: Add the route to main.py**
 
-Append to `tool-call-web/main.py`:
+Append to `tool-call-api/main.py`:
 ```python
 
 @app.get("/api/sessions/{session_id}/history")
@@ -347,7 +347,7 @@ async def history(session_id: str) -> JSONResponse:
 - [ ] **Step 4: Run test to confirm it passes**
 
 ```bash
-cd tool-call-web && pytest tests/test_main.py::test_history -v
+cd tool-call-api && pytest tests/test_main.py::test_history -v
 ```
 
 Expected: PASS.
@@ -355,8 +355,8 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add tool-call-web/main.py tool-call-web/tests/test_main.py
-git commit -m "feat(tool-call-web): add GET /api/sessions/{id}/history route"
+git add tool-call-api/main.py tool-call-api/tests/test_main.py
+git commit -m "feat(tool-call-api): add GET /api/sessions/{id}/history route"
 ```
 
 ---
@@ -364,12 +364,12 @@ git commit -m "feat(tool-call-web): add GET /api/sessions/{id}/history route"
 ## Task 5: Approve Route (TDD)
 
 **Files:**
-- Modify: `tool-call-web/main.py` — add `POST /api/sessions/{session_id}/approve`
-- Modify: `tool-call-web/tests/test_main.py` — add `test_approve`
+- Modify: `tool-call-api/main.py` — add `POST /api/sessions/{session_id}/approve`
+- Modify: `tool-call-api/tests/test_main.py` — add `test_approve`
 
 - [ ] **Step 1: Write the failing test**
 
-Append to `tool-call-web/tests/test_main.py`:
+Append to `tool-call-api/tests/test_main.py`:
 ```python
 
 async def test_approve(ac):
@@ -391,14 +391,14 @@ async def test_approve(ac):
 - [ ] **Step 2: Run test to confirm it fails**
 
 ```bash
-cd tool-call-web && pytest tests/test_main.py::test_approve -v
+cd tool-call-api && pytest tests/test_main.py::test_approve -v
 ```
 
 Expected: FAIL — `404 Not Found`.
 
 - [ ] **Step 3: Add the route to main.py**
 
-Append to `tool-call-web/main.py`:
+Append to `tool-call-api/main.py`:
 ```python
 
 @app.post("/api/sessions/{session_id}/approve")
@@ -417,7 +417,7 @@ async def approve(session_id: str, request: Request) -> JSONResponse:
 - [ ] **Step 4: Run test to confirm it passes**
 
 ```bash
-cd tool-call-web && pytest tests/test_main.py::test_approve -v
+cd tool-call-api && pytest tests/test_main.py::test_approve -v
 ```
 
 Expected: PASS.
@@ -425,8 +425,8 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add tool-call-web/main.py tool-call-web/tests/test_main.py
-git commit -m "feat(tool-call-web): add POST /api/sessions/{id}/approve route"
+git add tool-call-api/main.py tool-call-api/tests/test_main.py
+git commit -m "feat(tool-call-api): add POST /api/sessions/{id}/approve route"
 ```
 
 ---
@@ -434,12 +434,12 @@ git commit -m "feat(tool-call-web): add POST /api/sessions/{id}/approve route"
 ## Task 6: Stream Route (TDD)
 
 **Files:**
-- Modify: `tool-call-web/main.py` — add `GET /api/sessions/{session_id}/stream`
-- Modify: `tool-call-web/tests/test_main.py` — add `test_stream`
+- Modify: `tool-call-api/main.py` — add `GET /api/sessions/{session_id}/stream`
+- Modify: `tool-call-api/tests/test_main.py` — add `test_stream`
 
 - [ ] **Step 1: Write the failing test**
 
-Append to `tool-call-web/tests/test_main.py`:
+Append to `tool-call-api/tests/test_main.py`:
 ```python
 
 async def test_stream(ac):
@@ -470,14 +470,14 @@ async def test_stream(ac):
 - [ ] **Step 2: Run test to confirm it fails**
 
 ```bash
-cd tool-call-web && pytest tests/test_main.py::test_stream -v
+cd tool-call-api && pytest tests/test_main.py::test_stream -v
 ```
 
 Expected: FAIL — `404 Not Found`.
 
 - [ ] **Step 3: Add the route to main.py**
 
-Append to `tool-call-web/main.py`:
+Append to `tool-call-api/main.py`:
 ```python
 
 @app.get("/api/sessions/{session_id}/stream")
@@ -499,7 +499,7 @@ async def stream_events(session_id: str) -> StreamingResponse:
 - [ ] **Step 4: Run test to confirm it passes**
 
 ```bash
-cd tool-call-web && pytest tests/test_main.py::test_stream -v
+cd tool-call-api && pytest tests/test_main.py::test_stream -v
 ```
 
 Expected: PASS.
@@ -507,8 +507,8 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add tool-call-web/main.py tool-call-web/tests/test_main.py
-git commit -m "feat(tool-call-web): add GET /api/sessions/{id}/stream SSE pass-through"
+git add tool-call-api/main.py tool-call-api/tests/test_main.py
+git commit -m "feat(tool-call-api): add GET /api/sessions/{id}/stream SSE pass-through"
 ```
 
 ---
@@ -516,11 +516,11 @@ git commit -m "feat(tool-call-web): add GET /api/sessions/{id}/stream SSE pass-t
 ## Task 7: Error Handling Tests (TDD)
 
 **Files:**
-- Modify: `tool-call-web/tests/test_main.py` — add 404, 502, 504 tests
+- Modify: `tool-call-api/tests/test_main.py` — add 404, 502, 504 tests
 
 - [ ] **Step 1: Write the failing error tests**
 
-Append to `tool-call-web/tests/test_main.py`:
+Append to `tool-call-api/tests/test_main.py`:
 ```python
 
 async def test_session_not_found(ac):
@@ -559,7 +559,7 @@ async def test_backend_timeout(ac):
 - [ ] **Step 2: Run tests to confirm they fail**
 
 ```bash
-cd tool-call-web && pytest tests/test_main.py::test_session_not_found tests/test_main.py::test_backend_unreachable tests/test_main.py::test_backend_timeout -v
+cd tool-call-api && pytest tests/test_main.py::test_session_not_found tests/test_main.py::test_backend_unreachable tests/test_main.py::test_backend_timeout -v
 ```
 
 Expected: all three FAIL — the error handling is already implemented in `_proxy`, so these should actually PASS if the implementation is correct. If they fail, check the `_proxy` function in `main.py` matches the implementation from Task 1 exactly.
@@ -567,7 +567,7 @@ Expected: all three FAIL — the error handling is already implemented in `_prox
 - [ ] **Step 3: Run the full test suite**
 
 ```bash
-cd tool-call-web && pytest -v
+cd tool-call-api && pytest -v
 ```
 
 Expected: all 9 tests PASS.
@@ -586,8 +586,8 @@ tests/test_main.py::test_backend_timeout PASSED
 - [ ] **Step 4: Commit**
 
 ```bash
-git add tool-call-web/tests/test_main.py
-git commit -m "test(tool-call-web): add error handling tests for 404, 502, 504"
+git add tool-call-api/tests/test_main.py
+git commit -m "test(tool-call-api): add error handling tests for 404, 502, 504"
 ```
 
 ---
@@ -633,7 +633,7 @@ Expected: all existing tests PASS.
 
 ```bash
 git add tool-call-fastapi/main.py
-git commit -m "fix(tool-call-fastapi): restrict CORS to tool-call-web origin only"
+git commit -m "fix(tool-call-fastapi): restrict CORS to tool-call-api origin only"
 ```
 
 ---
@@ -641,20 +641,20 @@ git commit -m "fix(tool-call-fastapi): restrict CORS to tool-call-web origin onl
 ## Task 9: README
 
 **Files:**
-- Create: `tool-call-web/README.md`
+- Create: `tool-call-api/README.md`
 
 - [ ] **Step 1: Write README**
 
-Create `tool-call-web/README.md`:
+Create `tool-call-api/README.md`:
 ```markdown
-# tool-call-web
+# tool-call-api
 
 API gateway that sits between `tool-call-ui` and `tool-call-fastapi`. The Angular UI communicates exclusively with this service; it forwards requests to the agent backend.
 
 ## Architecture
 
 ```
-tool-call-ui (:4200) → tool-call-web (:8080) → tool-call-fastapi (:8000)
+tool-call-ui (:4200) → tool-call-api (:8080) → tool-call-fastapi (:8000)
 ```
 
 ## Routes
@@ -696,8 +696,8 @@ pytest -v
 - [ ] **Step 2: Commit**
 
 ```bash
-git add tool-call-web/README.md
-git commit -m "docs(tool-call-web): add README with routes and setup instructions"
+git add tool-call-api/README.md
+git commit -m "docs(tool-call-api): add README with routes and setup instructions"
 ```
 
 ---
@@ -707,7 +707,7 @@ git commit -m "docs(tool-call-web): add README with routes and setup instruction
 - [ ] **Run all tests in both services**
 
 ```bash
-cd tool-call-web && pytest -v && cd ../tool-call-fastapi && pytest -v
+cd tool-call-api && pytest -v && cd ../tool-call-fastapi && pytest -v
 ```
 
 Expected: all tests in both services PASS with no failures.
@@ -720,7 +720,7 @@ In three terminals:
 cd tool-call-fastapi && uvicorn main:app --port 8000 --reload
 
 # Terminal 2 — start gateway
-cd tool-call-web && uvicorn main:app --port 8080 --reload
+cd tool-call-api && uvicorn main:app --port 8080 --reload
 
 # Terminal 3 — create a session through the gateway
 curl -s -X POST http://localhost:8080/api/sessions | python3 -m json.tool

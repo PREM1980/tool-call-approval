@@ -97,10 +97,9 @@ services:
       start_period: 30s
 
   minio:
-    image: cgr.dev/chainguard/minio
+    image: minio/minio:latest
     restart: always
-    entrypoint: sh
-    command: -c 'mkdir -p /data/langfuse && minio server --address ":9000" --console-address ":9001" /data'
+    command: server /data --address ":9000" --console-address ":9001"
     environment:
       MINIO_ROOT_USER: minio
       MINIO_ROOT_PASSWORD: miniosecret
@@ -140,7 +139,7 @@ services:
       TZ: UTC
       PGTZ: UTC
     ports:
-      - "127.0.0.1:5433:5432"
+      - "5433:5432"
     volumes:
       - langfuse_postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -162,17 +161,17 @@ services:
       LANGFUSE_HOST: http://langfuse-web:3000
       GOOGLE_APPLICATION_CREDENTIALS: /etc/gcp/service-account.json
     volumes:
-      - /Users/premlakshmanan/.config/gcloud/provs-487517-sa.json:/etc/gcp/service-account.json:ro
+      - /Users/Shared/Docker/provs-487517-sa.json:/etc/gcp/service-account.json:ro
     depends_on:
       postgres:
         condition: service_healthy
       langfuse-web:
         condition: service_started
 
-  tool-call-web:
+  tool-call-api:
     build:
-      context: ./tool-call-web
-    image: tool-call-web:latest
+      context: ./tool-call-api
+    image: tool-call-api:latest
     ports:
       - "8080:8080"
     environment:

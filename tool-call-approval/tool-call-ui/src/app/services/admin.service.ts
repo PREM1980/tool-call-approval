@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 
-const API = 'http://localhost:8080/api/admin';
+const API = '/api/admin';
 
 export interface CredentialsData {
   aws_access_key_id: string;

@@ -3,7 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { Subject, firstValueFrom } from 'rxjs';
 import { SseEvent } from '../models/types';
 
-const API_URL = 'http://localhost:8080/api';
+const API_URL = '/api';
 
 @Injectable({ providedIn: 'root' })
 export class ChatService {
@@ -20,6 +20,10 @@ export class ChatService {
       this.http.post<{ session_id: string }>(`${API_URL}/sessions`, body)
     );
     this.sessionId = res.session_id;
+  }
+
+  setSession(sessionId: string): void {
+    this.sessionId = sessionId;
   }
 
   connectStream(): void {

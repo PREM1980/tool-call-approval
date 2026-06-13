@@ -4,7 +4,7 @@ This guide runs the real Kubernetes operations agent locally with the Angular UI
 The local stack is:
 
 ```text
-tool-call-ui (:4200) -> tool-call-web (:8080) -> tool-call-agent (:8000)
+tool-call-ui (:4200) -> tool-call-api (:8080) -> tool-call-agent (:8000)
 ```
 
 Use real agent mode when you want the app to call an actual LLM provider
@@ -44,7 +44,7 @@ Docker use port `5432`, but local Python processes should use `localhost:5433`.
 python3.12 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
-pip install -r tool-call-agent/requirements.txt -r tool-call-web/requirements.txt
+pip install -r tool-call-agent/requirements.txt -r tool-call-api/requirements.txt
 ```
 
 ## 3. Configure the Agent
@@ -109,7 +109,7 @@ In terminal 2:
 
 ```bash
 source .venv/bin/activate
-cd tool-call-web
+cd tool-call-api
 cp .env.example .env
 uvicorn main:app --host 0.0.0.0 --port 8080 --reload
 ```

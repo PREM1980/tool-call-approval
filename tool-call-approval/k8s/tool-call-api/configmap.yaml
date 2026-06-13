@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: tool-call-web-config
+  name: tool-call-api-config
 data:
   AGENT_BACKEND_URL: http://tool-call-agent:8000
   CORS_ORIGIN: http://tool-call.local

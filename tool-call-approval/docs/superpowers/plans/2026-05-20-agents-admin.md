@@ -4,7 +4,7 @@
 
 **Goal:** Add an Admin > Agents section with Deployments and View tabs, backed by a new `tool-call-k8s` FastAPI service that wraps `kubectl` to create and manage Kubernetes Deployments named `*-ui-agents`.
 
-**Architecture:** A new `tool-call-k8s` container (port 8001) owns all kubectl operations; `tool-call-web` proxies `/api/agents/*` and `/api/k8s-config` to it; Angular's Agents component auto-syncs the kubeconfig from existing Credentials on load, then lets users deploy containers and manage running agents.
+**Architecture:** A new `tool-call-k8s` container (port 8001) owns all kubectl operations; `tool-call-api` proxies `/api/agents/*` and `/api/k8s-config` to it; Angular's Agents component auto-syncs the kubeconfig from existing Credentials on load, then lets users deploy containers and manage running agents.
 
 **Tech Stack:** Python 3.12 / FastAPI / subprocess kubectl (backend), Angular 19 standalone components (frontend), Docker Compose.
 
@@ -25,9 +25,9 @@
 - `tests/test_main.py` — API tests via TestClient
 
 **Modified**
-- `docker-compose.yml` — add `tool-call-k8s` service + `k8s_data` volume; add `K8S_BACKEND_URL` to tool-call-web
-- `tool-call-web/main.py` — add `_K8S_BACKEND`, `/api/agents/*` proxy, `/api/k8s-config` proxy
-- `tool-call-web/tests/test_main.py` — add tests for the two new proxy routes
+- `docker-compose.yml` — add `tool-call-k8s` service + `k8s_data` volume; add `K8S_BACKEND_URL` to tool-call-api
+- `tool-call-api/main.py` — add `_K8S_BACKEND`, `/api/agents/*` proxy, `/api/k8s-config` proxy
+- `tool-call-api/tests/test_main.py` — add tests for the two new proxy routes
 
 **New — Angular**
 - `tool-call-ui/src/app/services/agents.service.ts`
@@ -880,7 +880,7 @@ git commit -m "feat(k8s): add FastAPI routes with TDD"
 
 - [ ] **Step 1: Add the tool-call-k8s service and k8s_data volume**
 
-In `docker-compose.yml`, add after the `tool-call-web` block and before `loki`:
+In `docker-compose.yml`, add after the `tool-call-api` block and before `loki`:
 
 ```yaml
   tool-call-k8s:
@@ -892,10 +892,10 @@ In `docker-compose.yml`, add after the `tool-call-web` block and before `loki`:
     volumes:
       - k8s_data:/data
     depends_on:
-      - tool-call-web
+      - tool-call-api
 ```
 
-In the `tool-call-web` environment block, add:
+In the `tool-call-api` environment block, add:
 
 ```yaml
       K8S_BACKEND_URL: http://tool-call-k8s:8001
@@ -932,15 +932,15 @@ git commit -m "feat(k8s): add tool-call-k8s to docker-compose"
 
 ---
 
-### Task 6: `tool-call-web` — proxy routes for k8s service (TDD)
+### Task 6: `tool-call-api` — proxy routes for k8s service (TDD)
 
 **Files:**
-- Modify: `tool-call-web/main.py`
-- Modify: `tool-call-web/tests/test_main.py`
+- Modify: `tool-call-api/main.py`
+- Modify: `tool-call-api/tests/test_main.py`
 
 - [ ] **Step 1: Write the failing tests**
 
-In `tool-call-web/tests/test_main.py`, append after the last test:
+In `tool-call-api/tests/test_main.py`, append after the last test:
 
 ```python
 async def test_agents_get_proxied(ac):
@@ -980,14 +980,14 @@ async def test_k8s_config_proxied(ac):
 - [ ] **Step 2: Run tests to verify they fail**
 
 ```bash
-cd tool-call-web && pytest tests/test_main.py -v -k "agents or k8s_config"
+cd tool-call-api && pytest tests/test_main.py -v -k "agents or k8s_config"
 ```
 
 Expected: 3 failures with `404 Not Found`
 
 - [ ] **Step 3: Add the proxy routes to main.py**
 
-In `tool-call-web/main.py`, after the existing `_BACKEND` line, add:
+In `tool-call-api/main.py`, after the existing `_BACKEND` line, add:
 
 ```python
 _K8S_BACKEND = os.getenv("K8S_BACKEND_URL", "http://localhost:8001")
@@ -1027,7 +1027,7 @@ async def k8s_config_proxy(request: Request) -> JSONResponse:
     )
 ```
 
-- [ ] **Step 4: Run all tool-call-web tests**
+- [ ] **Step 4: Run all tool-call-api tests**
 
 ```bash
 pytest tests/test_main.py -v
@@ -1035,16 +1035,16 @@ pytest tests/test_main.py -v
 
 Expected: all 14 tests pass
 
-- [ ] **Step 5: Rebuild tool-call-web and redeploy**
+- [ ] **Step 5: Rebuild tool-call-api and redeploy**
 
 ```bash
-cd .. && docker compose build tool-call-web && docker compose up -d tool-call-web
+cd .. && docker compose build tool-call-api && docker compose up -d tool-call-api
 ```
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add tool-call-web/main.py tool-call-web/tests/test_main.py
+git add tool-call-api/main.py tool-call-api/tests/test_main.py
 git commit -m "feat(web): proxy /api/agents/* and /api/k8s-config to tool-call-k8s"
 ```
 
@@ -1809,7 +1809,7 @@ docker compose up -d
 docker compose ps
 ```
 
-Expected: tool-call-agent, tool-call-web, tool-call-k8s all Up
+Expected: tool-call-agent, tool-call-api, tool-call-k8s all Up
 
 - [ ] **Step 2: Start Angular dev server**
 

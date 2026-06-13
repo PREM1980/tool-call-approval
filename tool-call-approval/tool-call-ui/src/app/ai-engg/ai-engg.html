@@ -1,14 +1,14 @@
 <div class="aiengg-shell">
   <div class="aiengg-tabs">
-    <button type="button" class="aiengg-tab" [class.active]="tab === 'chat'" (click)="tab = 'chat'">Chat</button>
+    <button type="button" class="aiengg-tab" [class.active]="tab === 'chat'" (click)="goToChat()">Chat</button>
     <button type="button" class="aiengg-tab" [class.active]="tab === 'sessions'" (click)="tab = 'sessions'">Sessions</button>
   </div>
   <div class="aiengg-content">
     @if (tab === 'chat') {
-      <app-chat />
+      <app-chat [resumeSessionId]="resumeSessionId" />
     }
     @if (tab === 'sessions') {
-      <app-sessions />
+      <app-sessions (openChat)="openSessionInChat($event)" />
     }
   </div>
 </div>

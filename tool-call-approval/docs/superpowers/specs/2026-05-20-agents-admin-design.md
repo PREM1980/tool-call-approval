@@ -6,12 +6,12 @@ Add an **Agents** section to the Admin panel that lets users deploy Docker conta
 
 ## Architecture
 
-A new dedicated FastAPI service (`tool-call-k8s`) runs in its own Docker container and owns all `kubectl` operations. The Angular UI gains an Agents section under Admin. `tool-call-web` proxies `/api/agents/*` to `tool-call-k8s`. The existing `tool-call-agent` service is untouched.
+A new dedicated FastAPI service (`tool-call-k8s`) runs in its own Docker container and owns all `kubectl` operations. The Angular UI gains an Agents section under Admin. `tool-call-api` proxies `/api/agents/*` to `tool-call-k8s`. The existing `tool-call-agent` service is untouched.
 
 ```text
 Angular UI (/admin/agents)
     ↓  /api/agents/*
-tool-call-web  (new proxy block)
+tool-call-api  (new proxy block)
     ↓  /agents/*
 tool-call-k8s  (new container, port 8001)
     ↓  kubectl
@@ -103,7 +103,7 @@ Status is derived from `deployment.status.readyReplicas` vs `deployment.spec.rep
 
 ## Changes to Existing Services
 
-### `tool-call-web/main.py`
+### `tool-call-api/main.py`
 
 New proxy block added alongside existing `/api/sessions/*` and `/api/admin/*` blocks:
 
@@ -132,7 +132,7 @@ New `tool-call-k8s` service:
 - Volume `k8s_data:/data` for kubeconfig persistence
 - `extra_hosts: host.docker.internal:host-gateway` (same as tool-call-agent, needed for minikube access)
 
-`tool-call-web` gains `K8S_BACKEND_URL: http://tool-call-k8s:8001` in its environment.
+`tool-call-api` gains `K8S_BACKEND_URL: http://tool-call-k8s:8001` in its environment.
 
 ## Frontend Changes
 
@@ -204,4 +204,4 @@ This means the user never enters the kubeconfig twice. The Credentials page rema
 ## Testing
 
 - `tool-call-k8s/tests/test_agents.py` — unit tests mocking `subprocess.run` to verify kubectl commands are constructed correctly for create, list, delete, restart, scale
-- `tool-call-web/tests/test_main.py` — add tests for the `/api/agents/*` proxy (same pattern as existing admin proxy tests)
+- `tool-call-api/tests/test_main.py` — add tests for the `/api/agents/*` proxy (same pattern as existing admin proxy tests)

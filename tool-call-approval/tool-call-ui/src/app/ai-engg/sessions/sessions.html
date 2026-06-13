@@ -22,13 +22,23 @@
 
     @for (s of sessions; track s.session_id) {
       <div class="session-row" [class.active]="selectedId === s.session_id" (click)="selectSession(s.session_id)">
-        <span class="col-id session-id">{{ shortId(s.session_id) }}</span>
+        <span class="col-id">
+          <span class="session-id">{{ shortId(s.session_id) }}</span>
+          @if (s.first_message) {
+            <span class="session-preview">{{ s.first_message }}</span>
+          }
+        </span>
         <span class="col-time session-time">{{ formatTimestamp(s.updated_at ?? s.created_at) }}</span>
         <span class="col-turns session-turns">{{ s.turn_count }}</span>
       </div>
 
       @if (selectedId === s.session_id) {
         <div class="session-history">
+          <div class="session-history-toolbar">
+            <button type="button" class="continue-btn" (click)="openChat.emit(s.session_id); $event.stopPropagation()">
+              Continue chat →
+            </button>
+          </div>
           @if (loadingHistory) {
             <div class="sessions-loading history-loading">
               <div class="spinner spinner-sm"></div>

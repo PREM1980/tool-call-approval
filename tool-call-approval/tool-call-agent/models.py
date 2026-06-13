@@ -28,3 +28,4 @@ class SessionSummaryResponse(BaseModel):
     created_at: int
     updated_at: int | None
     turn_count: int
+    first_message: str | None = None

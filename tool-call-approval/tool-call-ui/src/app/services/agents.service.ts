@@ -3,7 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { AdminService } from './admin.service';
 
-const API = 'http://localhost:8080/api';
+const API = '/api';
 
 export interface EnvVar {
   key: string;

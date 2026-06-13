@@ -54,7 +54,8 @@ class PostgresRepository(IAgentStorage):
                         SELECT session_id,
                                created_at,
                                updated_at,
-                               COALESCE(jsonb_array_length(runs), 0) AS turn_count
+                               COALESCE(jsonb_array_length(runs), 0) AS turn_count,
+                               LEFT(runs->0->'input'->>'input_content', 120) AS first_message
                         FROM ai.agno_sessions
                         ORDER BY updated_at DESC NULLS LAST
                     """)

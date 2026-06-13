@@ -5,13 +5,13 @@
 
 ## Overview
 
-Containerize `tool-call-fastapi` and `tool-call-web`, then provide plain Kubernetes manifests to deploy both services. `tool-call-web` calls `tool-call-fastapi` by its K8s service DNS name. The Angular UI reaches `tool-call-web` via an Ingress.
+Containerize `tool-call-fastapi` and `tool-call-api`, then provide plain Kubernetes manifests to deploy both services. `tool-call-api` calls `tool-call-fastapi` by its K8s service DNS name. The Angular UI reaches `tool-call-api` via an Ingress.
 
 ```
 [browser / tool-call-ui]
         │ HTTP (Ingress)
         ▼
-tool-call-web (ClusterIP :8080)
+tool-call-api (ClusterIP :8080)
         │ http://tool-call-fastapi:8000
         ▼
 tool-call-fastapi (ClusterIP :8000)
@@ -27,13 +27,13 @@ Both services use `python:3.12-slim` with the same pattern: install dependencies
 
 **`tool-call-fastapi/Dockerfile`** — exposes port 8000.
 
-**`tool-call-web/Dockerfile`** — exposes port 8080.
+**`tool-call-api/Dockerfile`** — exposes port 8080.
 
 **`.dockerignore`** (each service) excludes: `__pycache__/`, `.env`, `.pytest_cache/`, `tests/`. This keeps images lean and prevents local secrets from leaking into the build context.
 
-## tool-call-web CORS Change
+## tool-call-api CORS Change
 
-`tool-call-web/main.py` currently hardcodes `allow_origins=["http://localhost:4200"]`. This is replaced with an env var `CORS_ORIGIN` read at startup, defaulting to `http://localhost:4200` for backward compatibility. This allows the Ingress hostname to be configured without rebuilding the image.
+`tool-call-api/main.py` currently hardcodes `allow_origins=["http://localhost:4200"]`. This is replaced with an env var `CORS_ORIGIN` read at startup, defaulting to `http://localhost:4200` for backward compatibility. This allows the Ingress hostname to be configured without rebuilding the image.
 
 ## Kubernetes Manifests
 
@@ -47,11 +47,11 @@ k8s/
     configmap.yaml       # AWS_DEFAULT_REGION, LANGFUSE_HOST
     secret.yaml.example  # Placeholder template (committed)
     # secret.yaml        # Real values — gitignored, never committed
-  tool-call-web/
+  tool-call-api/
     deployment.yaml      # 1 replica, port 8080
     service.yaml         # ClusterIP, port 8080
     configmap.yaml       # AGENT_BACKEND_URL, CORS_ORIGIN
-    ingress.yaml         # Routes external traffic → tool-call-web:8080
+    ingress.yaml         # Routes external traffic → tool-call-api:8080
 ```
 
 ### tool-call-fastapi
@@ -78,14 +78,14 @@ k8s/
 - Port 8000 → targetPort 8000
 - Selector: `app: tool-call-fastapi`
 
-### tool-call-web
+### tool-call-api
 
-**ConfigMap** (`tool-call-web-config`):
+**ConfigMap** (`tool-call-api-config`):
 - `AGENT_BACKEND_URL` — `http://tool-call-fastapi:8000`
 - `CORS_ORIGIN` — e.g. `http://tool-call.local` (or UI origin in production)
 
 **Deployment:**
-- Image: `tool-call-web:latest`
+- Image: `tool-call-api:latest`
 - 1 replica
 - `envFrom` referencing ConfigMap
 - Port 8080
@@ -93,12 +93,12 @@ k8s/
 **Service:**
 - Type: `ClusterIP`
 - Port 8080 → targetPort 8080
-- Selector: `app: tool-call-web`
+- Selector: `app: tool-call-api`
 
 **Ingress:**
 - Ingress class: `nginx`
 - Host: `tool-call.local` (override with real domain for cloud)
-- Rule: `/*` → `tool-call-web:8080`
+- Rule: `/*` → `tool-call-api:8080`
 - For local K8s: add `127.0.0.1 tool-call.local` to `/etc/hosts`
 
 ## Secrets Workflow
@@ -126,7 +126,7 @@ data:
 ```bash
 # 1. Build images
 docker build -t tool-call-fastapi:latest ./tool-call-fastapi
-docker build -t tool-call-web:latest ./tool-call-web
+docker build -t tool-call-api:latest ./tool-call-api
 
 # 2. Create secrets (once)
 cp k8s/tool-call-fastapi/secret.yaml.example k8s/tool-call-fastapi/secret.yaml
@@ -135,7 +135,7 @@ kubectl apply -f k8s/tool-call-fastapi/secret.yaml
 
 # 3. Deploy all manifests
 kubectl apply -f k8s/tool-call-fastapi/
-kubectl apply -f k8s/tool-call-web/
+kubectl apply -f k8s/tool-call-api/
 
 # 4. For local K8s (minikube/kind): add to /etc/hosts
 #    127.0.0.1 tool-call.local

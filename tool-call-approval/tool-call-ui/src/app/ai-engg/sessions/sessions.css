@@ -82,7 +82,7 @@
 .session-row.active { border-color: #4f46e5; background: #1e1b4b; }
 
 /* columns */
-.col-id    { flex: 1; min-width: 0; }
+.col-id    { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .col-time  { flex: 0 0 140px; }
 .col-turns { flex: 0 0 50px; text-align: right; }
 
@@ -90,6 +90,12 @@
   font-family: ui-monospace, monospace;
   font-size: 0.8rem;
   color: #818cf8;
+  white-space: nowrap;
+}
+
+.session-preview {
+  font-size: 0.78rem;
+  color: #94a3b8;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -113,6 +119,25 @@
   margin-top: -3px;
   margin-bottom: 4px;
 }
+
+.session-history-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 8px 12px 0;
+}
+
+.continue-btn {
+  padding: 5px 14px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  background: #4f46e5;
+  color: #e0e7ff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.continue-btn:hover { background: #4338ca; }
 
 .history-messages {
   display: flex;

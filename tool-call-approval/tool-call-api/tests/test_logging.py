@@ -19,19 +19,19 @@ def reset_root_logger():
 
 
 def test_log_output_is_valid_json(capsys):
-    setup_logging("tool-call-web")
+    setup_logging("tool-call-api")
     logging.getLogger("test").info("request proxied")
     captured = capsys.readouterr()
     record = json.loads(captured.out.strip())
     assert record["message"] == "request proxied"
     assert record["level"] == "INFO"
-    assert record["service"] == "tool-call-web"
+    assert record["service"] == "tool-call-api"
     assert record["logger"] == "test"
     assert "timestamp" in record
 
 
 def test_extra_fields_propagated(capsys):
-    setup_logging("tool-call-web")
+    setup_logging("tool-call-api")
     logging.getLogger("test").warning("backend error", extra={"status_code": 502})
     captured = capsys.readouterr()
     record = json.loads(captured.out.strip())
@@ -40,15 +40,15 @@ def test_extra_fields_propagated(capsys):
 
 
 def test_reconfigure_uvicorn_loggers_replaces_handlers(capsys):
-    reconfigure_uvicorn_loggers("tool-call-web")
+    reconfigure_uvicorn_loggers("tool-call-api")
     logging.getLogger("uvicorn.access").info("GET /api/sessions 200")
     captured = capsys.readouterr()
     record = json.loads(captured.out.strip())
-    assert record["service"] == "tool-call-web"
+    assert record["service"] == "tool-call-api"
     assert record["logger"] == "uvicorn.access"
 
 
 def test_reconfigure_uvicorn_loggers_disables_propagation():
-    reconfigure_uvicorn_loggers("tool-call-web")
+    reconfigure_uvicorn_loggers("tool-call-api")
     for name in ("uvicorn", "uvicorn.access", "uvicorn.error"):
         assert logging.getLogger(name).propagate is False

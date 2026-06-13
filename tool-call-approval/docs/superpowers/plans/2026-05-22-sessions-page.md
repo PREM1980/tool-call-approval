@@ -4,7 +4,7 @@
 
 **Goal:** Add a Sessions tab to the AI-Engineer page that lists all past sessions and shows full chat history inline when a row is clicked.
 
-**Architecture:** A new `AiEngg` shell component wraps the existing `Chat` component (unchanged) and a new `Sessions` component under a tab switcher. The backend gets a new `GET /sessions` endpoint that queries `ai.agno_sessions` directly, proxied through `tool-call-web`. The Angular `SessionsService` fetches both the list and per-session history.
+**Architecture:** A new `AiEngg` shell component wraps the existing `Chat` component (unchanged) and a new `Sessions` component under a tab switcher. The backend gets a new `GET /sessions` endpoint that queries `ai.agno_sessions` directly, proxied through `tool-call-api`. The Angular `SessionsService` fetches both the list and per-session history.
 
 **Tech Stack:** Python 3.12, FastAPI, psycopg2, pytest | Angular 19, TypeScript, standalone components
 
@@ -18,7 +18,7 @@
 | `tool-call-agent/models.py` | Add `SessionSummaryResponse` Pydantic model |
 | `tool-call-agent/main.py` | Add `GET /sessions` endpoint |
 | `tool-call-agent/tests/test_sessions.py` | New test file for the sessions endpoint |
-| `tool-call-web/main.py` | Add `GET /api/sessions` proxy route |
+| `tool-call-api/main.py` | Add `GET /api/sessions` proxy route |
 | `tool-call-ui/src/app/models/types.ts` | Add `SessionSummary` and `ChatMessage` interfaces |
 | `tool-call-ui/src/app/services/sessions.service.ts` | New service: `getAll()`, `getHistory()` |
 | `tool-call-ui/src/app/ai-engg/sessions/sessions.ts` | New Sessions component |
@@ -194,9 +194,9 @@ cd tool-call-agent && python -m pytest tests/test_sessions.py -v
 
 Expected: 4 tests PASS
 
-- [ ] **Step 7: Add proxy route to `tool-call-web/main.py`**
+- [ ] **Step 7: Add proxy route to `tool-call-api/main.py`**
 
-In `tool-call-web/main.py`, add after the existing `create_session` route (around line 72):
+In `tool-call-api/main.py`, add after the existing `create_session` route (around line 72):
 
 ```python
 @app.get("/api/sessions")
@@ -210,7 +210,7 @@ async def list_sessions() -> JSONResponse:
 
 ```bash
 git add tool-call-agent/repository.py tool-call-agent/models.py tool-call-agent/main.py \
-        tool-call-agent/tests/test_sessions.py tool-call-web/main.py
+        tool-call-agent/tests/test_sessions.py tool-call-api/main.py
 git commit -m "feat(api): add GET /sessions endpoint and web proxy"
 ```
 

@@ -1,6 +1,7 @@
 import {
   ChangeDetectorRef,
   Component,
+  Input,
   OnInit,
   OnDestroy,
   ViewChild,
@@ -12,6 +13,7 @@ import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
 import { AdminService, AgentInstance } from '../../services/admin.service';
 import { ChatService } from '../../services/chat.service';
+import { SessionsService } from '../../services/sessions.service';
 import { WebsocketChatService } from '../../services/websocket-chat.service';
 import { ToolApproval } from '../tool-approval/tool-approval';
 import { Message, ToolCall } from '../../models/types';
@@ -27,6 +29,7 @@ export type ConnectionMode = 'sse' | 'websocket';
 })
 export class Chat implements OnInit, OnDestroy, AfterViewChecked {
   @ViewChild('messageList') private messageListRef!: ElementRef;
+  @Input() resumeSessionId?: string | null;
 
   messages: Message[] = [];
   userInput = '';
@@ -45,6 +48,7 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
   constructor(
     private chatService: ChatService,
     private wsChatService: WebsocketChatService,
+    private sessionsService: SessionsService,
     private adminService: AdminService,
     private cdr: ChangeDetectorRef
   ) {}
@@ -61,7 +65,11 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
     this.kubeconfig = creds?.kubeconfig ?? null;
     this.instances = instances;
     this.selectedInstanceId = instances[0]?.id ?? null;
-    await this.initConnection();
+    if (this.resumeSessionId) {
+      await this.loadExistingSession(this.resumeSessionId);
+    } else {
+      await this.initConnection();
+    }
   }
 
   ngAfterViewChecked(): void {
@@ -124,10 +132,28 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
     await this.activeService.approveTool(tool_use_id, approved);
   }
 
+  private async loadExistingSession(sessionId: string): Promise<void> {
+    this.mode = 'sse';
+    this.chatService.setSession(sessionId);
+    const history = await this.sessionsService.getHistory(sessionId).catch(() => []);
+    this.messages = history.map(m => ({
+      id: crypto.randomUUID(),
+      role: m.role,
+      content: m.content,
+      timestamp: new Date(),
+    }));
+    this.shouldScrollToBottom = true;
+    this.subscribeToEvents(this.chatService);
+  }
+
   private async initConnection(): Promise<void> {
     await this.activeService.createSession(this.selectedInstanceId ?? undefined);
-    this.activeService.connectStream();
-    this.sseSubscription = this.activeService.sseEvents$.subscribe((event) => {
+    this.subscribeToEvents(this.activeService);
+  }
+
+  private subscribeToEvents(service: ChatService | WebsocketChatService): void {
+    service.connectStream();
+    this.sseSubscription = service.sseEvents$.subscribe((event) => {
       switch (event.type) {
         case 'thinking':
           this.isWaiting = true;

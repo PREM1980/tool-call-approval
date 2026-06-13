@@ -12,4 +12,15 @@ import { Sessions } from './sessions/sessions';
 })
 export class AiEngg {
   tab: 'chat' | 'sessions' = 'chat';
+  resumeSessionId: string | null = null;
+
+  goToChat(): void {
+    this.resumeSessionId = null;
+    this.tab = 'chat';
+  }
+
+  openSessionInChat(sessionId: string): void {
+    this.resumeSessionId = sessionId;
+    this.tab = 'chat';
+  }
 }

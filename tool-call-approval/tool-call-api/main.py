@@ -14,7 +14,7 @@ load_dotenv()
 
 from logging_config import reconfigure_uvicorn_loggers, setup_logging  # noqa: E402
 
-setup_logging("tool-call-web")
+setup_logging("tool-call-api")
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +26,7 @@ _client: httpx.AsyncClient | None = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    reconfigure_uvicorn_loggers("tool-call-web")
+    reconfigure_uvicorn_loggers("tool-call-api")
     global _client
     _client = httpx.AsyncClient(
         limits=httpx.Limits(max_connections=500, max_keepalive_connections=500),
@@ -36,7 +36,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await _client.aclose()
 
 
-app = FastAPI(title="Tool Call Web", lifespan=lifespan)
+app = FastAPI(title="Tool Call API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

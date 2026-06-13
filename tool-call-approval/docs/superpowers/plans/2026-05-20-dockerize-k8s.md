@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Containerize `tool-call-fastapi` and `tool-call-web`, and provide plain Kubernetes manifests so both services can be deployed to any K8s cluster with `kubectl apply -f k8s/`.
+**Goal:** Containerize `tool-call-fastapi` and `tool-call-api`, and provide plain Kubernetes manifests so both services can be deployed to any K8s cluster with `kubectl apply -f k8s/`.
 
-**Architecture:** Each service gets a `Dockerfile` + `.dockerignore`. K8s manifests live under `k8s/<service>/` (Deployment, Service, ConfigMap, Secret template, Ingress). `tool-call-web` calls `tool-call-fastapi` by K8s service DNS (`http://tool-call-fastapi:8000`). The CORS origin in `tool-call-web` is made configurable via a `CORS_ORIGIN` env var so it can be set per-environment without rebuilding the image.
+**Architecture:** Each service gets a `Dockerfile` + `.dockerignore`. K8s manifests live under `k8s/<service>/` (Deployment, Service, ConfigMap, Secret template, Ingress). `tool-call-api` calls `tool-call-fastapi` by K8s service DNS (`http://tool-call-fastapi:8000`). The CORS origin in `tool-call-api` is made configurable via a `CORS_ORIGIN` env var so it can be set per-environment without rebuilding the image.
 
 **Tech Stack:** Docker (python:3.12-slim base), Kubernetes 1.24+ (apps/v1 Deployment, networking.k8s.io/v1 Ingress), nginx ingress controller.
 
@@ -16,20 +16,20 @@
 |---|---|---|
 | Create | `tool-call-fastapi/Dockerfile` | Container image for agent backend |
 | Create | `tool-call-fastapi/.dockerignore` | Exclude cache, secrets, tests from build |
-| Modify | `tool-call-web/main.py:14,31-37` | Read CORS_ORIGIN from env |
-| Create | `tool-call-web/Dockerfile` | Container image for API gateway |
-| Create | `tool-call-web/.dockerignore` | Exclude cache, secrets, tests from build |
+| Modify | `tool-call-api/main.py:14,31-37` | Read CORS_ORIGIN from env |
+| Create | `tool-call-api/Dockerfile` | Container image for API gateway |
+| Create | `tool-call-api/.dockerignore` | Exclude cache, secrets, tests from build |
 | Create | `k8s/tool-call-fastapi/deployment.yaml` | Run agent backend pod |
 | Create | `k8s/tool-call-fastapi/service.yaml` | ClusterIP service on port 8000 |
 | Create | `k8s/tool-call-fastapi/configmap.yaml` | AWS_DEFAULT_REGION, LANGFUSE_HOST |
 | Create | `k8s/tool-call-fastapi/secret.yaml.example` | Placeholder template for secrets |
-| Create | `k8s/tool-call-web/deployment.yaml` | Run gateway pod |
-| Create | `k8s/tool-call-web/service.yaml` | ClusterIP service on port 8080 |
-| Create | `k8s/tool-call-web/configmap.yaml` | AGENT_BACKEND_URL, CORS_ORIGIN |
-| Create | `k8s/tool-call-web/ingress.yaml` | Route external traffic to gateway |
+| Create | `k8s/tool-call-api/deployment.yaml` | Run gateway pod |
+| Create | `k8s/tool-call-api/service.yaml` | ClusterIP service on port 8080 |
+| Create | `k8s/tool-call-api/configmap.yaml` | AGENT_BACKEND_URL, CORS_ORIGIN |
+| Create | `k8s/tool-call-api/ingress.yaml` | Route external traffic to gateway |
 | Modify | `.gitignore` | Add k8s/**/secret.yaml |
 | Modify | `tool-call-fastapi/README.md` | Docker + K8s usage |
-| Modify | `tool-call-web/README.md` | Docker + K8s usage |
+| Modify | `tool-call-api/README.md` | Docker + K8s usage |
 
 ---
 
@@ -94,14 +94,14 @@ git commit -m "feat(tool-call-fastapi): add Dockerfile and .dockerignore"
 
 ---
 
-## Task 2: Make CORS Origin Configurable in tool-call-web
+## Task 2: Make CORS Origin Configurable in tool-call-api
 
 **Files:**
-- Modify: `tool-call-web/main.py:14,31-37`
+- Modify: `tool-call-api/main.py:14,31-37`
 
 - [ ] **Step 1: Update main.py to read CORS_ORIGIN from env**
 
-In `tool-call-web/main.py`, change lines 14–15 from:
+In `tool-call-api/main.py`, change lines 14–15 from:
 ```python
 _BACKEND = os.getenv("AGENT_BACKEND_URL", "http://localhost:8000")
 _client: httpx.AsyncClient | None = None
@@ -139,14 +139,14 @@ app.add_middleware(
 - [ ] **Step 2: Run existing tests to confirm nothing broke**
 
 ```bash
-cd tool-call-web && python -m pytest -v 2>&1 | tail -15
+cd tool-call-api && python -m pytest -v 2>&1 | tail -15
 ```
 
 Expected: all 8 tests PASS (CORS middleware is not directly tested, so no test changes needed).
 
 - [ ] **Step 3: Update .env.example**
 
-Add `CORS_ORIGIN` to `tool-call-web/.env.example`:
+Add `CORS_ORIGIN` to `tool-call-api/.env.example`:
 ```
 AGENT_BACKEND_URL=http://localhost:8000
 CORS_ORIGIN=http://localhost:4200
@@ -156,21 +156,21 @@ CORS_ORIGIN=http://localhost:4200
 
 ```bash
 cd ..
-git add tool-call-web/main.py tool-call-web/.env.example
-git commit -m "feat(tool-call-web): make CORS origin configurable via CORS_ORIGIN env var"
+git add tool-call-api/main.py tool-call-api/.env.example
+git commit -m "feat(tool-call-api): make CORS origin configurable via CORS_ORIGIN env var"
 ```
 
 ---
 
-## Task 3: Dockerize tool-call-web
+## Task 3: Dockerize tool-call-api
 
 **Files:**
-- Create: `tool-call-web/Dockerfile`
-- Create: `tool-call-web/.dockerignore`
+- Create: `tool-call-api/Dockerfile`
+- Create: `tool-call-api/.dockerignore`
 
 - [ ] **Step 1: Create .dockerignore**
 
-Create `tool-call-web/.dockerignore`:
+Create `tool-call-api/.dockerignore`:
 ```
 __pycache__/
 *.pyc
@@ -181,7 +181,7 @@ tests/
 
 - [ ] **Step 2: Create Dockerfile**
 
-Create `tool-call-web/Dockerfile`:
+Create `tool-call-api/Dockerfile`:
 ```dockerfile
 FROM python:3.12-slim
 WORKDIR /app
@@ -194,7 +194,7 @@ CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
 - [ ] **Step 3: Build the image to verify it works**
 
 ```bash
-docker build -t tool-call-web:latest ./tool-call-web
+docker build -t tool-call-api:latest ./tool-call-api
 ```
 
 Expected: image builds successfully.
@@ -202,7 +202,7 @@ Expected: image builds successfully.
 - [ ] **Step 4: Verify the image starts**
 
 ```bash
-docker run --rm -e AGENT_BACKEND_URL=http://localhost:8000 -p 8080:8080 tool-call-web:latest &
+docker run --rm -e AGENT_BACKEND_URL=http://localhost:8000 -p 8080:8080 tool-call-api:latest &
 sleep 3
 curl -s http://localhost:8080/docs | grep -q "Tool Call Web" && echo "OK" || echo "FAIL"
 kill %1
@@ -213,8 +213,8 @@ Expected: `OK`.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add tool-call-web/Dockerfile tool-call-web/.dockerignore
-git commit -m "feat(tool-call-web): add Dockerfile and .dockerignore"
+git add tool-call-api/Dockerfile tool-call-api/.dockerignore
+git commit -m "feat(tool-call-api): add Dockerfile and .dockerignore"
 ```
 
 ---
@@ -340,28 +340,28 @@ git commit -m "feat(k8s): add tool-call-fastapi manifests (deployment, service, 
 
 ---
 
-## Task 5: K8s Manifests for tool-call-web
+## Task 5: K8s Manifests for tool-call-api
 
 **Files:**
-- Create: `k8s/tool-call-web/deployment.yaml`
-- Create: `k8s/tool-call-web/service.yaml`
-- Create: `k8s/tool-call-web/configmap.yaml`
-- Create: `k8s/tool-call-web/ingress.yaml`
+- Create: `k8s/tool-call-api/deployment.yaml`
+- Create: `k8s/tool-call-api/service.yaml`
+- Create: `k8s/tool-call-api/configmap.yaml`
+- Create: `k8s/tool-call-api/ingress.yaml`
 
 - [ ] **Step 1: Create directory**
 
 ```bash
-mkdir -p k8s/tool-call-web
+mkdir -p k8s/tool-call-api
 ```
 
 - [ ] **Step 2: Create configmap.yaml**
 
-Create `k8s/tool-call-web/configmap.yaml`:
+Create `k8s/tool-call-api/configmap.yaml`:
 ```yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: tool-call-web-config
+  name: tool-call-api-config
 data:
   AGENT_BACKEND_URL: http://tool-call-fastapi:8000
   CORS_ORIGIN: http://tool-call.local
@@ -369,15 +369,15 @@ data:
 
 - [ ] **Step 3: Create service.yaml**
 
-Create `k8s/tool-call-web/service.yaml`:
+Create `k8s/tool-call-api/service.yaml`:
 ```yaml
 apiVersion: v1
 kind: Service
 metadata:
-  name: tool-call-web
+  name: tool-call-api
 spec:
   selector:
-    app: tool-call-web
+    app: tool-call-api
   ports:
     - port: 8080
       targetPort: 8080
@@ -386,41 +386,41 @@ spec:
 
 - [ ] **Step 4: Create deployment.yaml**
 
-Create `k8s/tool-call-web/deployment.yaml`:
+Create `k8s/tool-call-api/deployment.yaml`:
 ```yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: tool-call-web
+  name: tool-call-api
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: tool-call-web
+      app: tool-call-api
   template:
     metadata:
       labels:
-        app: tool-call-web
+        app: tool-call-api
     spec:
       containers:
-        - name: tool-call-web
-          image: tool-call-web:latest
+        - name: tool-call-api
+          image: tool-call-api:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
           envFrom:
             - configMapRef:
-                name: tool-call-web-config
+                name: tool-call-api-config
 ```
 
 - [ ] **Step 5: Create ingress.yaml**
 
-Create `k8s/tool-call-web/ingress.yaml`:
+Create `k8s/tool-call-api/ingress.yaml`:
 ```yaml
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: tool-call-web
+  name: tool-call-api
   annotations:
     nginx.ingress.kubernetes.io/rewrite-target: /
 spec:
@@ -433,7 +433,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: tool-call-web
+                name: tool-call-api
                 port:
                   number: 8080
 ```
@@ -441,25 +441,25 @@ spec:
 - [ ] **Step 6: Validate all manifests with dry-run**
 
 ```bash
-kubectl apply --dry-run=client -f k8s/tool-call-web/configmap.yaml
-kubectl apply --dry-run=client -f k8s/tool-call-web/service.yaml
-kubectl apply --dry-run=client -f k8s/tool-call-web/deployment.yaml
-kubectl apply --dry-run=client -f k8s/tool-call-web/ingress.yaml
+kubectl apply --dry-run=client -f k8s/tool-call-api/configmap.yaml
+kubectl apply --dry-run=client -f k8s/tool-call-api/service.yaml
+kubectl apply --dry-run=client -f k8s/tool-call-api/deployment.yaml
+kubectl apply --dry-run=client -f k8s/tool-call-api/ingress.yaml
 ```
 
 Expected:
 ```
-configmap/tool-call-web-config created (dry run)
-service/tool-call-web created (dry run)
-deployment.apps/tool-call-web created (dry run)
-ingress.networking.k8s.io/tool-call-web created (dry run)
+configmap/tool-call-api-config created (dry run)
+service/tool-call-api created (dry run)
+deployment.apps/tool-call-api created (dry run)
+ingress.networking.k8s.io/tool-call-api created (dry run)
 ```
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add k8s/tool-call-web/
-git commit -m "feat(k8s): add tool-call-web manifests (deployment, service, configmap, ingress)"
+git add k8s/tool-call-api/
+git commit -m "feat(k8s): add tool-call-api manifests (deployment, service, configmap, ingress)"
 ```
 
 ---
@@ -498,7 +498,7 @@ git commit -m "chore: gitignore k8s secret.yaml files"
 
 **Files:**
 - Modify: `tool-call-fastapi/README.md`
-- Modify: `tool-call-web/README.md`
+- Modify: `tool-call-api/README.md`
 
 - [ ] **Step 1: Add Docker & K8s section to tool-call-fastapi/README.md**
 
@@ -532,26 +532,26 @@ kubectl apply -f k8s/tool-call-fastapi/
 ```
 ```
 
-- [ ] **Step 2: Add Docker & K8s section to tool-call-web/README.md**
+- [ ] **Step 2: Add Docker & K8s section to tool-call-api/README.md**
 
-Open `tool-call-web/README.md` and append:
+Open `tool-call-api/README.md` and append:
 
 ```markdown
 ## Docker
 
 ```bash
-docker build -t tool-call-web:latest .
+docker build -t tool-call-api:latest .
 docker run --rm \
   -e AGENT_BACKEND_URL=http://tool-call-fastapi:8000 \
   -e CORS_ORIGIN=http://tool-call.local \
   -p 8080:8080 \
-  tool-call-web:latest
+  tool-call-api:latest
 ```
 
 ## Kubernetes
 
 ```bash
-kubectl apply -f k8s/tool-call-web/
+kubectl apply -f k8s/tool-call-api/
 ```
 
 For local K8s (minikube/kind), add to `/etc/hosts`:
@@ -563,7 +563,7 @@ For local K8s (minikube/kind), add to `/etc/hosts`:
 - [ ] **Step 3: Commit**
 
 ```bash
-git add tool-call-fastapi/README.md tool-call-web/README.md
+git add tool-call-fastapi/README.md tool-call-api/README.md
 git commit -m "docs: add Docker and Kubernetes usage to READMEs"
 ```
 
@@ -574,17 +574,17 @@ git commit -m "docs: add Docker and Kubernetes usage to READMEs"
 - [ ] **Run both test suites to confirm nothing regressed**
 
 ```bash
-cd tool-call-web && python -m pytest -v 2>&1 | tail -12
+cd tool-call-api && python -m pytest -v 2>&1 | tail -12
 cd ../tool-call-fastapi && python -m pytest -v 2>&1 | tail -5
 ```
 
-Expected: 8 passed in tool-call-web, 107 passed in tool-call-fastapi.
+Expected: 8 passed in tool-call-api, 107 passed in tool-call-fastapi.
 
 - [ ] **Verify both images build cleanly from scratch**
 
 ```bash
 docker build --no-cache -t tool-call-fastapi:latest ./tool-call-fastapi
-docker build --no-cache -t tool-call-web:latest ./tool-call-web
+docker build --no-cache -t tool-call-api:latest ./tool-call-api
 ```
 
 Expected: both complete without errors.
@@ -595,7 +595,7 @@ Expected: both complete without errors.
 kubectl apply --dry-run=client -f k8s/tool-call-fastapi/configmap.yaml \
   -f k8s/tool-call-fastapi/service.yaml \
   -f k8s/tool-call-fastapi/deployment.yaml
-kubectl apply --dry-run=client -f k8s/tool-call-web/
+kubectl apply --dry-run=client -f k8s/tool-call-api/
 ```
 
 Expected: all resources show `created (dry run)` with no errors.

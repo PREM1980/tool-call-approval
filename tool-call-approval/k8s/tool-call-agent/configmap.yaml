@@ -3,5 +3,9 @@ kind: ConfigMap
 metadata:
   name: tool-call-agent-config
 data:
-  AWS_DEFAULT_REGION: us-east-1
-  LANGFUSE_HOST: http://langfuse-web:3000
+  LLM_PROVIDER: GCP
+  GOOGLE_CLOUD_PROJECT: provs-487517
+  GOOGLE_CLOUD_LOCATION: us-east5
+  GOOGLE_APPLICATION_CREDENTIALS: /etc/gcp/service-account.json
+  LANGFUSE_HOST: http://host.docker.internal:3000
+  AUTO_APPROVE_TOOLS: "false"

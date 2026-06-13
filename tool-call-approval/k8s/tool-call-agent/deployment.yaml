@@ -12,6 +12,10 @@ spec:
       labels:
         app: tool-call-agent
     spec:
+      hostAliases:
+        - ip: "192.168.65.254"
+          hostnames:
+            - "host.docker.internal"
       containers:
         - name: tool-call-agent
           image: tool-call-agent:latest
@@ -23,3 +27,11 @@ spec:
                 name: tool-call-agent-config
             - secretRef:
                 name: tool-call-agent-secret
+          volumeMounts:
+            - name: gcp-credentials
+              mountPath: /etc/gcp
+              readOnly: true
+      volumes:
+        - name: gcp-credentials
+          secret:
+            secretName: gcp-credentials

@@ -1,11 +1,12 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: tool-call-web
+  name: tool-call-api
 spec:
   selector:
-    app: tool-call-web
+    app: tool-call-api
   ports:
     - port: 8080
       targetPort: 8080
-  type: ClusterIP
+      nodePort: 30080
+  type: NodePort

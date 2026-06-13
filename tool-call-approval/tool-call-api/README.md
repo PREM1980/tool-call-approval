@@ -1,11 +1,11 @@
-# tool-call-web
+# tool-call-api
 
 API gateway that sits between `tool-call-ui` and `tool-call-agent`. The Angular UI communicates exclusively with this service; it forwards requests to the agent backend.
 
 ## Architecture
 
 ```
-tool-call-ui (:4200) → tool-call-web (:8080) → tool-call-agent (:8000)
+tool-call-ui (:4200) → tool-call-api (:8080) → tool-call-agent (:8000)
 ```
 
 ## Routes
@@ -49,14 +49,14 @@ pytest -v
 
 ```bash
 # Build
-docker build -t tool-call-web:latest .
+docker build -t tool-call-api:latest .
 
 # Run (forwarding to a local backend)
 docker run --rm \
   -e AGENT_BACKEND_URL=http://host.docker.internal:8000 \
   -e CORS_ORIGIN=http://localhost:4200 \
   -p 8080:8080 \
-  tool-call-web:latest
+  tool-call-api:latest
 ```
 
 ---
@@ -65,7 +65,7 @@ docker run --rm \
 
 ```bash
 # Apply all manifests
-kubectl apply -f ../k8s/tool-call-web/
+kubectl apply -f ../k8s/tool-call-api/
 
 # For local K8s (minikube/kind): add the ingress host to /etc/hosts
 echo "127.0.0.1 tool-call.local" | sudo tee -a /etc/hosts

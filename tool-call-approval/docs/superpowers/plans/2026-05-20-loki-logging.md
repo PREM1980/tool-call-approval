@@ -4,7 +4,7 @@
 
 **Goal:** Add structured JSON logging to both Python services and ship logs to Loki via Promtail, with Grafana on :3001 for querying.
 
-**Architecture:** Both `tool-call-agent` and `tool-call-web` emit structured JSON logs to stdout; Promtail reads them from the Docker daemon via the Unix socket and pushes to Loki; Grafana queries Loki with the datasource pre-provisioned. All three new services (Loki, Grafana, Promtail) are added to the existing `docker-compose.yml`.
+**Architecture:** Both `tool-call-agent` and `tool-call-api` emit structured JSON logs to stdout; Promtail reads them from the Docker daemon via the Unix socket and pushes to Loki; Grafana queries Loki with the datasource pre-provisioned. All three new services (Loki, Grafana, Promtail) are added to the existing `docker-compose.yml`.
 
 **Tech Stack:** `python-json-logger==2.0.7`, `grafana/loki:3.0.0`, `grafana/promtail:3.0.0`, `grafana/grafana:11.0.0`
 
@@ -18,10 +18,10 @@
 | Create | `tool-call-agent/tests/test_logging.py` | Unit tests for agent logging |
 | Modify | `tool-call-agent/requirements.txt` | Add python-json-logger |
 | Modify | `tool-call-agent/main.py` | Call setup_logging at startup |
-| Create | `tool-call-web/logging_config.py` | JSON log setup for web gateway |
-| Create | `tool-call-web/tests/test_logging.py` | Unit tests for web logging |
-| Modify | `tool-call-web/requirements.txt` | Add python-json-logger |
-| Modify | `tool-call-web/main.py` | Call setup_logging at startup |
+| Create | `tool-call-api/logging_config.py` | JSON log setup for web gateway |
+| Create | `tool-call-api/tests/test_logging.py` | Unit tests for web logging |
+| Modify | `tool-call-api/requirements.txt` | Add python-json-logger |
+| Modify | `tool-call-api/main.py` | Call setup_logging at startup |
 | Create | `loki/loki-config.yaml` | Loki single-process config |
 | Create | `promtail/promtail-config.yaml` | Promtail Docker socket scrape config |
 | Create | `grafana/provisioning/datasources/loki.yaml` | Auto-provision Loki datasource |
@@ -230,17 +230,17 @@ git commit -m "feat(agent): add structured JSON logging via python-json-logger"
 
 ---
 
-### Task 2: Structured JSON logging in tool-call-web
+### Task 2: Structured JSON logging in tool-call-api
 
 **Files:**
-- Create: `tool-call-web/logging_config.py`
-- Create: `tool-call-web/tests/test_logging.py`
-- Modify: `tool-call-web/requirements.txt`
-- Modify: `tool-call-web/main.py`
+- Create: `tool-call-api/logging_config.py`
+- Create: `tool-call-api/tests/test_logging.py`
+- Modify: `tool-call-api/requirements.txt`
+- Modify: `tool-call-api/main.py`
 
 - [ ] **Step 1: Add python-json-logger to requirements**
 
-Edit `tool-call-web/requirements.txt` — append one line:
+Edit `tool-call-api/requirements.txt` — append one line:
 
 ```
 python-json-logger==2.0.7
@@ -249,14 +249,14 @@ python-json-logger==2.0.7
 - [ ] **Step 2: Install it**
 
 ```bash
-cd tool-call-web && pip install python-json-logger==2.0.7
+cd tool-call-api && pip install python-json-logger==2.0.7
 ```
 
 Expected: `Successfully installed python-json-logger-2.0.7` (or "already satisfied")
 
 - [ ] **Step 3: Write the failing tests**
 
-Create `tool-call-web/tests/__init__.py` if it doesn't exist (empty file), then create `tool-call-web/tests/test_logging.py`:
+Create `tool-call-api/tests/__init__.py` if it doesn't exist (empty file), then create `tool-call-api/tests/test_logging.py`:
 
 ```python
 import json
@@ -280,19 +280,19 @@ def reset_root_logger():
 
 
 def test_log_output_is_valid_json(capsys):
-    setup_logging("tool-call-web")
+    setup_logging("tool-call-api")
     logging.getLogger("test").info("request proxied")
     captured = capsys.readouterr()
     record = json.loads(captured.out.strip())
     assert record["message"] == "request proxied"
     assert record["level"] == "INFO"
-    assert record["service"] == "tool-call-web"
+    assert record["service"] == "tool-call-api"
     assert record["logger"] == "test"
     assert "timestamp" in record
 
 
 def test_extra_fields_propagated(capsys):
-    setup_logging("tool-call-web")
+    setup_logging("tool-call-api")
     logging.getLogger("test").warning("backend error", extra={"status_code": 502})
     captured = capsys.readouterr()
     record = json.loads(captured.out.strip())
@@ -303,14 +303,14 @@ def test_extra_fields_propagated(capsys):
 - [ ] **Step 4: Run tests to confirm they fail**
 
 ```bash
-cd tool-call-web && pytest tests/test_logging.py -v
+cd tool-call-api && pytest tests/test_logging.py -v
 ```
 
 Expected: `ModuleNotFoundError: No module named 'logging_config'`
 
 - [ ] **Step 5: Create logging_config.py**
 
-Create `tool-call-web/logging_config.py`:
+Create `tool-call-api/logging_config.py`:
 
 ```python
 import logging
@@ -354,14 +354,14 @@ def setup_logging(service: str) -> None:
 - [ ] **Step 6: Run tests to confirm they pass**
 
 ```bash
-cd tool-call-web && pytest tests/test_logging.py -v
+cd tool-call-api && pytest tests/test_logging.py -v
 ```
 
 Expected: `2 passed`
 
 - [ ] **Step 7: Wire logging into main.py**
 
-In `tool-call-web/main.py`, add after `load_dotenv()`:
+In `tool-call-api/main.py`, add after `load_dotenv()`:
 
 ```python
 import logging
@@ -380,7 +380,7 @@ load_dotenv()
 
 from logging_config import setup_logging  # noqa: E402
 
-setup_logging("tool-call-web")
+setup_logging("tool-call-api")
 
 logger = logging.getLogger(__name__)
 ```
@@ -406,7 +406,7 @@ async def _proxy(coro: Awaitable[httpx.Response]) -> JSONResponse:
 - [ ] **Step 8: Run the full test suite**
 
 ```bash
-cd tool-call-web && pytest -v
+cd tool-call-api && pytest -v
 ```
 
 Expected: all 8 tests + 2 new logging tests pass.
@@ -414,10 +414,10 @@ Expected: all 8 tests + 2 new logging tests pass.
 - [ ] **Step 9: Commit**
 
 ```bash
-git add tool-call-web/logging_config.py \
-        tool-call-web/tests/test_logging.py \
-        tool-call-web/requirements.txt \
-        tool-call-web/main.py
+git add tool-call-api/logging_config.py \
+        tool-call-api/tests/test_logging.py \
+        tool-call-api/requirements.txt \
+        tool-call-api/main.py
 git commit -m "feat(web): add structured JSON logging via python-json-logger"
 ```
 
@@ -702,7 +702,7 @@ git commit -m "feat(infra): add Loki, Grafana, Promtail to docker-compose"
 
 **Files:**
 - Modify: `tool-call-agent/README.md`
-- Modify: `tool-call-web/README.md`
+- Modify: `tool-call-api/README.md`
 
 - [ ] **Step 1: Add Logging section to tool-call-agent README**
 
@@ -720,9 +720,9 @@ The service emits structured JSON logs to stdout. Each line is a valid JSON obje
 When running via Docker Compose, Promtail ships these logs to Loki automatically. Query them in Grafana at `http://localhost:3001`.
 ```
 
-- [ ] **Step 2: Add Logging section to tool-call-web README**
+- [ ] **Step 2: Add Logging section to tool-call-api README**
 
-In `tool-call-web/README.md`, add a new section at the end:
+In `tool-call-api/README.md`, add a new section at the end:
 
 ```markdown
 ## Logging
@@ -733,7 +733,7 @@ The gateway emits structured JSON logs to stdout. Backend errors (502, 504) are 
 - [ ] **Step 3: Commit**
 
 ```bash
-git add tool-call-agent/README.md tool-call-web/README.md
+git add tool-call-agent/README.md tool-call-api/README.md
 git commit -m "docs: add structured logging and Loki/Grafana sections to READMEs"
 ```
 
