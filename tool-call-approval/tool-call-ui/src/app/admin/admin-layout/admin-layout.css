@@ -1,12 +1,19 @@
 :host {
   display: flex;
   flex: 1;
+  min-width: 0;
   overflow: hidden;
+}
+
+.admin-layout {
+  width: 100%;
+  min-width: 0;
 }
 
 /* ── Sidebar shell ─────────────────────────────────── */
 .admin-sidebar {
   width: 216px;
+  min-width: 0;
   flex-shrink: 0;
   background: #0f172a;
   display: flex;
@@ -81,7 +88,50 @@
 /* ── Content area ──────────────────────────────────── */
 .admin-content {
   flex: 1;
+  min-width: 0;
   padding: 24px;
-  overflow-y: auto;
+  overflow: hidden;
   background: #f8fafc;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+@media (max-width: 720px) {
+  :host {
+    overflow: auto;
+  }
+
+  .admin-layout {
+    flex-direction: column;
+    min-height: 100%;
+  }
+
+  .admin-sidebar {
+    width: 100%;
+    max-width: 100%;
+    flex-direction: row;
+    gap: 10px;
+    padding: 10px 12px;
+    overflow-x: auto;
+  }
+
+  .sidebar-section-label {
+    display: none;
+  }
+
+  .sidebar-nav {
+    flex-direction: row;
+    gap: 6px;
+  }
+
+  .sidebar-link {
+    padding: 8px 10px;
+  }
+
+  .admin-content {
+    flex: 1 0 auto;
+    padding: 16px;
+    overflow: visible;
+  }
 }

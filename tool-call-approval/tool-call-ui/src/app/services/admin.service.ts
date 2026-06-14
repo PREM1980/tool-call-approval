@@ -42,6 +42,15 @@ export interface AgentInstance {
   updated_at: string;
 }
 
+export interface SystemPromptData {
+  id: string;
+  name: string;
+  instructions: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class AdminService {
   constructor(private http: HttpClient) {}
@@ -141,5 +150,25 @@ export class AdminService {
 
   deleteAgentInstance(id: string) {
     return firstValueFrom(this.http.delete(`${API}/agent-instances/${id}`));
+  }
+
+  listSystemPrompts() {
+    return firstValueFrom(this.http.get<SystemPromptData[]>(`${API}/system-prompts`));
+  }
+
+  createSystemPrompt(name: string, instructions: string) {
+    return firstValueFrom(this.http.post<SystemPromptData>(`${API}/system-prompts`, { name, instructions }));
+  }
+
+  updateSystemPrompt(id: string, name: string, instructions: string) {
+    return firstValueFrom(this.http.put<SystemPromptData>(`${API}/system-prompts/${id}`, { name, instructions }));
+  }
+
+  deleteSystemPrompt(id: string) {
+    return firstValueFrom(this.http.delete(`${API}/system-prompts/${id}`));
+  }
+
+  activateSystemPrompt(id: string) {
+    return firstValueFrom(this.http.post<SystemPromptData>(`${API}/system-prompts/${id}/activate`, {}));
   }
 }

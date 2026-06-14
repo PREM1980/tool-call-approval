@@ -65,10 +65,14 @@ async def list_sessions() -> list[dict]:
 async def create_session(
     request: CreateSessionRequest = Body(CreateSessionRequest()),
 ) -> SessionResponse:
-    session = service.create_session(request.instance_id)
+    session = service.create_session(request.instance_id, request.system_prompt_id)
     logger.info(
         "session created",
-        extra={"session_id": session.id, "instance_id": request.instance_id},
+        extra={
+            "session_id": session.id,
+            "instance_id": request.instance_id,
+            "system_prompt_id": request.system_prompt_id,
+        },
     )
     return SessionResponse(session_id=session.id)
 
@@ -80,6 +84,7 @@ async def chat(session_id: str, request: ChatRequest) -> dict:
         raise HTTPException(status_code=404, detail="Session not found")
     if request.platform_context:
         session.kubeconfig = request.platform_context.kubeconfig
+    service.record_user_message(session, request.message)
     asyncio.create_task(service.run(session, request.message))
     return {"status": "processing"}
 

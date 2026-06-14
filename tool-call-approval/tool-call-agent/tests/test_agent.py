@@ -47,10 +47,53 @@ from agent_service import AgentService
 
 
 class MockStorage(IAgentStorage):
+    def __init__(self):
+        self.session_records = []
+        self.messages = []
+
     def get_db(self):
         return MagicMock()
 
     def list_sessions(self):
+        return []
+
+    def create_session_record(
+        self,
+        session_id,
+        instance_id,
+        system_prompt_id,
+        system_prompt_name,
+        system_prompt_instructions_snapshot,
+    ):
+        self.session_records.append({
+            "session_id": session_id,
+            "instance_id": instance_id,
+            "system_prompt_id": system_prompt_id,
+            "system_prompt_name": system_prompt_name,
+            "system_prompt_instructions_snapshot": system_prompt_instructions_snapshot,
+        })
+
+    def append_session_message(
+        self,
+        session_id,
+        role,
+        content,
+        instance_id=None,
+        system_prompt_id=None,
+        system_prompt_name=None,
+        system_prompt_instructions_snapshot=None,
+    ):
+        self.messages.append({
+            "session_id": session_id,
+            "role": role,
+            "content": content,
+            "instance_id": instance_id,
+            "system_prompt_id": system_prompt_id,
+            "system_prompt_name": system_prompt_name,
+            "system_prompt_instructions_snapshot": system_prompt_instructions_snapshot,
+        })
+
+    def get_session_history(self, session_id):
         return []
 
     def save_report(self, report_id, session_id, s3_bucket, s3_key, title):
@@ -83,6 +126,60 @@ def test_create_session_returns_session_with_id(service):
         session = service.create_session()
     assert session.id is not None
     assert len(session.id) == 36  # UUID
+
+
+def test_create_session_uses_selected_system_prompt(service):
+    service._admin_repository.get_system_prompt = MagicMock(return_value={
+        "id": "prompt-1",
+        "name": "default_agent",
+        "instructions": "selected instructions",
+    })
+    service._admin_repository.get_active_system_prompt = MagicMock(
+        return_value="active instructions"
+    )
+
+    with patch("agent_service.Agent") as MockAgent, patch("agent_service.AwsBedrock"):
+        service.create_session(system_prompt_id="prompt-1")
+
+    assert MockAgent.call_args.kwargs["instructions"] == "selected instructions"
+    service._admin_repository.get_system_prompt.assert_called_once_with("prompt-1")
+
+
+def test_create_session_defers_prompt_metadata_until_first_message(service):
+    service._admin_repository.get_system_prompt = MagicMock(return_value={
+        "id": "prompt-1",
+        "name": "default_agent",
+        "instructions": "selected instructions",
+    })
+
+    with patch("agent_service.Agent"), patch("agent_service.AwsBedrock"):
+        service.create_session(instance_id="inst-1", system_prompt_id="prompt-1")
+
+    assert service._repository.session_records == []
+    assert service._repository.messages == []
+
+
+def test_record_user_message_persists_prompt_metadata_with_first_message(service):
+    service._admin_repository.get_system_prompt = MagicMock(return_value={
+        "id": "prompt-1",
+        "name": "default_agent",
+        "instructions": "selected instructions",
+    })
+
+    with patch("agent_service.Agent"), patch("agent_service.AwsBedrock"):
+        session = service.create_session(instance_id="inst-1", system_prompt_id="prompt-1")
+
+    service.record_user_message(session, "hello")
+
+    assert service._repository.messages == [{
+        "session_id": session.id,
+        "role": "user",
+        "content": "hello",
+        "instance_id": "inst-1",
+        "system_prompt_id": "prompt-1",
+        "system_prompt_name": "default_agent",
+        "system_prompt_instructions_snapshot": "selected instructions",
+    }]
 
 
 def test_get_session_returns_none_for_unknown(service):
@@ -167,6 +264,15 @@ async def test_run_happy_path(service):
     assert "thinking" in types
     assert "message" in types
     assert "done" in types
+    assert service._repository.messages[-1] == {
+        "session_id": session.id,
+        "role": "assistant",
+        "content": "Hello!",
+        "instance_id": None,
+        "system_prompt_id": None,
+        "system_prompt_name": None,
+        "system_prompt_instructions_snapshot": None,
+    }
 
 
 async def test_run_tool_approved(service):

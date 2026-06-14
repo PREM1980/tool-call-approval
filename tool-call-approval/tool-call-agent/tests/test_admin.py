@@ -1,14 +1,12 @@
 import pytest
 import psycopg2
 from admin_repository import AdminRepository
+from system_prompt_defaults import DEFAULT_INSTRUCTIONS
 
 TEST_URL = "postgresql://localhost:5432/postgres"
 
 
-@pytest.fixture
-def repo():
-    r = AdminRepository(TEST_URL)
-    # clean slate before each test
+def _clean_admin_tables() -> None:
     conn = psycopg2.connect(TEST_URL)
     with conn.cursor() as cur:
         cur.execute("DELETE FROM admin_credentials")
@@ -16,8 +14,16 @@ def repo():
         cur.execute("DELETE FROM admin_skills")
         cur.execute("DELETE FROM admin_personas")
         cur.execute("DELETE FROM admin_agent_instances")
+        cur.execute("DELETE FROM admin_system_prompts")
     conn.commit()
     conn.close()
+
+
+@pytest.fixture
+def repo():
+    r = AdminRepository(TEST_URL)
+    # clean slate before each test
+    _clean_admin_tables()
     return r
 
 
@@ -106,6 +112,30 @@ def test_persona_name_must_be_unique(repo):
         repo.create_persona("Unique", [])
 
 
+def test_repository_seeds_default_kubernetes_agent_prompt():
+    _clean_admin_tables()
+    repo = AdminRepository(TEST_URL)
+
+    prompts = repo.list_system_prompts()
+    kubernetes_prompts = [p for p in prompts if p["name"] == "kubernetes_agent"]
+    generic_prompts = [p for p in prompts if p["name"] == "default_agent"]
+
+    assert len(kubernetes_prompts) == 1
+    assert kubernetes_prompts[0]["instructions"] == DEFAULT_INSTRUCTIONS
+    assert kubernetes_prompts[0]["is_active"] is True
+    assert len(generic_prompts) == 1
+    assert "general-purpose AI assistant" in generic_prompts[0]["instructions"]
+    assert generic_prompts[0]["is_active"] is False
+    assert repo.get_active_system_prompt() == DEFAULT_INSTRUCTIONS
+
+
+def test_get_system_prompt_instructions_returns_prompt_text(repo):
+    prompt = repo.create_system_prompt("custom_prompt", "custom instructions")
+
+    assert repo.get_system_prompt_instructions(str(prompt["id"])) == "custom instructions"
+    assert repo.get_system_prompt_instructions("00000000-0000-0000-0000-000000000000") is None
+
+
 # ── Agent Instances ────────────────────────────────────────────────────────
 
 def test_agent_instances_empty_initially(repo):
@@ -175,15 +205,7 @@ http = TestClient(app)
 
 @pytest.fixture(autouse=True)
 def clean_tables():
-    conn = psycopg2.connect(TEST_URL)
-    with conn.cursor() as cur:
-        cur.execute("DELETE FROM admin_credentials")
-        cur.execute("DELETE FROM admin_mcp_servers")
-        cur.execute("DELETE FROM admin_skills")
-        cur.execute("DELETE FROM admin_personas")
-        cur.execute("DELETE FROM admin_agent_instances")
-    conn.commit()
-    conn.close()
+    _clean_admin_tables()
     yield
 
 

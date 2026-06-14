@@ -60,22 +60,115 @@
 .mode-btn:hover:not(.active):not(:disabled) { background: #334155; color: #cbd5e1; }
 .mode-btn:disabled { opacity: 0.4; cursor: default; }
 
-/* ── Instance bar ──────────────────────────────────── */
-.chat-instance-bar {
+/* ── Context bar ───────────────────────────────────── */
+.chat-context-bar {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 6px 16px;
+  gap: 16px;
+  padding: 8px 16px;
   background: #111827;
   border-bottom: 1px solid #1e293b;
   flex-shrink: 0;
+  flex-wrap: wrap;
 }
-.instance-label {
+
+.prompt-picker,
+.instance-picker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.prompt-picker {
+  flex: 1 1 360px;
+}
+
+.instance-picker {
+  flex: 0 1 auto;
+}
+
+.context-label {
   font-size: 0.75rem;
   font-weight: 500;
   color: #64748b;
   white-space: nowrap;
 }
+
+.prompt-list {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow-x: auto;
+  padding-bottom: 1px;
+  scrollbar-width: thin;
+}
+
+.prompt-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 220px;
+  min-height: 28px;
+  padding: 4px 9px;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  background: #1e293b;
+  color: #cbd5e1;
+  cursor: pointer;
+  font-size: 0.76rem;
+  line-height: 1.2;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+
+.prompt-item:hover:not(:disabled):not(.active) {
+  border-color: #475569;
+  background: #273449;
+  color: #e2e8f0;
+}
+
+.prompt-item.active {
+  background: #4f46e5;
+  border-color: #6366f1;
+  color: #eef2ff;
+}
+
+.prompt-item:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.prompt-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.prompt-badge {
+  flex-shrink: 0;
+  font-size: 0.6rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 3px 5px;
+  border-radius: 999px;
+  background: rgba(224, 231, 255, 0.16);
+  color: #e0e7ff;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.prompt-badge--selected {
+  background: rgba(238, 242, 255, 0.22);
+  color: #ffffff;
+}
+
+.prompt-badge--default {
+  background: rgba(148, 163, 184, 0.14);
+  color: #94a3b8;
+}
+
 .instance-select {
   font-size: 0.78rem;
   background: #1e293b;
@@ -83,6 +176,7 @@
   border: 1px solid #334155;
   border-radius: 5px;
   padding: 3px 8px;
+  max-width: 260px;
 }
 
 /* ── Message list ──────────────────────────────────── */
@@ -267,3 +361,27 @@
 }
 .chat-send:hover:not(:disabled) { background: #4338ca; }
 .chat-send:disabled { opacity: 0.4; cursor: default; }
+
+@media (max-width: 720px) {
+  .chat-context-bar {
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .prompt-picker,
+  .instance-picker {
+    width: 100%;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .prompt-list,
+  .instance-select {
+    width: 100%;
+  }
+
+  .instance-select {
+    max-width: none;
+  }
+}

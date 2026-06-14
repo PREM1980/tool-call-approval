@@ -21,6 +21,7 @@ class SessionResponse(BaseModel):
 
 class CreateSessionRequest(BaseModel):
     instance_id: str | None = None
+    system_prompt_id: str | None = None
 
 
 class SessionSummaryResponse(BaseModel):
@@ -29,3 +30,5 @@ class SessionSummaryResponse(BaseModel):
     updated_at: int | None
     turn_count: int
     first_message: str | None = None
+    system_prompt_id: str | None = None
+    system_prompt_name: str | None = None

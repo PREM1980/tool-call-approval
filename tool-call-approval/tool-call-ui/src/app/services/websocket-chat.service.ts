@@ -15,8 +15,10 @@ export class WebsocketChatService {
 
   constructor(private http: HttpClient) {}
 
-  async createSession(instanceId?: string | null): Promise<void> {
-    const body = instanceId ? { instance_id: instanceId } : {};
+  async createSession(instanceId?: string | null, systemPromptId?: string | null): Promise<void> {
+    const body: Record<string, string> = {};
+    if (instanceId) body['instance_id'] = instanceId;
+    if (systemPromptId) body['system_prompt_id'] = systemPromptId;
     const res = await firstValueFrom(
       this.http.post<{ session_id: string }>(`${API_URL}/sessions`, body)
     );
@@ -32,6 +34,10 @@ export class WebsocketChatService {
       this.sseEvents$.next(data);
     };
     this.ws.onerror = () => {
+      this.sseEvents$.next({
+        type: 'stream_error',
+        content: 'WebSocket connection lost.',
+      });
       this.ws?.close();
     };
   }

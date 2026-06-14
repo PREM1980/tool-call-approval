@@ -11,7 +11,7 @@ import {
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
-import { AdminService, AgentInstance } from '../../services/admin.service';
+import { AdminService, AgentInstance, SystemPromptData } from '../../services/admin.service';
 import { ChatService } from '../../services/chat.service';
 import { SessionsService } from '../../services/sessions.service';
 import { WebsocketChatService } from '../../services/websocket-chat.service';
@@ -19,6 +19,18 @@ import { ToolApproval } from '../tool-approval/tool-approval';
 import { Message, ToolCall } from '../../models/types';
 
 export type ConnectionMode = 'sse' | 'websocket';
+
+const KUBERNETES_SUGGESTIONS = [
+  'List all pods in the default namespace',
+  'Scale the frontend deployment to 3 replicas',
+  'Show me recent events in the kube-system namespace',
+];
+
+const GENERIC_SUGGESTIONS = [
+  'Summarize this text in three bullet points',
+  'Draft a concise status update',
+  'Help me debug this error message',
+];
 
 @Component({
   selector: 'app-chat',
@@ -39,6 +51,8 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
   isSwitching = false;
   instances: AgentInstance[] = [];
   selectedInstanceId: string | null = null;
+  systemPrompts: SystemPromptData[] = [];
+  selectedSystemPromptId: string | null = null;
 
   private sseSubscription!: Subscription;
   private shouldScrollToBottom = false;
@@ -57,14 +71,28 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
     return this.mode === 'sse' ? this.chatService : this.wsChatService;
   }
 
+  get emptyStateSuggestions(): string[] {
+    const promptName = this.selectedSystemPromptName.toLowerCase();
+    return promptName.includes('kubernetes')
+      ? KUBERNETES_SUGGESTIONS
+      : GENERIC_SUGGESTIONS;
+  }
+
+  private get selectedSystemPromptName(): string {
+    return this.systemPrompts.find(prompt => prompt.id === this.selectedSystemPromptId)?.name ?? '';
+  }
+
   async ngOnInit(): Promise<void> {
-    const [creds, instances] = await Promise.all([
+    const [creds, instances, systemPrompts] = await Promise.all([
       this.adminService.getCredentials().catch(() => null),
       this.adminService.getAllAgentInstances().catch(() => []),
+      this.adminService.listSystemPrompts().catch(() => []),
     ]);
     this.kubeconfig = creds?.kubeconfig ?? null;
     this.instances = instances;
     this.selectedInstanceId = instances[0]?.id ?? null;
+    this.systemPrompts = systemPrompts;
+    this.selectedSystemPromptId = this.getInitialSystemPromptId(systemPrompts);
     if (this.resumeSessionId) {
       await this.loadExistingSession(this.resumeSessionId);
     } else {
@@ -100,6 +128,12 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
     await this.newSession();
   }
 
+  async onSystemPromptSelect(promptId: string): Promise<void> {
+    if (this.isSwitching || this.isWaiting || promptId === this.selectedSystemPromptId) return;
+    this.selectedSystemPromptId = promptId;
+    await this.newSession();
+  }
+
   async switchMode(newMode: ConnectionMode): Promise<void> {
     if (newMode === this.mode || this.isSwitching) return;
     this.isSwitching = true;
@@ -120,7 +154,14 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
     this.addMessage('user', text);
     this.isWaiting = true;
     const platformContext = this.kubeconfig ? { kubeconfig: this.kubeconfig } : undefined;
-    await this.activeService.sendMessage(text, platformContext);
+    try {
+      await this.activeService.sendMessage(text, platformContext);
+    } catch (error) {
+      this.isWaiting = false;
+      this.addSystemMessage(`Error: ${this.describeRequestError(error)}`);
+      this.shouldScrollToBottom = true;
+      this.cdr.detectChanges();
+    }
   }
 
   async handleApproval(tool_use_id: string, approved: boolean): Promise<void> {
@@ -147,8 +188,21 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
   }
 
   private async initConnection(): Promise<void> {
-    await this.activeService.createSession(this.selectedInstanceId ?? undefined);
+    await this.activeService.createSession(
+      this.selectedInstanceId ?? undefined,
+      this.selectedSystemPromptId ?? undefined,
+    );
     this.subscribeToEvents(this.activeService);
+  }
+
+  private getInitialSystemPromptId(prompts: SystemPromptData[]): string | null {
+    if (
+      this.selectedSystemPromptId &&
+      prompts.some(prompt => prompt.id === this.selectedSystemPromptId)
+    ) {
+      return this.selectedSystemPromptId;
+    }
+    return prompts.find(prompt => prompt.is_active)?.id ?? prompts[0]?.id ?? null;
   }
 
   private subscribeToEvents(service: ChatService | WebsocketChatService): void {
@@ -206,10 +260,30 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
           this.isWaiting = false;
           this.addSystemMessage(`Error: ${event.content}`);
           break;
+        case 'stream_error':
+          if (this.isWaiting || this.pendingToolCalls.length > 0) {
+            this.isWaiting = false;
+            this.addSystemMessage(`Error: ${event.content ?? 'Stream connection lost.'}`);
+          }
+          break;
       }
       this.shouldScrollToBottom = true;
       this.cdr.detectChanges();
     });
+  }
+
+  private describeRequestError(error: unknown): string {
+    if (error && typeof error === 'object') {
+      const maybeHttpError = error as {
+        error?: { detail?: string; message?: string };
+        message?: string;
+        status?: number;
+      };
+      const detail = maybeHttpError.error?.detail ?? maybeHttpError.error?.message ?? maybeHttpError.message;
+      if (detail) return detail;
+      if (maybeHttpError.status === 404) return 'Session not found. Start a new chat and try again.';
+    }
+    return 'Could not send message. Please try again.';
   }
 
   private appendAssistantMessage(content: string): void {

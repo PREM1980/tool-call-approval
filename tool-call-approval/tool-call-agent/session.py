@@ -11,3 +11,7 @@ class Session:
     approval_results: dict[str, bool] = field(default_factory=dict)
     kubeconfig: str | None = None
     tmpdir: str | None = None
+    instance_id: str | None = None
+    system_prompt_id: str | None = None
+    system_prompt_name: str | None = None
+    system_prompt_instructions_snapshot: str | None = None

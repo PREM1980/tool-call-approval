@@ -11,6 +11,9 @@ from admin_models import (
     PersonaRequest,
     PersonaResponse,
     SkillResponse,
+    SystemPromptRequest,
+    SystemPromptUpdateRequest,
+    SystemPromptResponse,
 )
 from admin_repository import AdminRepository
 
@@ -174,3 +177,43 @@ async def delete_agent_instance(instance_id: str):
     if not _get_repo().delete_agent_instance(instance_id):
         raise HTTPException(status_code=404, detail="Agent instance not found")
     return {"status": "ok"}
+
+
+# ── System Prompts ──────────────────────────────────────────────────────────
+
+@router.get("/system-prompts", response_model=list[SystemPromptResponse])
+async def list_system_prompts():
+    return _get_repo().list_system_prompts()
+
+
+@router.post("/system-prompts", response_model=SystemPromptResponse, status_code=201)
+async def create_system_prompt(request: SystemPromptRequest):
+    try:
+        return _get_repo().create_system_prompt(request.name, request.instructions)
+    except Exception as e:
+        if "unique" in str(e).lower():
+            raise HTTPException(status_code=409, detail="Prompt name already exists")
+        raise
+
+
+@router.put("/system-prompts/{prompt_id}", response_model=SystemPromptResponse)
+async def update_system_prompt(prompt_id: str, request: SystemPromptUpdateRequest):
+    prompt = _get_repo().update_system_prompt(prompt_id, request.name, request.instructions)
+    if not prompt:
+        raise HTTPException(status_code=404, detail="System prompt not found")
+    return prompt
+
+
+@router.delete("/system-prompts/{prompt_id}")
+async def delete_system_prompt(prompt_id: str):
+    if not _get_repo().delete_system_prompt(prompt_id):
+        raise HTTPException(status_code=404, detail="System prompt not found")
+    return {"status": "ok"}
+
+
+@router.post("/system-prompts/{prompt_id}/activate", response_model=SystemPromptResponse)
+async def activate_system_prompt(prompt_id: str):
+    prompt = _get_repo().activate_system_prompt(prompt_id)
+    if not prompt:
+        raise HTTPException(status_code=404, detail="System prompt not found")
+    return prompt

@@ -16,6 +16,7 @@
   <div class="sessions-list">
     <div class="sessions-header">
       <span class="col-id">Session ID</span>
+      <span class="col-prompt">Prompt</span>
       <span class="col-time">Last Active</span>
       <span class="col-turns">Turns</span>
     </div>
@@ -27,6 +28,9 @@
           @if (s.first_message) {
             <span class="session-preview">{{ s.first_message }}</span>
           }
+        </span>
+        <span class="col-prompt session-prompt">
+          {{ s.system_prompt_name || 'Unknown' }}
         </span>
         <span class="col-time session-time">{{ formatTimestamp(s.updated_at ?? s.created_at) }}</span>
         <span class="col-turns session-turns">{{ s.turn_count }}</span>
@@ -55,7 +59,53 @@
               <div class="hist-row" [class.hist-user]="msg.role === 'user'" [class.hist-other]="msg.role !== 'user'">
                 <div class="hist-bubble">
                   <div class="hist-role">{{ msg.role }}</div>
-                  <p class="hist-content">{{ msg.content }}</p>
+                  <div class="hist-content">
+                    @for (block of msg.blocks; track $index) {
+                      @switch (block.type) {
+                        @case ('heading') {
+                          <h3 class="hist-heading">{{ block.text }}</h3>
+                        }
+                        @case ('paragraph') {
+                          <p class="hist-paragraph">{{ block.text }}</p>
+                        }
+                        @case ('list') {
+                          <ul class="hist-list">
+                            @for (item of block.items; track $index) {
+                              <li>{{ item }}</li>
+                            }
+                          </ul>
+                        }
+                        @case ('table') {
+                          <div class="hist-table-wrap">
+                            <table class="hist-table">
+                              <thead>
+                                <tr>
+                                  @for (header of block.headers; track $index) {
+                                    <th>{{ header }}</th>
+                                  }
+                                </tr>
+                              </thead>
+                              <tbody>
+                                @for (row of block.rows; track $index) {
+                                  <tr>
+                                    @for (cell of row; track $index) {
+                                      <td>{{ cell }}</td>
+                                    }
+                                  </tr>
+                                }
+                              </tbody>
+                            </table>
+                          </div>
+                        }
+                        @case ('code') {
+                          <pre class="hist-code"><code>{{ block.text }}</code></pre>
+                        }
+                        @case ('rule') {
+                          <hr class="hist-rule" />
+                        }
+                      }
+                    }
+                  </div>
                 </div>
               </div>
             }

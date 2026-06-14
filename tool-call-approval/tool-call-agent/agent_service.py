@@ -25,6 +25,10 @@ from langfuse.decorators import langfuse_context, observe
 from admin_repository import AdminRepository
 from repository import IAgentStorage
 from session import Session
+from system_prompt_defaults import (
+    DEFAULT_INSTRUCTIONS as _DEFAULT_INSTRUCTIONS,
+    DEFAULT_SYSTEM_PROMPT_NAME as _DEFAULT_SYSTEM_PROMPT_NAME,
+)
 from tools import execute_tool, reset_kubeconfig, set_kubeconfig
 
 _AWS_MODEL_ID = "us.anthropic.claude-sonnet-4-20250514-v1:0"
@@ -54,49 +58,6 @@ def _build_model() -> AwsBedrock | VertexAIClaude:
             }
         },
     )
-
-_DEFAULT_INSTRUCTIONS = (
-    "You are a Kubernetes operations agent.\n"
-    "\n"
-    "MANDATORY BEHAVIOR — READ THIS FIRST:\n"
-    "NEVER describe or list kubectl commands as text. Always execute them using the kubectl tool.\n"
-    "ALWAYS call ALL relevant kubectl commands simultaneously in a single batch — do not call one,\n"
-    "wait for the result, then call the next. Identify every command you need upfront and issue them all at once.\n"
-    "NEVER write a prose response after fewer tool calls than the investigation depth below requires.\n"
-    "\n"
-    "INVESTIGATION DEPTH — call all commands for the relevant category simultaneously:\n"
-    "  Cluster status → cluster-info, get nodes -o wide, get namespaces, get pods --all-namespaces -o wide,\n"
-    "                   get deployments --all-namespaces, get services --all-namespaces,\n"
-    "                   get persistentvolumeclaims --all-namespaces, top nodes, top pods --all-namespaces,\n"
-    "                   get events --all-namespaces --sort-by=.lastTimestamp --field-selector type=Warning\n"
-    "  Pod issue      → get pod -o yaml, describe pod, logs, logs --previous (if restarted), events\n"
-    "  Deployment     → describe deployment, get pods for it, describe failing pods, events\n"
-    "  Service/net    → describe service, get endpoints, describe ingress, networkpolicies\n"
-    "  Node issue     → describe node, get pods on node, top node\n"
-    "  Namespace      → get pods, deployments, services, configmaps, pvcs, events in namespace\n"
-    "  Failing thing  → always include: Warning events + logs of the failing container\n"
-    "\n"
-    "ALLOWED kubectl subcommands:\n"
-    "  Read: get, describe, logs, top, explain, version, cluster-info,\n"
-    "        api-resources, api-versions, config, events\n"
-    "  Mutating: apply, create, delete, edit, patch, replace,\n"
-    "            rollout, scale, autoscale, set, run, expose, label, annotate\n"
-    "  Interaction: exec, port-forward, cp, debug\n"
-    "  Other: diff, wait\n"
-    "  Blocked: cluster-info dump, delete node/namespace/pv/clusterrole\n"
-    "\n"
-    "SCOPE: Only help with Kubernetes. Resolve ambiguous pronouns ('it', 'that', 'this')\n"
-    "from context — do not refuse short follow-ups. Refuse only for clearly non-Kubernetes\n"
-    "requests with: 'I am a Kubernetes agent and cannot help with that.'\n"
-    "\n"
-    "If any tool call is rejected by the user, do not retry it. Proceed with the results\n"
-    "you have and clearly note in your response which commands were skipped and what\n"
-    "information is therefore unavailable.\n"
-    "\n"
-    "RESPONSE FORMAT: findings → root cause (if applicable) → next steps with exact kubectl commands.\n"
-    "Never introduce yourself or list your capabilities unless asked."
-)
-
 
 @tool(requires_confirmation=True)
 def calculate(expression: str) -> str:
@@ -148,10 +109,19 @@ class AgentService:
 
     # ── Session lifecycle ──────────────────────────────────────────────────
 
-    def create_session(self, instance_id: str | None = None) -> Session:
+    def create_session(
+        self,
+        instance_id: str | None = None,
+        system_prompt_id: str | None = None,
+    ) -> Session:
         session = Session(id=str(uuid4()))
-        agent, tmpdir = self._build_agent(session.id, instance_id)
+        prompt = self._resolve_system_prompt(system_prompt_id)
+        agent, tmpdir = self._build_agent(session.id, instance_id, prompt["instructions"])
         session.tmpdir = tmpdir
+        session.instance_id = instance_id
+        session.system_prompt_id = prompt["id"]
+        session.system_prompt_name = prompt["name"]
+        session.system_prompt_instructions_snapshot = prompt["instructions"]
         self._sessions[session.id] = (session, agent)
         return session
 
@@ -171,7 +141,12 @@ class AgentService:
         Path(tmpdir, f"{report_id}.pdf").write_bytes(_build_pdf(title, content))
         return f"/sessions/{session_id}/reports/{report_id}"
 
-    def _build_agent(self, session_id: str, instance_id: str | None = None) -> tuple[Agent, str]:
+    def _build_agent(
+        self,
+        session_id: str,
+        instance_id: str | None = None,
+        instructions: str | None = None,
+    ) -> tuple[Agent, str]:
         if instance_id:
             tmpdir, skills_obj = self._load_instance_skills(instance_id)
         else:
@@ -192,7 +167,7 @@ class AgentService:
         agent_kwargs: dict[str, Any] = dict(
             model=_build_model(),
             tools=[calculate, get_weather, search_web, kubectl, save_report],
-            instructions=_DEFAULT_INSTRUCTIONS,
+            instructions=instructions or _DEFAULT_INSTRUCTIONS,
             stream=True,
             session_id=session_id,
             user_id=session_id,
@@ -202,6 +177,58 @@ class AgentService:
         if skills_obj is not None:
             agent_kwargs["skills"] = skills_obj
         return Agent(**agent_kwargs), tmpdir
+
+    def _resolve_system_prompt(self, system_prompt_id: str | None = None) -> dict[str, str | None]:
+        if system_prompt_id:
+            get_prompt = getattr(self._admin_repository, "get_system_prompt", None)
+            if callable(get_prompt):
+                prompt = get_prompt(system_prompt_id)
+                if prompt and prompt.get("instructions"):
+                    return {
+                        "id": str(prompt.get("id")),
+                        "name": prompt.get("name"),
+                        "instructions": prompt["instructions"],
+                    }
+
+            get_instructions = getattr(
+                self._admin_repository,
+                "get_system_prompt_instructions",
+                None,
+            )
+            if callable(get_instructions):
+                instructions = get_instructions(system_prompt_id)
+                if instructions:
+                    return {
+                        "id": system_prompt_id,
+                        "name": None,
+                        "instructions": instructions,
+                    }
+
+        get_active_record = getattr(
+            self._admin_repository,
+            "get_active_system_prompt_record",
+            None,
+        )
+        if callable(get_active_record):
+            prompt = get_active_record()
+            if prompt and prompt.get("instructions"):
+                return {
+                    "id": str(prompt.get("id")),
+                    "name": prompt.get("name"),
+                    "instructions": prompt["instructions"],
+                }
+
+        get_active = getattr(self._admin_repository, "get_active_system_prompt", None)
+        if callable(get_active):
+            instructions = get_active()
+            if instructions:
+                return {"id": None, "name": None, "instructions": instructions}
+
+        return {
+            "id": None,
+            "name": _DEFAULT_SYSTEM_PROMPT_NAME,
+            "instructions": _DEFAULT_INSTRUCTIONS,
+        }
 
     def _load_instance_skills(self, instance_id: str) -> tuple[str | None, Any]:
         """Resolve instance → persona → skills; write to tmpdir. Returns (tmpdir, Skills) or (None, None)."""
@@ -233,14 +260,18 @@ class AgentService:
         return tmpdir, Skills(loaders=[LocalSkills(tmpdir)])
 
     def get_history(self, session_id: str) -> list[dict]:
-        db = self._repository.get_db()
-        agent_session = db.get_session(session_id)
-        if agent_session is None:
-            return []
-        return [
-            {"role": msg.role, "content": msg.content or ""}
-            for msg in agent_session.get_chat_history()
-        ]
+        return self._repository.get_session_history(session_id)
+
+    def record_user_message(self, session: Session, message: str) -> None:
+        self._repository.append_session_message(
+            session.id,
+            "user",
+            message,
+            session.instance_id,
+            session.system_prompt_id,
+            session.system_prompt_name,
+            session.system_prompt_instructions_snapshot,
+        )
 
     def _get_agent(self, session_id: str) -> Agent | None:
         pair = self._sessions.get(session_id)
@@ -263,11 +294,13 @@ class AgentService:
 
         kubeconfig_token = set_kubeconfig(session.kubeconfig)
         try:
-            await self._run_inner(session, agent, message)
+            final_output = await self._run_inner(session, agent, message)
+            if final_output:
+                self._repository.append_session_message(session.id, "assistant", final_output)
         finally:
             reset_kubeconfig(kubeconfig_token)
 
-    async def _run_inner(self, session: Session, agent: Any, message: str) -> None:
+    async def _run_inner(self, session: Session, agent: Any, message: str) -> str:
         langfuse_context.update_current_trace(
             user_id=session.id,
             tags=["tool-call-approval"],
@@ -279,6 +312,7 @@ class AgentService:
 
         langfuse_context.update_current_observation(output=final_output)
         langfuse_context.update_current_trace(output=final_output)
+        return final_output
 
     async def _run_agent(self, session: Session, agent: Any, message: str) -> str:
         """Run one agent turn, handling throttle retries. Returns the final text response."""

@@ -1,4 +1,5 @@
 import logging
+import json
 import socket
 from abc import ABC, abstractmethod
 from urllib.parse import urlparse
@@ -17,6 +18,31 @@ class IAgentStorage(ABC):
 
     @abstractmethod
     def list_sessions(self) -> list[dict]: ...
+
+    @abstractmethod
+    def create_session_record(
+        self,
+        session_id: str,
+        instance_id: str | None,
+        system_prompt_id: str | None,
+        system_prompt_name: str | None,
+        system_prompt_instructions_snapshot: str,
+    ) -> None: ...
+
+    @abstractmethod
+    def append_session_message(
+        self,
+        session_id: str,
+        role: str,
+        content: str,
+        instance_id: str | None = None,
+        system_prompt_id: str | None = None,
+        system_prompt_name: str | None = None,
+        system_prompt_instructions_snapshot: str | None = None,
+    ) -> None: ...
+
+    @abstractmethod
+    def get_session_history(self, session_id: str) -> list[dict]: ...
 
     @abstractmethod
     def save_report(
@@ -49,21 +75,171 @@ class PostgresRepository(IAgentStorage):
         try:
             conn = psycopg2.connect(url)
             try:
+                self._ensure_session_records_table(conn)
                 with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
                     cur.execute("""
                         SELECT session_id,
-                               created_at,
-                               updated_at,
-                               COALESCE(jsonb_array_length(runs), 0) AS turn_count,
-                               LEFT(runs->0->'input'->>'input_content', 120) AS first_message
-                        FROM ai.agno_sessions
-                        ORDER BY updated_at DESC NULLS LAST
+                               EXTRACT(EPOCH FROM created_at)::BIGINT AS created_at,
+                               EXTRACT(EPOCH FROM updated_at)::BIGINT AS updated_at,
+                               system_prompt_id,
+                               system_prompt_name,
+                               COALESCE((
+                                   SELECT COUNT(*)
+                                   FROM jsonb_array_elements(messages) AS message
+                                   WHERE message->>'role' = 'user'
+                               ), 0) AS turn_count,
+                               LEFT((
+                                   SELECT message->>'content'
+                                   FROM jsonb_array_elements(messages) AS message
+                                   WHERE message->>'role' = 'user'
+                                   LIMIT 1
+                               ), 120) AS first_message
+                        FROM ai.session_records
+                        WHERE EXISTS (
+                            SELECT 1
+                            FROM jsonb_array_elements(messages) AS message
+                            WHERE message->>'role' = 'user'
+                        )
+                        ORDER BY updated_at DESC
                     """)
                     return [dict(r) for r in cur.fetchall()]
             finally:
                 conn.close()
         except Exception as e:
             logger.warning("list_sessions failed: %s", e)
+            return []
+
+    def create_session_record(
+        self,
+        session_id: str,
+        instance_id: str | None,
+        system_prompt_id: str | None,
+        system_prompt_name: str | None,
+        system_prompt_instructions_snapshot: str,
+    ) -> None:
+        if not self._is_reachable():
+            return
+        url = self._url.replace("postgresql+psycopg2://", "postgresql://")
+        try:
+            conn = psycopg2.connect(url)
+            try:
+                self._ensure_session_records_table(conn)
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        INSERT INTO ai.session_records (
+                            session_id,
+                            instance_id,
+                            system_prompt_id,
+                            system_prompt_name,
+                            system_prompt_instructions_snapshot
+                        )
+                        VALUES (%s, %s, %s, %s, %s)
+                        ON CONFLICT (session_id) DO UPDATE SET
+                            instance_id = EXCLUDED.instance_id,
+                            system_prompt_id = EXCLUDED.system_prompt_id,
+                            system_prompt_name = EXCLUDED.system_prompt_name,
+                            system_prompt_instructions_snapshot = EXCLUDED.system_prompt_instructions_snapshot,
+                            updated_at = NOW()
+                    """, (
+                        session_id,
+                        instance_id,
+                        system_prompt_id,
+                        system_prompt_name,
+                        system_prompt_instructions_snapshot,
+                    ))
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
+            finally:
+                conn.close()
+        except Exception as e:
+            logger.warning("create_session_record failed: %s", e)
+
+    def append_session_message(
+        self,
+        session_id: str,
+        role: str,
+        content: str,
+        instance_id: str | None = None,
+        system_prompt_id: str | None = None,
+        system_prompt_name: str | None = None,
+        system_prompt_instructions_snapshot: str | None = None,
+    ) -> None:
+        if not self._is_reachable():
+            return
+        url = self._url.replace("postgresql+psycopg2://", "postgresql://")
+        message = [{"role": role, "content": content}]
+        try:
+            conn = psycopg2.connect(url)
+            try:
+                self._ensure_session_records_table(conn)
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        INSERT INTO ai.session_records (
+                            session_id,
+                            instance_id,
+                            system_prompt_id,
+                            system_prompt_name,
+                            system_prompt_instructions_snapshot,
+                            messages
+                        )
+                        VALUES (%s, %s, %s, %s, %s, %s::jsonb)
+                        ON CONFLICT (session_id) DO UPDATE SET
+                            instance_id = COALESCE(EXCLUDED.instance_id, ai.session_records.instance_id),
+                            system_prompt_id = COALESCE(EXCLUDED.system_prompt_id, ai.session_records.system_prompt_id),
+                            system_prompt_name = COALESCE(EXCLUDED.system_prompt_name, ai.session_records.system_prompt_name),
+                            system_prompt_instructions_snapshot = COALESCE(
+                                EXCLUDED.system_prompt_instructions_snapshot,
+                                ai.session_records.system_prompt_instructions_snapshot
+                            ),
+                            messages = ai.session_records.messages || EXCLUDED.messages,
+                            updated_at = NOW()
+                    """, (
+                        session_id,
+                        instance_id,
+                        system_prompt_id,
+                        system_prompt_name,
+                        system_prompt_instructions_snapshot,
+                        json.dumps(message),
+                    ))
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
+            finally:
+                conn.close()
+        except Exception as e:
+            logger.warning("append_session_message failed: %s", e)
+
+    def get_session_history(self, session_id: str) -> list[dict]:
+        if not self._is_reachable():
+            return []
+        url = self._url.replace("postgresql+psycopg2://", "postgresql://")
+        try:
+            conn = psycopg2.connect(url)
+            try:
+                self._ensure_session_records_table(conn)
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "SELECT messages FROM ai.session_records WHERE session_id = %s",
+                        (session_id,),
+                    )
+                    row = cur.fetchone()
+                    if not row:
+                        return []
+                    return [
+                        {
+                            "role": message.get("role"),
+                            "content": message.get("content") or "",
+                        }
+                        for message in row[0]
+                        if message.get("role") in {"user", "assistant"}
+                    ]
+            finally:
+                conn.close()
+        except Exception as e:
+            logger.warning("get_session_history failed: %s", e)
             return []
 
     def save_report(
@@ -98,6 +274,22 @@ class PostgresRepository(IAgentStorage):
             conn.commit()
         finally:
             conn.close()
+
+    def _ensure_session_records_table(self, conn: psycopg2.extensions.connection) -> None:
+        with conn.cursor() as cur:
+            cur.execute("CREATE SCHEMA IF NOT EXISTS ai")
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS ai.session_records (
+                    session_id TEXT PRIMARY KEY,
+                    instance_id TEXT,
+                    system_prompt_id TEXT,
+                    system_prompt_name TEXT,
+                    system_prompt_instructions_snapshot TEXT,
+                    messages JSONB NOT NULL DEFAULT '[]',
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                )
+            """)
 
     def _is_reachable(self) -> bool:
         parsed = urlparse(self._url)

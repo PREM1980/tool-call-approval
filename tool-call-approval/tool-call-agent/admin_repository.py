@@ -4,6 +4,8 @@ import psycopg2
 import psycopg2.extensions
 import psycopg2.extras
 
+from system_prompt_defaults import DEFAULT_INSTRUCTIONS, DEFAULT_SYSTEM_PROMPT_NAME, SEEDED_SYSTEM_PROMPTS
+
 logger = logging.getLogger(__name__)
 
 
@@ -74,12 +76,46 @@ class AdminRepository:
                         UNIQUE (agent_name, instance_name)
                     )
                 """)
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS admin_system_prompts (
+                        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                        name TEXT NOT NULL UNIQUE,
+                        instructions TEXT NOT NULL,
+                        is_active BOOLEAN NOT NULL DEFAULT FALSE,
+                        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                    )
+                """)
+                self._seed_default_system_prompt(cur)
             conn.commit()
         except Exception:
             conn.rollback()
             raise
         finally:
             conn.close()
+
+    def _seed_default_system_prompt(self, cur: psycopg2.extensions.cursor) -> None:
+        for name, instructions in SEEDED_SYSTEM_PROMPTS:
+            cur.execute(
+                """
+                INSERT INTO admin_system_prompts (name, instructions, is_active)
+                VALUES (%s, %s, FALSE)
+                ON CONFLICT (name) DO NOTHING
+                """,
+                (name, instructions),
+            )
+        cur.execute(
+            """
+            UPDATE admin_system_prompts
+            SET is_active = TRUE, updated_at = NOW()
+            WHERE name = %s
+              AND is_active = FALSE
+              AND NOT EXISTS (
+                  SELECT 1 FROM admin_system_prompts WHERE is_active = TRUE
+              )
+            """,
+            (DEFAULT_SYSTEM_PROMPT_NAME,),
+        )
 
     # ── Credentials ────────────────────────────────────────────────────────
 
@@ -404,5 +440,134 @@ class AdminRepository:
         except Exception:
             conn.rollback()
             raise
+        finally:
+            conn.close()
+
+    # ── System Prompts ─────────────────────────────────────────────────────
+
+    def list_system_prompts(self) -> list[dict]:
+        conn = self._connect()
+        try:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute("SELECT * FROM admin_system_prompts ORDER BY created_at")
+                return [dict(r) for r in cur.fetchall()]
+        finally:
+            conn.close()
+
+    def create_system_prompt(self, name: str, instructions: str) -> dict:
+        conn = self._connect()
+        try:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute(
+                    "INSERT INTO admin_system_prompts (name, instructions) VALUES (%s, %s) RETURNING *",
+                    (name, instructions),
+                )
+                row = dict(cur.fetchone())
+            conn.commit()
+            return row
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
+    def update_system_prompt(self, prompt_id: str, name: str, instructions: str) -> dict | None:
+        conn = self._connect()
+        try:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute("""
+                    UPDATE admin_system_prompts
+                    SET name = %s, instructions = %s, updated_at = NOW()
+                    WHERE id = %s::uuid
+                    RETURNING *
+                """, (name, instructions, prompt_id))
+                row = cur.fetchone()
+            conn.commit()
+            return dict(row) if row else None
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
+    def delete_system_prompt(self, prompt_id: str) -> bool:
+        conn = self._connect()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("DELETE FROM admin_system_prompts WHERE id = %s::uuid", (prompt_id,))
+                deleted = cur.rowcount > 0
+            conn.commit()
+            return deleted
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
+    def activate_system_prompt(self, prompt_id: str) -> dict | None:
+        conn = self._connect()
+        try:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute("UPDATE admin_system_prompts SET is_active = FALSE")
+                cur.execute("""
+                    UPDATE admin_system_prompts SET is_active = TRUE, updated_at = NOW()
+                    WHERE id = %s::uuid RETURNING *
+                """, (prompt_id,))
+                row = cur.fetchone()
+            conn.commit()
+            return dict(row) if row else None
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
+    def get_active_system_prompt(self) -> str | None:
+        conn = self._connect()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT instructions FROM admin_system_prompts WHERE is_active = TRUE LIMIT 1"
+                )
+                row = cur.fetchone()
+                return row[0] if row else None
+        finally:
+            conn.close()
+
+    def get_active_system_prompt_record(self) -> dict | None:
+        conn = self._connect()
+        try:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute(
+                    "SELECT * FROM admin_system_prompts WHERE is_active = TRUE LIMIT 1"
+                )
+                row = cur.fetchone()
+                return dict(row) if row else None
+        finally:
+            conn.close()
+
+    def get_system_prompt(self, prompt_id: str) -> dict | None:
+        conn = self._connect()
+        try:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute(
+                    "SELECT * FROM admin_system_prompts WHERE id = %s::uuid",
+                    (prompt_id,),
+                )
+                row = cur.fetchone()
+                return dict(row) if row else None
+        finally:
+            conn.close()
+
+    def get_system_prompt_instructions(self, prompt_id: str) -> str | None:
+        conn = self._connect()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT instructions FROM admin_system_prompts WHERE id = %s::uuid",
+                    (prompt_id,),
+                )
+                row = cur.fetchone()
+                return row[0] if row else None
         finally:
             conn.close()

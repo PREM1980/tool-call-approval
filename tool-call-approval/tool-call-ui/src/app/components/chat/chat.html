@@ -17,19 +17,50 @@
     </div>
   </div>
 
-  @if (instances.length > 0) {
-    <div class="chat-instance-bar">
-      <label class="instance-label">Agent instance</label>
-      <select class="instance-select"
-        [(ngModel)]="selectedInstanceId"
-        (ngModelChange)="onInstanceChange()"
-        name="instanceSelect"
-        title="Agent instance">
-        <option [ngValue]="null">— none —</option>
-        @for (inst of instances; track inst.id) {
-          <option [ngValue]="inst.id">{{ inst.agent_name }} / {{ inst.instance_name }}</option>
-        }
-      </select>
+  @if (systemPrompts.length > 0 || instances.length > 0) {
+    <div class="chat-context-bar">
+      @if (systemPrompts.length > 0) {
+        <div class="prompt-picker" aria-label="System prompts">
+          <span class="context-label">System prompt</span>
+          <div class="prompt-list" role="listbox" aria-label="System prompts">
+            @for (prompt of systemPrompts; track prompt.id) {
+              <button
+                type="button"
+                class="prompt-item"
+                role="option"
+                [class.active]="selectedSystemPromptId === prompt.id"
+                [attr.aria-selected]="selectedSystemPromptId === prompt.id"
+                [disabled]="isSwitching || isWaiting"
+                [title]="prompt.name"
+                (click)="onSystemPromptSelect(prompt.id)">
+                <span class="prompt-name">{{ prompt.name }}</span>
+                @if (selectedSystemPromptId === prompt.id) {
+                  <span class="prompt-badge prompt-badge--selected">Selected</span>
+                } @else if (prompt.is_active) {
+                  <span class="prompt-badge prompt-badge--default">Default</span>
+                }
+              </button>
+            }
+          </div>
+        </div>
+      }
+
+      @if (instances.length > 0) {
+        <div class="instance-picker">
+          <label class="context-label" for="instanceSelect">Agent instance</label>
+          <select class="instance-select"
+            id="instanceSelect"
+            [(ngModel)]="selectedInstanceId"
+            (ngModelChange)="onInstanceChange()"
+            name="instanceSelect"
+            title="Agent instance">
+            <option [ngValue]="null">— none —</option>
+            @for (inst of instances; track inst.id) {
+              <option [ngValue]="inst.id">{{ inst.agent_name }} / {{ inst.instance_name }}</option>
+            }
+          </select>
+        </div>
+      }
     </div>
   }
 
@@ -38,9 +69,9 @@
       <div class="chat-empty">
         <p class="chat-empty-prompt">Try asking:</p>
         <div class="chat-empty-chips">
-          <span class="suggestion-chip">"List all pods in the default namespace"</span>
-          <span class="suggestion-chip">"Scale the frontend deployment to 3 replicas"</span>
-          <span class="suggestion-chip">"Show me recent events in the kube-system namespace"</span>
+          @for (suggestion of emptyStateSuggestions; track $index) {
+            <span class="suggestion-chip">"{{ suggestion }}"</span>
+          }
         </div>
       </div>
     }

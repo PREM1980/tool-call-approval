@@ -29,6 +29,24 @@ async def test_create_session(ac):
     mock_client.post.assert_called_once_with("http://localhost:8000/sessions", timeout=30.0)
 
 
+async def test_create_session_forwards_selected_prompt(ac):
+    mock_client = AsyncMock()
+    mock_client.post.return_value = _resp(200, {"session_id": "abc-123"})
+
+    with patch("main._client", mock_client):
+        resp = await ac.post(
+            "/api/sessions",
+            json={"instance_id": "inst-1", "system_prompt_id": "prompt-1"},
+        )
+
+    assert resp.status_code == 200
+    call_args = mock_client.post.call_args
+    assert call_args.args[0] == "http://localhost:8000/sessions"
+    assert b'"instance_id":"inst-1"' in call_args.kwargs["content"]
+    assert b'"system_prompt_id":"prompt-1"' in call_args.kwargs["content"]
+    assert call_args.kwargs["headers"] == {"Content-Type": "application/json"}
+
+
 async def test_chat(ac):
     mock_client = AsyncMock()
     mock_client.post.return_value = _resp(200, {"status": "processing"})

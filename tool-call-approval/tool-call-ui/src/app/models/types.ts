@@ -19,6 +19,8 @@ export interface SessionSummary {
   updated_at: number | null;
   turn_count: number;
   first_message?: string | null;
+  system_prompt_id?: string | null;
+  system_prompt_name?: string | null;
 }
 
 export interface ChatMessage {
@@ -34,7 +36,8 @@ export interface SseEvent {
     | 'tool_rejected'
     | 'message'
     | 'done'
-    | 'error';
+    | 'error'
+    | 'stream_error';
   content?: string;
   tool_use_id?: string;
   tool_name?: string;

@@ -73,9 +73,14 @@ async def list_sessions() -> JSONResponse:
 
 
 @app.post("/api/sessions")
-async def create_session() -> JSONResponse:
+async def create_session(request: Request) -> JSONResponse:
+    body = await request.body()
+    kwargs = {"timeout": 30.0}
+    if body:
+        kwargs["content"] = body
+        kwargs["headers"] = {"Content-Type": "application/json"}
     return await _proxy(
-        _get_client().post(f"{_BACKEND}/sessions", timeout=30.0)
+        _get_client().post(f"{_BACKEND}/sessions", **kwargs)
     )
 
 

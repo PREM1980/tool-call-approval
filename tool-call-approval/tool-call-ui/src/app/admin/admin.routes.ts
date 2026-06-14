@@ -32,4 +32,9 @@ export const adminRoutes: Routes = [
     loadComponent: () =>
       import('./agents/agents').then((m) => m.Agents),
   },
+  {
+    path: 'system-prompt',
+    loadComponent: () =>
+      import('./system-prompt/system-prompt').then((m) => m.SystemPrompt),
+  },
 ];

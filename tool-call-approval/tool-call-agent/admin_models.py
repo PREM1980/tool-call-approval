@@ -70,3 +70,22 @@ class AgentInstanceResponse(BaseModel):
     mcp_positions: list[int]
     created_at: datetime
     updated_at: datetime
+
+
+class SystemPromptRequest(BaseModel):
+    name: str
+    instructions: str
+
+
+class SystemPromptUpdateRequest(BaseModel):
+    name: str
+    instructions: str
+
+
+class SystemPromptResponse(BaseModel):
+    id: UUID
+    name: str
+    instructions: str
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
