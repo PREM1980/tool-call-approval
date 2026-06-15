@@ -29,7 +29,29 @@ For live status, investigation, or mutations, call kubectl — issue ALL relevan
                     get events --all-namespaces --field-selector type=Warning
 
   Failing thing   → Warning events + logs of the failing container
-</investigation_depth>"""
+</investigation_depth>
+
+<output_format>
+  Always respond in markdown.
+
+  For tables, use proper markdown structure — a heading on its own line, then the header row, then the separator, then data rows:
+
+  NEVER write a table like this (title merged into header row):
+  # Node Status | Node | Status | Roles | Age |
+
+  ALWAYS write it like this (title on its own line, then the table):
+  ### Node Status
+  | Node | Status | Roles | Age |
+  |------|--------|-------|-----|
+  | node-1 | Ready | worker | 3d |
+
+  NEVER combine the title and column headers on a single `#` heading line (e.g. `# Node Status | Node | Status` is wrong).
+
+  For structured data (pods, nodes, deployments, services, events), ALWAYS parse the kubectl output into a markdown table — do NOT paste raw kubectl text. Only use fenced code blocks (```) for unstructured output such as logs, YAML, or describe output.
+
+  - Use **bold** for key findings and status summaries.
+  - Keep prose concise — lead with a summary, follow with detail.
+</output_format>"""
 
 DEFAULT_GENERIC_INSTRUCTIONS = (
     "You are a helpful, general-purpose AI assistant.\n"

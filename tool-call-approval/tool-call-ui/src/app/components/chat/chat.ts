@@ -10,7 +10,9 @@ import {
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { Subscription } from 'rxjs';
+import { marked } from 'marked';
 import { AdminService, AgentInstance, SystemPromptData } from '../../services/admin.service';
 import { ChatService } from '../../services/chat.service';
 import { SessionsService } from '../../services/sessions.service';
@@ -64,8 +66,21 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
     private wsChatService: WebsocketChatService,
     private sessionsService: SessionsService,
     private adminService: AdminService,
-    private cdr: ChangeDetectorRef
+    private cdr: ChangeDetectorRef,
+    private sanitizer: DomSanitizer,
   ) {}
+
+  renderMarkdown(content: string): SafeHtml {
+    return this.sanitizer.bypassSecurityTrustHtml(marked.parse(this.fixMdTables(content)) as string);
+  }
+
+  private fixMdTables(content: string): string {
+    // LLMs often emit "# Title | col1 | col2 |" — split into heading + table header row
+    return content.replace(
+      /^(#{1,6})\s*([^|\n]+?)\s*\|\s*(.+)$/gm,
+      (_, hashes, title, rest) => `${hashes} ${title.trim()}\n| ${rest}`,
+    );
+  }
 
   private get activeService(): ChatService | WebsocketChatService {
     return this.mode === 'sse' ? this.chatService : this.wsChatService;

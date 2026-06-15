@@ -492,12 +492,18 @@ class AgentService:
         self, session: Session, event: ToolCallCompletedEvent, tool_spans: list, response_parts: list
     ) -> bool:
         if event.tool:
-            result = str(event.content)
-            tool_spans.append({"tool": event.tool.tool_name, "result": result})
+            content = str(event.content)
+            tool_args = event.tool.tool_args or {}
+            args_str = ", ".join(f"{k}={v}" for k, v in tool_args.items())
+            # Extract "completed in X.XXXXs" from Agno's string; use full args instead of truncated
+            import re as _re
+            elapsed = next(iter(_re.findall(r"completed in [\d.]+s", content)), "")
+            display = f"{event.tool.tool_name}({args_str}) {elapsed}".strip()
+            tool_spans.append({"tool": event.tool.tool_name, "result": display})
             await session.queue.put({
                 "type": "tool_result",
                 "tool_use_id": event.tool.tool_call_id,
                 "tool_name": event.tool.tool_name,
-                "result": result,
+                "result": display,
             })
         return False

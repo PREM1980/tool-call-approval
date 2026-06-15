@@ -105,7 +105,11 @@
           [class.msg-assistant]="message.role === 'assistant'"
           [class.msg-system]="message.role === 'system'">
           <div class="msg-wrap">
-            <div class="msg-bubble">{{ message.content }}</div>
+            @if (message.role === 'assistant') {
+              <div class="msg-bubble msg-bubble--md" [innerHTML]="renderMarkdown(message.content)"></div>
+            } @else {
+              <div class="msg-bubble">{{ message.content }}</div>
+            }
             <div class="msg-time">{{ message.timestamp | date: 'HH:mm' }}</div>
           </div>
         </div>
