@@ -287,6 +287,7 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
   }
 
   private appendAssistantMessage(content: string): void {
+    if (!content.trim()) return;
     const last = this.messages.at(-1);
     if (last?.role === 'assistant') {
       last.content += content;

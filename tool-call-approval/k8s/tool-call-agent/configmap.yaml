@@ -3,7 +3,7 @@ kind: ConfigMap
 metadata:
   name: tool-call-agent-config
 data:
-  LLM_PROVIDER: LOCAL
+  LLM_PROVIDER: GCP
   MODEL_ID: nemotron-3-super
   BASE_URL: https://models.k8s.aip.mitre.org/v1
   LOCAL_VERIFY_SSL: "false"

@@ -129,6 +129,12 @@ def test_repository_seeds_default_kubernetes_agent_prompt():
     assert repo.get_active_system_prompt() == DEFAULT_INSTRUCTIONS
 
 
+def test_kubernetes_prompt_includes_argocd_investigation_depth():
+    assert "investigation_depth" in DEFAULT_INSTRUCTIONS
+    assert "Argo CD status" in DEFAULT_INSTRUCTIONS
+    assert "app.kubernetes.io/part-of=argocd" in DEFAULT_INSTRUCTIONS
+
+
 def test_get_system_prompt_instructions_returns_prompt_text(repo):
     prompt = repo.create_system_prompt("custom_prompt", "custom instructions")
 

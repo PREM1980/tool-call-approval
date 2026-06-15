@@ -19,7 +19,7 @@ spec:
       containers:
         - name: tool-call-agent
           image: tool-call-agent:latest
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Never
           ports:
             - containerPort: 8000
           envFrom:

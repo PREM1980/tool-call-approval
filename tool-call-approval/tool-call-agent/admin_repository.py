@@ -100,7 +100,9 @@ class AdminRepository:
                 """
                 INSERT INTO admin_system_prompts (name, instructions, is_active)
                 VALUES (%s, %s, FALSE)
-                ON CONFLICT (name) DO NOTHING
+                ON CONFLICT (name) DO UPDATE SET
+                    instructions = EXCLUDED.instructions,
+                    updated_at   = NOW()
                 """,
                 (name, instructions),
             )
