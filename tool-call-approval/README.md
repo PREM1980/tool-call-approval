@@ -8,7 +8,8 @@ tool-call-ui (:4200) -> tool-call-api (:8080) -> tool-call-agent (:8000)
 ```
 
 Use real agent mode when you want the app to call an actual LLM provider
-(AWS Bedrock or GCP Vertex AI) and require human approval before tools run.
+(AWS Bedrock, GCP Vertex AI, or a local OpenAI-compatible endpoint) and require
+human approval before tools run.
 
 ## Prerequisites
 
@@ -16,7 +17,7 @@ Use real agent mode when you want the app to call an actual LLM provider
 - Node.js/npm compatible with Angular 20
 - Docker + Docker Compose
 - `kubectl` on your PATH if you want the Kubernetes tool to run locally
-- AWS Bedrock access or GCP Vertex AI credentials
+- AWS Bedrock, GCP Vertex AI, or local OpenAI-compatible endpoint credentials
 
 ## 1. Start Postgres and Langfuse
 
@@ -77,6 +78,20 @@ LLM_PROVIDER=GCP
 GOOGLE_APPLICATION_CREDENTIALS=/absolute/path/to/service-account.json
 GOOGLE_CLOUD_PROJECT=your-gcp-project-id
 GOOGLE_CLOUD_LOCATION=us-east5
+POSTGRES_URL=postgresql+psycopg2://postgres:postgres@localhost:5433/postgres
+LANGFUSE_PUBLIC_KEY=pk-lf-local-tool-call-approval
+LANGFUSE_SECRET_KEY=sk-lf-local-tool-call-approval
+LANGFUSE_HOST=http://localhost:3000
+```
+
+For the local/AIP OpenAI-compatible endpoint:
+
+```env
+LLM_PROVIDER=LOCAL
+OPENAI_API_KEY=sk-your-local-endpoint-key
+MODEL_ID=nemotron-3-super
+BASE_URL=https://models.k8s.aip.mitre.org/v1
+LOCAL_VERIFY_SSL=false
 POSTGRES_URL=postgresql+psycopg2://postgres:postgres@localhost:5433/postgres
 LANGFUSE_PUBLIC_KEY=pk-lf-local-tool-call-approval
 LANGFUSE_SECRET_KEY=sk-lf-local-tool-call-approval
@@ -191,4 +206,3 @@ To remove local Docker data too:
 ```bash
 docker compose down -v
 ```
-

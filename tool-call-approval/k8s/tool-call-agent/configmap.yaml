@@ -3,7 +3,11 @@ kind: ConfigMap
 metadata:
   name: tool-call-agent-config
 data:
-  LLM_PROVIDER: GCP
+  LLM_PROVIDER: LOCAL
+  MODEL_ID: nemotron-3-super
+  BASE_URL: https://models.k8s.aip.mitre.org/v1
+  LOCAL_VERIFY_SSL: "false"
+  POSTGRES_URL: postgresql+psycopg2://postgres:postgres@postgres:5432/postgres
   GOOGLE_CLOUD_PROJECT: provs-487517
   GOOGLE_CLOUD_LOCATION: us-east5
   GOOGLE_APPLICATION_CREDENTIALS: /etc/gcp/service-account.json

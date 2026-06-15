@@ -8,6 +8,7 @@ from uuid import uuid4
 from fpdf import FPDF
 from os import getenv
 
+import httpx
 from agno.agent import Agent
 from agno.models.aws.bedrock import AwsBedrock
 from agno.models.vertexai.claude import Claude as VertexAIClaude
@@ -33,13 +34,15 @@ from tools import execute_tool, reset_kubeconfig, set_kubeconfig
 
 _AWS_MODEL_ID = "us.anthropic.claude-sonnet-4-20250514-v1:0"
 _GCP_MODEL_ID = "claude-sonnet-4-6"
+_LOCAL_MODEL_ID = "nemotron-3-super"
+_LOCAL_BASE_URL = "https://models.k8s.aip.mitre.org/v1"
 _THROTTLE_MAX_RETRIES = 3
 _THROTTLE_BASE_DELAY = 5  # seconds; backoff: 5s, 10s, 20s
 _AUTO_APPROVE = getenv("AUTO_APPROVE_TOOLS", "false").lower() == "true"
 _APPROVAL_TIMEOUT = float(getenv("APPROVAL_TIMEOUT_SECONDS", "300"))  # 5 minutes
 
 
-def _build_model() -> AwsBedrock | VertexAIClaude:
+def _build_model() -> Any:
     provider = getenv("LLM_PROVIDER", "AWS").upper()
     if provider == "GCP":
         return VertexAIClaude(
@@ -49,6 +52,30 @@ def _build_model() -> AwsBedrock | VertexAIClaude:
             request_params={
                 "tool_choice": {"type": "auto", "disable_parallel_tool_use": False}
             },
+        )
+    if provider == "LOCAL":
+        from agno.models.openai import OpenAILike
+
+        api_key = getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise EnvironmentError("OPENAI_API_KEY is required when LLM_PROVIDER=LOCAL")
+        if not api_key.startswith("sk-"):
+            raise EnvironmentError("OPENAI_API_KEY must start with 'sk-' for LLM_PROVIDER=LOCAL")
+        verify_ssl = getenv("LOCAL_VERIFY_SSL", "true").lower() not in {"0", "false", "no"}
+        local_ca_bundle = getenv("LOCAL_CA_BUNDLE")
+        http_client = None
+        if local_ca_bundle:
+            http_client = httpx.AsyncClient(verify=local_ca_bundle)
+        elif not verify_ssl:
+            http_client = httpx.AsyncClient(verify=False)
+        local_kwargs: dict[str, Any] = {}
+        if http_client is not None:
+            local_kwargs["http_client"] = http_client
+        return OpenAILike(
+            id=getenv("MODEL_ID") or getenv("LOCAL_MODEL_ID", _LOCAL_MODEL_ID),
+            api_key=api_key,
+            base_url=getenv("BASE_URL") or getenv("LOCAL_BASE_URL", _LOCAL_BASE_URL),
+            **local_kwargs,
         )
     return AwsBedrock(
         id=_AWS_MODEL_ID,

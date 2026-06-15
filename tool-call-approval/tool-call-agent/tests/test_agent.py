@@ -43,7 +43,70 @@ from agno.models.response import ToolExecution
 from agno.run.agent import RunCompletedEvent, RunContentEvent, RunErrorEvent, RunPausedEvent, ToolCallCompletedEvent
 from agno.run.requirement import RunRequirement
 
-from agent_service import AgentService
+from agent_service import AgentService, _build_model
+
+
+def test_build_model_uses_local_openai_like_provider(monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "LOCAL")
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-local-test")
+    monkeypatch.setenv("LOCAL_MODEL_ID", "nemotron-3-super")
+    monkeypatch.setenv("LOCAL_BASE_URL", "https://models.k8s.aip.mitre.org/v1")
+
+    with patch("agno.models.openai.OpenAILike") as MockOpenAILike:
+        model = _build_model()
+
+    MockOpenAILike.assert_called_once_with(
+        id="nemotron-3-super",
+        api_key="sk-local-test",
+        base_url="https://models.k8s.aip.mitre.org/v1",
+    )
+    assert model is MockOpenAILike.return_value
+
+
+def test_build_model_uses_local_model_id_and_base_url_env(monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "LOCAL")
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-local-test")
+    monkeypatch.setenv("MODEL_ID", "custom-local-model")
+    monkeypatch.setenv("BASE_URL", "https://local-models.example/v1")
+    monkeypatch.delenv("LOCAL_MODEL_ID", raising=False)
+    monkeypatch.delenv("LOCAL_BASE_URL", raising=False)
+
+    with patch("agno.models.openai.OpenAILike") as MockOpenAILike:
+        model = _build_model()
+
+    MockOpenAILike.assert_called_once_with(
+        id="custom-local-model",
+        api_key="sk-local-test",
+        base_url="https://local-models.example/v1",
+    )
+    assert model is MockOpenAILike.return_value
+
+
+def test_build_model_can_disable_local_tls_verification(monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "LOCAL")
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-local-test")
+    monkeypatch.setenv("LOCAL_VERIFY_SSL", "false")
+
+    with patch("agno.models.openai.OpenAILike") as MockOpenAILike, \
+         patch("agent_service.httpx.AsyncClient") as MockAsyncClient:
+        model = _build_model()
+
+    MockAsyncClient.assert_called_once_with(verify=False)
+    MockOpenAILike.assert_called_once_with(
+        id="nemotron-3-super",
+        api_key="sk-local-test",
+        base_url="https://models.k8s.aip.mitre.org/v1",
+        http_client=MockAsyncClient.return_value,
+    )
+    assert model is MockOpenAILike.return_value
+
+
+def test_build_model_rejects_invalid_local_api_key(monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "LOCAL")
+    monkeypatch.setenv("OPENAI_API_KEY", "not-a-sk-key")
+
+    with pytest.raises(EnvironmentError, match="must start with 'sk-'"):
+        _build_model()
 
 
 class MockStorage(IAgentStorage):

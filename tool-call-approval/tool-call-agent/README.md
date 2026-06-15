@@ -1,13 +1,13 @@
 # tool-call-agent
 
-FastAPI backend for the tool-call-approval demo. Runs an LLM agent (AWS Bedrock or GCP Vertex AI) with human-in-the-loop tool approval, streaming events over SSE and WebSocket. Includes Langfuse tracing and a mock mode that requires no API keys.
+FastAPI backend for the tool-call-approval demo. Runs an LLM agent (AWS Bedrock, GCP Vertex AI, or a local OpenAI-compatible endpoint) with human-in-the-loop tool approval, streaming events over SSE and WebSocket. Includes Langfuse tracing and a mock mode that requires no API keys.
 
 ---
 
 ## Prerequisites
 
 - Python 3.12+
-- AWS account with Bedrock access (for the real agent)
+- AWS Bedrock, GCP Vertex AI, or local OpenAI-compatible endpoint access (for the real agent)
 - Docker + Docker Compose (for Langfuse)
 
 ---
@@ -29,7 +29,7 @@ cp .env.example .env
 Edit `.env`:
 
 ```env
-# LLM provider: AWS (default) or GCP
+# LLM provider: AWS (default), GCP, or LOCAL
 LLM_PROVIDER=AWS
 
 # AWS Bedrock — required when LLM_PROVIDER=AWS
@@ -42,6 +42,12 @@ AWS_DEFAULT_REGION=us-east-1
 GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
 GOOGLE_CLOUD_PROJECT=your-gcp-project-id
 GOOGLE_CLOUD_LOCATION=us-central1   # optional, defaults to us-central1
+
+# Local/AIP OpenAI-compatible endpoint — required when LLM_PROVIDER=LOCAL
+OPENAI_API_KEY=sk-your-local-endpoint-key
+MODEL_ID=nemotron-3-super
+BASE_URL=https://models.k8s.aip.mitre.org/v1
+LOCAL_VERIFY_SSL=false
 
 # Langfuse (auto-set if using docker compose)
 LANGFUSE_PUBLIC_KEY=pk-lf-local-tool-call-approval
