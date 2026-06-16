@@ -65,7 +65,12 @@ class PostgresRepository(IAgentStorage):
             if not self._is_reachable():
                 logger.warning("Postgres unreachable — session persistence disabled")
                 return None
-            self._db = PostgresDb(db_url=self._url)
+            db = PostgresDb(db_url=self._url)
+            try:
+                db._create_all_tables()
+            except Exception as e:
+                logger.warning("Agno schema init failed: %s", e)
+            self._db = db
         return self._db
 
     def list_sessions(self) -> list[dict]:

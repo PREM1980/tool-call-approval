@@ -22,6 +22,8 @@ class SessionResponse(BaseModel):
 class CreateSessionRequest(BaseModel):
     instance_id: str | None = None
     system_prompt_id: str | None = None
+    model_id: str | None = None
+    provider: str | None = None
 
 
 class SessionSummaryResponse(BaseModel):

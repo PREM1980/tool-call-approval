@@ -42,8 +42,8 @@ _AUTO_APPROVE = getenv("AUTO_APPROVE_TOOLS", "false").lower() == "true"
 _APPROVAL_TIMEOUT = float(getenv("APPROVAL_TIMEOUT_SECONDS", "300"))  # 5 minutes
 
 
-def _build_model() -> Any:
-    provider = getenv("LLM_PROVIDER", "AWS").upper()
+def _build_model(model_id: str | None = None, provider: str | None = None) -> Any:
+    provider = (provider or getenv("LLM_PROVIDER", "AWS")).upper()
     if provider == "GCP":
         return VertexAIClaude(
             id=_GCP_MODEL_ID,
@@ -72,7 +72,7 @@ def _build_model() -> Any:
         if http_client is not None:
             local_kwargs["http_client"] = http_client
         return OpenAILike(
-            id=getenv("MODEL_ID") or getenv("LOCAL_MODEL_ID", _LOCAL_MODEL_ID),
+            id=model_id or getenv("MODEL_ID") or getenv("LOCAL_MODEL_ID", _LOCAL_MODEL_ID),
             api_key=api_key,
             base_url=getenv("BASE_URL") or getenv("LOCAL_BASE_URL", _LOCAL_BASE_URL),
             **local_kwargs,
@@ -140,10 +140,12 @@ class AgentService:
         self,
         instance_id: str | None = None,
         system_prompt_id: str | None = None,
+        model_id: str | None = None,
+        provider: str | None = None,
     ) -> Session:
         session = Session(id=str(uuid4()))
         prompt = self._resolve_system_prompt(system_prompt_id)
-        agent, tmpdir = self._build_agent(session.id, instance_id, prompt["instructions"])
+        agent, tmpdir = self._build_agent(session.id, instance_id, prompt["instructions"], model_id, provider)
         session.tmpdir = tmpdir
         session.instance_id = instance_id
         session.system_prompt_id = prompt["id"]
@@ -173,6 +175,8 @@ class AgentService:
         session_id: str,
         instance_id: str | None = None,
         instructions: str | None = None,
+        model_id: str | None = None,
+        provider: str | None = None,
     ) -> tuple[Agent, str]:
         if instance_id:
             tmpdir, skills_obj = self._load_instance_skills(instance_id)
@@ -192,12 +196,14 @@ class AgentService:
             )
 
         agent_kwargs: dict[str, Any] = dict(
-            model=_build_model(),
+            model=_build_model(model_id, provider),
             tools=[calculate, get_weather, search_web, kubectl, save_report],
             instructions=instructions or _DEFAULT_INSTRUCTIONS,
             stream=True,
             session_id=session_id,
             user_id=session_id,
+            add_history_to_context=True,
+            num_history_runs=5,
         )
         if db is not None:
             agent_kwargs["db"] = db

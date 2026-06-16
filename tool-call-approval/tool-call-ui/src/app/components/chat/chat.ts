@@ -55,6 +55,18 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
   selectedInstanceId: string | null = null;
   systemPrompts: SystemPromptData[] = [];
   selectedSystemPromptId: string | null = null;
+  selectedProvider: string = 'LOCAL';
+  selectedModelId: string = 'nemotron-3-super';
+
+  readonly availableProviders = ['AWS', 'GCP', 'LOCAL'];
+  readonly availableModels = [
+    'devstral',
+    'gemma-4',
+    'gpt-oss-120b',
+    'nemotron-3-nano',
+    'nemotron-3-super',
+    'nemotron-3-ultra',
+  ];
 
   private sseSubscription!: Subscription;
   private shouldScrollToBottom = false;
@@ -143,6 +155,14 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
     await this.newSession();
   }
 
+  async onProviderChange(): Promise<void> {
+    await this.newSession();
+  }
+
+  async onModelChange(): Promise<void> {
+    await this.newSession();
+  }
+
   async onSystemPromptSelect(promptId: string): Promise<void> {
     if (this.isSwitching || this.isWaiting || promptId === this.selectedSystemPromptId) return;
     this.selectedSystemPromptId = promptId;
@@ -206,6 +226,8 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
     await this.activeService.createSession(
       this.selectedInstanceId ?? undefined,
       this.selectedSystemPromptId ?? undefined,
+      this.selectedProvider === 'LOCAL' ? this.selectedModelId || undefined : undefined,
+      this.selectedProvider,
     );
     this.subscribeToEvents(this.activeService);
   }

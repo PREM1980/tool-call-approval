@@ -45,6 +45,35 @@
         </div>
       }
 
+      <div class="provider-picker">
+        <span class="context-label">Provider</span>
+        <div class="mode-toggle">
+          @for (p of availableProviders; track p) {
+            <button type="button" class="mode-btn"
+              [class.active]="selectedProvider === p"
+              [disabled]="isSwitching || isWaiting"
+              (click)="selectedProvider = p; onProviderChange()">{{ p }}</button>
+          }
+        </div>
+      </div>
+
+      @if (selectedProvider === 'LOCAL') {
+        <div class="model-picker">
+          <label class="context-label" for="modelSelect">Model</label>
+          <select class="instance-select"
+            id="modelSelect"
+            [(ngModel)]="selectedModelId"
+            (ngModelChange)="onModelChange()"
+            name="modelSelect"
+            [disabled]="isSwitching || isWaiting"
+            title="Model">
+            @for (model of availableModels; track model) {
+              <option [value]="model">{{ model }}</option>
+            }
+          </select>
+        </div>
+      }
+
       @if (instances.length > 0) {
         <div class="instance-picker">
           <label class="context-label" for="instanceSelect">Agent instance</label>

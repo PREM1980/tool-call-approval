@@ -14,10 +14,12 @@ export class ChatService {
 
   constructor(private http: HttpClient) {}
 
-  async createSession(instanceId?: string | null, systemPromptId?: string | null): Promise<void> {
+  async createSession(instanceId?: string | null, systemPromptId?: string | null, modelId?: string | null, provider?: string | null): Promise<void> {
     const body: Record<string, string> = {};
     if (instanceId) body['instance_id'] = instanceId;
     if (systemPromptId) body['system_prompt_id'] = systemPromptId;
+    if (modelId) body['model_id'] = modelId;
+    if (provider) body['provider'] = provider;
     const res = await firstValueFrom(
       this.http.post<{ session_id: string }>(`${API_URL}/sessions`, body)
     );
