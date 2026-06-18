@@ -1,7 +1,7 @@
 import pytest
 import psycopg2
-from admin_repository import AdminRepository
-from system_prompt_defaults import DEFAULT_INSTRUCTIONS
+from app.repositories.admin_repository import AdminRepository
+from app.core.system_prompts import DEFAULT_INSTRUCTIONS
 
 TEST_URL = "postgresql://localhost:5432/postgres"
 

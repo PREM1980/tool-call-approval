@@ -18,6 +18,65 @@ tool-call-ui (:4200) → tool-call-api (:8080) → tool-call-agent (:8000)
 | GET | `/api/sessions/{id}/history` | `GET /sessions/{id}/history` |
 | POST | `/api/sessions/{id}/approve` | `POST /sessions/{id}/approve` |
 
+## Message Envelope
+
+Session creation, chat, and approval requests must use the message envelope schema. Old payloads such as `{"message": "hello"}` or `{"approved": true}` are rejected.
+
+Create a session:
+
+```json
+{
+  "session": {
+    "instance_id": "inst-1",
+    "system_prompt_id": "prompt-1",
+    "model_id": "nemotron-3-super",
+    "provider": "LOCAL"
+  },
+  "messages": []
+}
+```
+
+Send chat:
+
+```json
+{
+  "session": {
+    "session_id": "abc-123"
+  },
+  "messages": [
+    {
+      "role": "user",
+      "content": "List pods in the default namespace",
+      "platform_context": {
+        "kubeconfig": "...",
+        "k8s_namespace": "default"
+      },
+      "data": {
+        "cmds": [],
+        "executed_cmds": [],
+        "url_configs": [],
+        "user_file_uploads": []
+      }
+    }
+  ]
+}
+```
+
+Approve a tool:
+
+```json
+{
+  "session": {
+    "session_id": "abc-123"
+  },
+  "messages": [],
+  "approval": {
+    "tool_use_id": "tool-1",
+    "approved": true
+  }
+}
+```
+
 ## Setup
 
 ```bash

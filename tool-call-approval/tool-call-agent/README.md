@@ -99,6 +99,22 @@ Server starts on `http://localhost:8000`.
 
 ---
 
+## Code Layout
+
+Runtime code is organized under `app/` by functionality:
+
+- `app/api/` contains FastAPI route modules and app entrypoints.
+- `app/schemas/` contains Pydantic request and response models.
+- `app/services/` contains agent orchestration and mock agent behavior.
+- `app/repositories/` contains persistence adapters.
+- `app/domain/` contains core runtime objects such as `Session`.
+- `app/tools/` contains tool execution and allowlist logic.
+- `app/core/` contains logging and system prompt defaults.
+
+The root `main.py`, `main_mock.py`, and `main_websocket.py` files are compatibility wrappers so existing `uvicorn main:app` commands continue to work.
+
+---
+
 ## Running the Python client
 
 A minimal SSE client for testing without the Angular frontend:
@@ -125,13 +141,54 @@ The client prints streamed output to the terminal and auto-approves any tool cal
 | POST | `/sessions/{id}/approve` | Approve or reject a pending tool call (SSE mode) |
 | WS   | `/sessions/{id}/ws` | WebSocket connection (chat + approval in one connection) |
 
+### Message envelope
+
+`POST /sessions`, `POST /sessions/{id}/chat`, and `POST /sessions/{id}/approve` accept only the message envelope format.
+
+```json
+{
+  "session": {
+    "session_id": "abc-123",
+    "instance_id": "inst-1",
+    "system_prompt_id": "prompt-1",
+    "model_id": "nemotron-3-super",
+    "provider": "LOCAL"
+  },
+  "messages": [
+    {
+      "role": "user",
+      "content": "List pods in the default namespace",
+      "platform_context": {
+        "kubeconfig": "...",
+        "k8s_namespace": "default"
+      }
+    }
+  ],
+  "approval": {
+    "tool_use_id": "tool-1",
+    "approved": true
+  }
+}
+```
+
+Use the fields needed for the route: session creation normally sends session metadata and an empty `messages` array; chat sends one or more messages; approval sends an `approval` object.
+
 ### WebSocket message format
 
 #### Client → Server
 
 ```json
-{ "type": "chat", "message": "What is 1234 × 5678?" }
-{ "type": "approve", "approved": true }
+{
+  "type": "chat",
+  "session": { "session_id": "abc-123" },
+  "messages": [{ "role": "user", "content": "What is 1234 x 5678?" }]
+}
+{
+  "type": "approve",
+  "session": { "session_id": "abc-123" },
+  "messages": [],
+  "approval": { "tool_use_id": "tool-1", "approved": true }
+}
 ```
 
 #### Server → Client

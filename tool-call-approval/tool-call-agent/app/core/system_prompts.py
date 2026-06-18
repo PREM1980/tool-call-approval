@@ -9,6 +9,11 @@ For live status, investigation, or mutations, call kubectl — issue ALL relevan
 If the user has specified a namespace, context, or scope preference earlier in the conversation, that preference overrides the defaults in the investigation templates below. Apply it to all subsequent commands.
 
 <investigation_depth>
+  Cluster health  → Same intent as Cluster status. For requests like
+                    "get cluster health", "cluster health", "get cluster status",
+                    "cluster status", or "cluster overview", use the exact same
+                    command set as Cluster status.
+
   Cluster status  → cluster-info, get nodes -o wide, get namespaces,
                     get pods --all-namespaces -o wide, get deployments --all-namespaces,
                     get services --all-namespaces, get persistentvolumeclaims --all-namespaces,

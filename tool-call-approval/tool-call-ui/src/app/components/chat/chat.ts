@@ -10,15 +10,14 @@ import {
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { Subscription } from 'rxjs';
-import { marked } from 'marked';
-import { AdminService, AgentInstance, SystemPromptData } from '../../services/admin.service';
+import { AdminService, PersonaData, Skill, SystemPromptData } from '../../services/admin.service';
 import { ChatService } from '../../services/chat.service';
 import { SessionsService } from '../../services/sessions.service';
 import { WebsocketChatService } from '../../services/websocket-chat.service';
 import { ToolApproval } from '../tool-approval/tool-approval';
-import { Message, ToolCall } from '../../models/types';
+import { AmbientContext, ApiMessage, Command, ExecutedCommand, Message, MessageData, PlatformContext, SseEvent, ToolCall } from '../../models/types';
+import { formatMarkdownBlocks, MarkdownBlock } from '../../shared/markdown-blocks';
 
 export type ConnectionMode = 'sse' | 'websocket';
 
@@ -51,8 +50,9 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
   isWaiting = false;
   mode: ConnectionMode = 'sse';
   isSwitching = false;
-  instances: AgentInstance[] = [];
-  selectedInstanceId: string | null = null;
+  personas: PersonaData[] = [];
+  skills: Skill[] = [];
+  selectedPersonaIds: string[] = [];
   systemPrompts: SystemPromptData[] = [];
   selectedSystemPromptId: string | null = null;
   selectedProvider: string = 'LOCAL';
@@ -72,6 +72,8 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
   private shouldScrollToBottom = false;
   private kubeconfig: string | null = null;
   private pendingReportTitles = new Map<string, string>();
+  private activeToolData: MessageData = this.emptyMessageData();
+  private activeToolCommands = new Map<string, Command>();
 
   constructor(
     private chatService: ChatService,
@@ -79,19 +81,10 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
     private sessionsService: SessionsService,
     private adminService: AdminService,
     private cdr: ChangeDetectorRef,
-    private sanitizer: DomSanitizer,
   ) {}
 
-  renderMarkdown(content: string): SafeHtml {
-    return this.sanitizer.bypassSecurityTrustHtml(marked.parse(this.fixMdTables(content)) as string);
-  }
-
-  private fixMdTables(content: string): string {
-    // LLMs often emit "# Title | col1 | col2 |" — split into heading + table header row
-    return content.replace(
-      /^(#{1,6})\s*([^|\n]+?)\s*\|\s*(.+)$/gm,
-      (_, hashes, title, rest) => `${hashes} ${title.trim()}\n| ${rest}`,
-    );
+  formatMessageContent(content: string): MarkdownBlock[] {
+    return formatMarkdownBlocks(content);
   }
 
   private get activeService(): ChatService | WebsocketChatService {
@@ -110,14 +103,16 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
   }
 
   async ngOnInit(): Promise<void> {
-    const [creds, instances, systemPrompts] = await Promise.all([
+    const [creds, personas, skills, systemPrompts] = await Promise.all([
       this.adminService.getCredentials().catch(() => null),
-      this.adminService.getAllAgentInstances().catch(() => []),
+      this.adminService.getPersonas().catch(() => []),
+      this.adminService.getSkills().catch(() => []),
       this.adminService.listSystemPrompts().catch(() => []),
     ]);
     this.kubeconfig = creds?.kubeconfig ?? null;
-    this.instances = instances;
-    this.selectedInstanceId = instances[0]?.id ?? null;
+    this.personas = personas;
+    this.skills = skills;
+    this.selectedPersonaIds = personas[0]?.id ? [personas[0].id] : [];
     this.systemPrompts = systemPrompts;
     this.selectedSystemPromptId = this.getInitialSystemPromptId(systemPrompts);
     if (this.resumeSessionId) {
@@ -147,12 +142,9 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
     this.messages = [];
     this.pendingToolCalls = [];
     this.isWaiting = false;
+    this.resetActiveToolData();
     await this.initConnection();
     this.isSwitching = false;
-  }
-
-  async onInstanceChange(): Promise<void> {
-    await this.newSession();
   }
 
   async onProviderChange(): Promise<void> {
@@ -177,6 +169,7 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
     this.messages = [];
     this.pendingToolCalls = [];
     this.isWaiting = false;
+    this.resetActiveToolData();
     this.mode = newMode;
     await this.initConnection();
     this.isSwitching = false;
@@ -186,11 +179,13 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
     const text = this.userInput.trim();
     if (!text) return;
     this.userInput = '';
-    this.addMessage('user', text);
+    const userMessage = this.addMessage('user', text);
     this.isWaiting = true;
     const platformContext = this.kubeconfig ? { kubeconfig: this.kubeconfig } : undefined;
     try {
-      await this.activeService.sendMessage(text, platformContext);
+      await this.activeService.sendMessage(
+        this.buildRequestMessages(userMessage.id, platformContext),
+      );
     } catch (error) {
       this.isWaiting = false;
       this.addSystemMessage(`Error: ${this.describeRequestError(error)}`);
@@ -201,9 +196,11 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
 
   async handleApproval(tool_use_id: string, approved: boolean): Promise<void> {
     this.pendingToolCalls = this.pendingToolCalls.filter(tc => tc.tool_use_id !== tool_use_id);
+    this.markToolApproval(tool_use_id, approved);
     if (this.pendingToolCalls.length === 0) {
       this.isWaiting = true;
     }
+    this.attachActiveToolDataToLatestAssistant();
     this.cdr.detectChanges();
     await this.activeService.approveTool(tool_use_id, approved);
   }
@@ -216,20 +213,65 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
       id: crypto.randomUUID(),
       role: m.role,
       content: m.content,
-      timestamp: new Date(),
+      timestamp: m.timestamp ? new Date(m.timestamp) : new Date(),
+      data: this.cloneMessageData(m.data ?? this.emptyMessageData()),
+      user: m.user ?? null,
+      agent: m.agent ?? null,
+      platform_context: m.role === 'user'
+        ? this.normalizePlatformContext(m.platform_context)
+        : undefined,
+      ambient_context: m.role === 'user'
+        ? this.normalizeAmbientContext(m.ambient_context)
+        : undefined,
     }));
     this.shouldScrollToBottom = true;
     this.subscribeToEvents(this.chatService);
   }
 
   private async initConnection(): Promise<void> {
+    const personaIds = [...this.selectedPersonaIds];
     await this.activeService.createSession(
-      this.selectedInstanceId ?? undefined,
+      null,
+      personaIds[0] ?? undefined,
       this.selectedSystemPromptId ?? undefined,
       this.selectedProvider === 'LOCAL' ? this.selectedModelId || undefined : undefined,
       this.selectedProvider,
+      personaIds,
     );
     this.subscribeToEvents(this.activeService);
+  }
+
+  selectedPersonaSkillSummary(): string {
+    const skillIds = this.selectedPersonaIds
+      .flatMap(personaId => this.personas.find(p => p.id === personaId)?.skill_ids ?? []);
+    const uniqueSkillIds = [...new Set(skillIds)];
+    if (uniqueSkillIds.length === 0) return 'No skills';
+    return uniqueSkillIds
+      .map(id => this.skills.find(skill => skill.id === id)?.filename ?? id)
+      .join(', ');
+  }
+
+  isPersonaSelected(personaId: string): boolean {
+    return this.selectedPersonaIds.includes(personaId);
+  }
+
+  async togglePersonaSelection(personaId: string, selected: boolean): Promise<void> {
+    if (this.isSwitching || this.isWaiting) return;
+    const current = new Set(this.selectedPersonaIds);
+    if (selected) {
+      current.add(personaId);
+    } else {
+      current.delete(personaId);
+    }
+    const next = this.personas
+      .map(persona => persona.id)
+      .filter(id => current.has(id));
+    if (next.join('|') === this.selectedPersonaIds.join('|')) return;
+    this.selectedPersonaIds = next;
+    this.activeService.updateSessionContext({
+      persona_id: next[0] ?? null,
+      persona_ids: next,
+    });
   }
 
   private getInitialSystemPromptId(prompts: SystemPromptData[]): string | null {
@@ -251,6 +293,7 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
           break;
         case 'tool_call_pending':
           this.isWaiting = false;
+          this.trackToolCommand(event);
           if (event.tool_name === 'save_report') {
             this.pendingReportTitles.set(
               event.tool_use_id!,
@@ -264,26 +307,33 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
           });
           break;
         case 'tool_result':
+          this.trackToolResult(event);
           if (event.tool_name === 'save_report' && event.result) {
             const title = this.pendingReportTitles.get(event.tool_use_id!) ?? 'Report';
             this.pendingReportTitles.delete(event.tool_use_id!);
             this.addReportMessage(title, event.result);
-          } else {
+          } else if (this.shouldShowToolResult(event)) {
             this.addSystemMessage(
               `Tool "${event.tool_name}" returned: ${event.result}`
             );
           }
           break;
         case 'tool_rejected':
+          this.markToolApproval(event.tool_use_id, false);
+          this.attachActiveToolDataToLatestAssistant();
           this.pendingReportTitles.delete(event.tool_use_id!);
           this.addSystemMessage(`Tool "${event.tool_name}" was rejected.`);
           break;
         case 'message':
           this.isWaiting = false;
-          this.appendAssistantMessage(event.content ?? '');
+          this.attachActiveToolDataToMessage(
+            this.appendAssistantMessage(event.content ?? ''),
+          );
           break;
         case 'done':
           this.isWaiting = false;
+          this.attachActiveToolDataToLatestAssistant();
+          this.resetActiveToolData();
           if (event.total_tokens) {
             this.addSystemMessage(
               `Tokens: ${event.total_tokens.toLocaleString()} total (${event.input_tokens?.toLocaleString()} in / ${event.output_tokens?.toLocaleString()} out)`
@@ -323,23 +373,183 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
     return 'Could not send message. Please try again.';
   }
 
-  private appendAssistantMessage(content: string): void {
-    if (!content.trim()) return;
+  private appendAssistantMessage(content: string): Message | null {
+    if (!content.trim()) return null;
     const last = this.messages.at(-1);
     if (last?.role === 'assistant') {
       last.content += content;
+      return last;
     } else {
-      this.addMessage('assistant', content);
+      return this.addMessage('assistant', content);
     }
   }
 
-  private addMessage(role: 'user' | 'assistant', content: string): void {
-    this.messages.push({
+  private trackToolCommand(event: SseEvent): void {
+    if (!event.tool_use_id || !event.tool_name) return;
+    const commandText = this.formatToolCommand(event.tool_name, event.tool_input);
+    if (!commandText) return;
+    const command: Command = { command: commandText, execute: false };
+    this.activeToolCommands.set(event.tool_use_id, command);
+    this.activeToolData.cmds.push(command);
+    this.attachActiveToolDataToLatestAssistant();
+  }
+
+  private trackToolResult(event: SseEvent): void {
+    if (!event.tool_use_id) return;
+    const command = this.activeToolCommands.get(event.tool_use_id);
+    if (!command) return;
+    command.execute = true;
+    delete command.rejection_reason;
+    const executed: ExecutedCommand = {
+      command: command.command,
+      output: event.result ?? '',
+    };
+    this.activeToolData.executed_cmds.push(executed);
+    this.attachActiveToolDataToLatestAssistant();
+  }
+
+  private markToolApproval(toolUseId: string | undefined, approved: boolean): void {
+    if (!toolUseId) return;
+    const command = this.activeToolCommands.get(toolUseId);
+    if (!command) return;
+    command.execute = approved;
+    if (approved) {
+      delete command.rejection_reason;
+    } else {
+      command.rejection_reason = 'User rejected tool call';
+    }
+  }
+
+  private formatToolCommand(
+    toolName: string,
+    toolInput: Record<string, unknown> | undefined,
+  ): string | null {
+    if (toolName === 'kubectl') {
+      const args = String(toolInput?.['args'] ?? '').trim();
+      return args ? `kubectl ${args}` : 'kubectl';
+    }
+    if (Object.keys(toolInput ?? {}).length === 0) {
+      return toolName;
+    }
+    return `${toolName}(${JSON.stringify(toolInput)})`;
+  }
+
+  private shouldShowToolResult(event: SseEvent): boolean {
+    return event.tool_name !== 'get_skill_instructions';
+  }
+
+  private attachActiveToolDataToLatestAssistant(): void {
+    const lastAssistant = [...this.messages].reverse().find(message => message.role === 'assistant');
+    this.attachActiveToolDataToMessage(lastAssistant ?? null);
+  }
+
+  private attachActiveToolDataToMessage(message: Message | null): void {
+    if (!message || message.role !== 'assistant' || !this.hasToolData(this.activeToolData)) return;
+    message.data = this.cloneMessageData(this.activeToolData);
+  }
+
+  private resetActiveToolData(): void {
+    this.activeToolData = this.emptyMessageData();
+    this.activeToolCommands.clear();
+  }
+
+  private emptyMessageData(): MessageData {
+    return {
+      cmds: [],
+      executed_cmds: [],
+      url_configs: [],
+      user_file_uploads: [],
+    };
+  }
+
+  private emptyPlatformContext(): PlatformContext {
+    return {
+      k8s_namespace: null,
+      duplo_base_url: null,
+      duplo_token: null,
+      tenant_name: null,
+      aws_credentials: null,
+      kubeconfig: null,
+    };
+  }
+
+  private emptyAmbientContext(): AmbientContext {
+    return { user_terminal_cmds: [] };
+  }
+
+  private hasToolData(data: MessageData): boolean {
+    return data.cmds.length > 0 || data.executed_cmds.length > 0;
+  }
+
+  private cloneMessageData(data: MessageData): MessageData {
+    return {
+      cmds: data.cmds.map(command => ({ ...command })),
+      executed_cmds: data.executed_cmds.map(command => ({ ...command })),
+      url_configs: data.url_configs.map(config => ({ ...config })),
+      user_file_uploads: data.user_file_uploads.map(file => ({ ...file })),
+    };
+  }
+
+  private normalizePlatformContext(context?: PlatformContext | null): PlatformContext {
+    return {
+      ...this.emptyPlatformContext(),
+      ...(context ?? {}),
+    };
+  }
+
+  private normalizeAmbientContext(context?: AmbientContext | null): AmbientContext {
+    return {
+      user_terminal_cmds: (context?.user_terminal_cmds ?? []).map(command => ({ ...command })),
+    };
+  }
+
+  private buildRequestMessages(
+    latestUserMessageId: string,
+    platformContext?: PlatformContext,
+  ): ApiMessage[] {
+    return this.messages
+      .filter((message): message is Message & { role: 'user' | 'assistant' } =>
+        message.role === 'user' || message.role === 'assistant'
+      )
+      .map((message) => {
+        const apiMessage: ApiMessage = {
+          role: message.role,
+          content: message.content,
+          data: this.cloneMessageData(message.data ?? this.emptyMessageData()),
+          timestamp: message.timestamp.toISOString(),
+          user: message.user ?? null,
+          agent: message.agent ?? null,
+        };
+        if (message.role === 'user') {
+          apiMessage.platform_context = this.normalizePlatformContext(message.platform_context);
+          apiMessage.ambient_context = this.normalizeAmbientContext(message.ambient_context);
+          if (message.id === latestUserMessageId) {
+            apiMessage.platform_context = this.normalizePlatformContext({
+              ...apiMessage.platform_context,
+              ...(platformContext ?? {}),
+            });
+          }
+        }
+        return apiMessage;
+      });
+  }
+
+  private addMessage(role: 'user' | 'assistant', content: string): Message {
+    const message: Message = {
       id: crypto.randomUUID(),
       role,
       content,
       timestamp: new Date(),
-    });
+      data: this.emptyMessageData(),
+      user: null,
+      agent: null,
+    };
+    if (role === 'user') {
+      message.platform_context = this.emptyPlatformContext();
+      message.ambient_context = this.emptyAmbientContext();
+    }
+    this.messages.push(message);
+    return message;
   }
 
   private addSystemMessage(content: string): void {

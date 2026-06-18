@@ -17,163 +17,218 @@
     </div>
   </div>
 
-  @if (systemPrompts.length > 0 || instances.length > 0) {
-    <div class="chat-context-bar">
-      @if (systemPrompts.length > 0) {
-        <div class="prompt-picker" aria-label="System prompts">
-          <span class="context-label">System prompt</span>
-          <div class="prompt-list" role="listbox" aria-label="System prompts">
-            @for (prompt of systemPrompts; track prompt.id) {
-              <button
-                type="button"
-                class="prompt-item"
-                role="option"
-                [class.active]="selectedSystemPromptId === prompt.id"
-                [attr.aria-selected]="selectedSystemPromptId === prompt.id"
+  <div class="chat-layout" [class.chat-layout--no-sidebar]="systemPrompts.length === 0 && personas.length === 0">
+    @if (systemPrompts.length > 0 || personas.length > 0) {
+      <aside class="chat-sidebar" aria-label="Chat context">
+        <div class="provider-picker">
+          <span class="context-label">Provider</span>
+          <div class="mode-toggle">
+            @for (p of availableProviders; track p) {
+              <button type="button" class="mode-btn"
+                [class.active]="selectedProvider === p"
                 [disabled]="isSwitching || isWaiting"
-                [title]="prompt.name"
-                (click)="onSystemPromptSelect(prompt.id)">
-                <span class="prompt-name">{{ prompt.name }}</span>
-                @if (selectedSystemPromptId === prompt.id) {
-                  <span class="prompt-badge prompt-badge--selected">Selected</span>
-                } @else if (prompt.is_active) {
-                  <span class="prompt-badge prompt-badge--default">Default</span>
-                }
-              </button>
+                (click)="selectedProvider = p; onProviderChange()">{{ p }}</button>
             }
           </div>
         </div>
-      }
 
-      <div class="provider-picker">
-        <span class="context-label">Provider</span>
-        <div class="mode-toggle">
-          @for (p of availableProviders; track p) {
-            <button type="button" class="mode-btn"
-              [class.active]="selectedProvider === p"
+        @if (selectedProvider === 'LOCAL') {
+          <div class="model-picker">
+            <label class="context-label" for="modelSelect">Model</label>
+            <select class="instance-select"
+              id="modelSelect"
+              [(ngModel)]="selectedModelId"
+              (ngModelChange)="onModelChange()"
+              name="modelSelect"
               [disabled]="isSwitching || isWaiting"
-              (click)="selectedProvider = p; onProviderChange()">{{ p }}</button>
+              title="Model">
+              @for (model of availableModels; track model) {
+                <option [value]="model">{{ model }}</option>
+              }
+            </select>
+          </div>
+        }
+
+        @if (systemPrompts.length > 0) {
+          <div class="prompt-picker" aria-label="System prompts">
+            <span class="context-label">System prompt</span>
+            <div class="prompt-list" role="listbox" aria-label="System prompts">
+              @for (prompt of systemPrompts; track prompt.id) {
+                <button
+                  type="button"
+                  class="prompt-item"
+                  role="option"
+                  [class.active]="selectedSystemPromptId === prompt.id"
+                  [attr.aria-selected]="selectedSystemPromptId === prompt.id"
+                  [disabled]="isSwitching || isWaiting"
+                  [title]="prompt.name"
+                  (click)="onSystemPromptSelect(prompt.id)">
+                  <span class="prompt-name">{{ prompt.name }}</span>
+                  @if (selectedSystemPromptId === prompt.id) {
+                    <span class="prompt-badge prompt-badge--selected">Selected</span>
+                  } @else if (prompt.is_active) {
+                    <span class="prompt-badge prompt-badge--default">Default</span>
+                  }
+                </button>
+              }
+            </div>
+          </div>
+        }
+
+        <div class="persona-picker">
+          <span class="context-label">Personas</span>
+          @if (personas.length > 0) {
+            <div class="persona-list" role="group" aria-label="Personas">
+              @for (persona of personas; track persona.id) {
+                <label class="persona-item" [class.active]="isPersonaSelected(persona.id)" [title]="persona.name">
+                  <input
+                    type="checkbox"
+                    [checked]="isPersonaSelected(persona.id)"
+                    [disabled]="isSwitching || isWaiting"
+                    (change)="togglePersonaSelection(persona.id, $any($event.target).checked)"
+                  />
+                  <span class="persona-name">{{ persona.name }}</span>
+                </label>
+              }
+            </div>
+            <span class="context-hint">{{ selectedPersonaSkillSummary() }}</span>
+          } @else {
+            <span class="persona-empty">No personas configured</span>
           }
-        </div>
+          </div>
+      </aside>
+    }
+
+    <div class="chat-main">
+      <div class="chat-messages" #messageList>
+        @if (messages.length === 0) {
+          <div class="chat-empty">
+            <p class="chat-empty-prompt">Try asking:</p>
+            <div class="chat-empty-chips">
+              @for (suggestion of emptyStateSuggestions; track $index) {
+                <span class="suggestion-chip">"{{ suggestion }}"</span>
+              }
+            </div>
+          </div>
+        }
+
+        @for (message of messages; track message.id) {
+          @if (message.reportUrl) {
+            <div class="msg-row msg-system">
+              <div class="report-card">
+                <div class="report-card-icon">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <polyline points="14 2 14 8 20 8"/>
+                    <line x1="16" y1="13" x2="8" y2="13"/>
+                    <line x1="16" y1="17" x2="8" y2="17"/>
+                    <polyline points="10 9 9 9 8 9"/>
+                  </svg>
+                </div>
+                <div class="report-card-body">
+                  <span class="report-card-label">Report ready</span>
+                  <span class="report-card-title">{{ message.reportTitle }}</span>
+                </div>
+                <a class="report-card-download" [href]="message.reportUrl" target="_blank" rel="noopener">
+                  Download
+                </a>
+              </div>
+              <div class="msg-time">{{ message.timestamp | date: 'HH:mm' }}</div>
+            </div>
+          } @else {
+            <div class="msg-row"
+              [class.msg-user]="message.role === 'user'"
+              [class.msg-assistant]="message.role === 'assistant'"
+              [class.msg-system]="message.role === 'system'">
+              <div class="msg-wrap">
+                @if (message.role === 'assistant') {
+                  <div class="msg-bubble msg-bubble--md">
+                    @for (block of formatMessageContent(message.content); track $index) {
+                      @switch (block.type) {
+                        @case ('heading') {
+                          <h3 class="msg-heading">{{ block.text }}</h3>
+                        }
+                        @case ('paragraph') {
+                          <p class="msg-paragraph">{{ block.text }}</p>
+                        }
+                        @case ('list') {
+                          <ul class="msg-list">
+                            @for (item of block.items; track $index) {
+                              <li>{{ item }}</li>
+                            }
+                          </ul>
+                        }
+                        @case ('table') {
+                          <div class="msg-table-wrap">
+                            <table class="msg-table">
+                              <thead>
+                                <tr>
+                                  @for (header of block.headers; track $index) {
+                                    <th>{{ header }}</th>
+                                  }
+                                </tr>
+                              </thead>
+                              <tbody>
+                                @for (row of block.rows; track $index) {
+                                  <tr>
+                                    @for (cell of row; track $index) {
+                                      <td>{{ cell }}</td>
+                                    }
+                                  </tr>
+                                }
+                              </tbody>
+                            </table>
+                          </div>
+                        }
+                        @case ('code') {
+                          <pre class="msg-code"><code>{{ block.text }}</code></pre>
+                        }
+                        @case ('rule') {
+                          <hr class="msg-rule" />
+                        }
+                      }
+                    }
+                  </div>
+                } @else {
+                  <div class="msg-bubble">{{ message.content }}</div>
+                }
+                <div class="msg-time">{{ message.timestamp | date: 'HH:mm' }}</div>
+              </div>
+            </div>
+          }
+        }
+
+        @for (tc of pendingToolCalls; track tc.tool_use_id) {
+          <app-tool-approval
+            [toolCall]="tc"
+            [disabled]="isWaiting"
+            (approved)="handleApproval(tc.tool_use_id, $event)"
+          />
+        }
+
+        @if (isWaiting && pendingToolCalls.length === 0) {
+          <div class="thinking-row">
+            <span class="thinking-dot"></span>
+            <span class="thinking-dot"></span>
+            <span class="thinking-dot"></span>
+          </div>
+        }
       </div>
 
-      @if (selectedProvider === 'LOCAL') {
-        <div class="model-picker">
-          <label class="context-label" for="modelSelect">Model</label>
-          <select class="instance-select"
-            id="modelSelect"
-            [(ngModel)]="selectedModelId"
-            (ngModelChange)="onModelChange()"
-            name="modelSelect"
-            [disabled]="isSwitching || isWaiting"
-            title="Model">
-            @for (model of availableModels; track model) {
-              <option [value]="model">{{ model }}</option>
-            }
-          </select>
-        </div>
-      }
-
-      @if (instances.length > 0) {
-        <div class="instance-picker">
-          <label class="context-label" for="instanceSelect">Agent instance</label>
-          <select class="instance-select"
-            id="instanceSelect"
-            [(ngModel)]="selectedInstanceId"
-            (ngModelChange)="onInstanceChange()"
-            name="instanceSelect"
-            title="Agent instance">
-            <option [ngValue]="null">— none —</option>
-            @for (inst of instances; track inst.id) {
-              <option [ngValue]="inst.id">{{ inst.agent_name }} / {{ inst.instance_name }}</option>
-            }
-          </select>
-        </div>
-      }
+      <form class="chat-input-bar" (ngSubmit)="sendMessage()">
+        <input
+          class="chat-input"
+          type="text"
+          [(ngModel)]="userInput"
+          name="userInput"
+          placeholder="Ask about your Kubernetes cluster..."
+          [disabled]="isWaiting || pendingToolCalls.length > 0"
+          autocomplete="off"
+        />
+        <button class="chat-send" type="submit"
+          [disabled]="isWaiting || pendingToolCalls.length > 0 || !userInput.trim()">Send</button>
+      </form>
     </div>
-  }
-
-  <div class="chat-messages" #messageList>
-    @if (messages.length === 0) {
-      <div class="chat-empty">
-        <p class="chat-empty-prompt">Try asking:</p>
-        <div class="chat-empty-chips">
-          @for (suggestion of emptyStateSuggestions; track $index) {
-            <span class="suggestion-chip">"{{ suggestion }}"</span>
-          }
-        </div>
-      </div>
-    }
-
-    @for (message of messages; track message.id) {
-      @if (message.reportUrl) {
-        <div class="msg-row msg-system">
-          <div class="report-card">
-            <div class="report-card-icon">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                <polyline points="14 2 14 8 20 8"/>
-                <line x1="16" y1="13" x2="8" y2="13"/>
-                <line x1="16" y1="17" x2="8" y2="17"/>
-                <polyline points="10 9 9 9 8 9"/>
-              </svg>
-            </div>
-            <div class="report-card-body">
-              <span class="report-card-label">Report ready</span>
-              <span class="report-card-title">{{ message.reportTitle }}</span>
-            </div>
-            <a class="report-card-download" [href]="message.reportUrl" target="_blank" rel="noopener">
-              Download
-            </a>
-          </div>
-          <div class="msg-time">{{ message.timestamp | date: 'HH:mm' }}</div>
-        </div>
-      } @else {
-        <div class="msg-row"
-          [class.msg-user]="message.role === 'user'"
-          [class.msg-assistant]="message.role === 'assistant'"
-          [class.msg-system]="message.role === 'system'">
-          <div class="msg-wrap">
-            @if (message.role === 'assistant') {
-              <div class="msg-bubble msg-bubble--md" [innerHTML]="renderMarkdown(message.content)"></div>
-            } @else {
-              <div class="msg-bubble">{{ message.content }}</div>
-            }
-            <div class="msg-time">{{ message.timestamp | date: 'HH:mm' }}</div>
-          </div>
-        </div>
-      }
-    }
-
-    @for (tc of pendingToolCalls; track tc.tool_use_id) {
-      <app-tool-approval
-        [toolCall]="tc"
-        [disabled]="isWaiting"
-        (approved)="handleApproval(tc.tool_use_id, $event)"
-      />
-    }
-
-    @if (isWaiting && pendingToolCalls.length === 0) {
-      <div class="thinking-row">
-        <span class="thinking-dot"></span>
-        <span class="thinking-dot"></span>
-        <span class="thinking-dot"></span>
-      </div>
-    }
   </div>
-
-  <form class="chat-input-bar" (ngSubmit)="sendMessage()">
-    <input
-      class="chat-input"
-      type="text"
-      [(ngModel)]="userInput"
-      name="userInput"
-      placeholder="Ask about your Kubernetes cluster..."
-      [disabled]="isWaiting || pendingToolCalls.length > 0"
-      autocomplete="off"
-    />
-    <button class="chat-send" type="submit"
-      [disabled]="isWaiting || pendingToolCalls.length > 0 || !userInput.trim()">Send</button>
-  </form>
 
 </div>

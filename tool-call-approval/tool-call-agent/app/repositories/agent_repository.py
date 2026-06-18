@@ -1,7 +1,11 @@
+from __future__ import annotations
+
 import logging
 import json
 import socket
 from abc import ABC, abstractmethod
+from datetime import datetime, timezone
+from typing import Any
 from urllib.parse import urlparse
 
 import psycopg2
@@ -39,6 +43,7 @@ class IAgentStorage(ABC):
         system_prompt_id: str | None = None,
         system_prompt_name: str | None = None,
         system_prompt_instructions_snapshot: str | None = None,
+        message: dict[str, Any] | None = None,
     ) -> None: ...
 
     @abstractmethod
@@ -170,11 +175,13 @@ class PostgresRepository(IAgentStorage):
         system_prompt_id: str | None = None,
         system_prompt_name: str | None = None,
         system_prompt_instructions_snapshot: str | None = None,
+        message: dict[str, Any] | None = None,
     ) -> None:
         if not self._is_reachable():
             return
         url = self._url.replace("postgresql+psycopg2://", "postgresql://")
-        message = [{"role": role, "content": content}]
+        message_record = self._normalize_message(role, content, message)
+        messages = [message_record]
         try:
             conn = psycopg2.connect(url)
             try:
@@ -206,7 +213,7 @@ class PostgresRepository(IAgentStorage):
                         system_prompt_id,
                         system_prompt_name,
                         system_prompt_instructions_snapshot,
-                        json.dumps(message),
+                        json.dumps(messages),
                     ))
                 conn.commit()
             except Exception:
@@ -233,14 +240,20 @@ class PostgresRepository(IAgentStorage):
                     row = cur.fetchone()
                     if not row:
                         return []
-                    return [
-                        {
-                            "role": message.get("role"),
-                            "content": message.get("content") or "",
-                        }
-                        for message in row[0]
-                        if message.get("role") in {"user", "assistant"}
-                    ]
+                    history = []
+                    for message in row[0]:
+                        if not isinstance(message, dict):
+                            continue
+                        if message.get("role") not in {"user", "assistant"}:
+                            continue
+                        history.append(
+                            self._normalize_message(
+                                message.get("role", "user"),
+                                message.get("content") or "",
+                                message,
+                            )
+                        )
+                    return history
             finally:
                 conn.close()
         except Exception as e:
@@ -295,6 +308,79 @@ class PostgresRepository(IAgentStorage):
                     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
                 )
             """)
+
+    def _normalize_message(
+        self,
+        role: str,
+        content: str,
+        message: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        source = message if isinstance(message, dict) else {}
+        normalized_role = source.get("role") if source.get("role") in {"user", "assistant"} else role
+        normalized = {
+            "role": normalized_role,
+            "content": source.get("content") if source.get("content") is not None else content,
+            "data": self._normalize_data(source.get("data")),
+            "timestamp": source.get("timestamp") or datetime.now(timezone.utc).isoformat(),
+            "user": source.get("user") if "user" in source else None,
+            "agent": self._normalize_agent(source.get("agent")) if "agent" in source else None,
+        }
+        if normalized_role == "user":
+            normalized["platform_context"] = self._normalize_platform_context(
+                source.get("platform_context")
+            )
+            normalized["ambient_context"] = self._normalize_ambient_context(
+                source.get("ambient_context")
+            )
+        return normalized
+
+    def _normalize_data(self, data: Any) -> dict[str, list]:
+        source = data if isinstance(data, dict) else {}
+        return {
+            "cmds": self._clone_list(source.get("cmds")),
+            "executed_cmds": self._clone_list(source.get("executed_cmds")),
+            "url_configs": self._clone_list(source.get("url_configs")),
+            "user_file_uploads": self._clone_list(source.get("user_file_uploads")),
+        }
+
+    def _normalize_platform_context(self, context: Any) -> dict[str, Any]:
+        source = context if isinstance(context, dict) else {}
+        return {
+            "k8s_namespace": source.get("k8s_namespace"),
+            "duplo_base_url": source.get("duplo_base_url"),
+            "duplo_token": source.get("duplo_token"),
+            "tenant_name": source.get("tenant_name"),
+            "aws_credentials": source.get("aws_credentials"),
+            "kubeconfig": source.get("kubeconfig"),
+        }
+
+    def _normalize_ambient_context(self, context: Any) -> dict[str, list]:
+        source = context if isinstance(context, dict) else {}
+        return {
+            "user_terminal_cmds": self._clone_list(source.get("user_terminal_cmds")),
+        }
+
+    def _normalize_agent(self, agent: Any) -> str | dict[str, Any] | None:
+        if not isinstance(agent, dict):
+            return agent
+        return {
+            "session_id": agent.get("session_id"),
+            "instance_id": agent.get("instance_id"),
+            "persona_id": agent.get("persona_id"),
+            "persona_ids": agent.get("persona_ids") if isinstance(agent.get("persona_ids"), list) else [],
+            "persona_name": agent.get("persona_name"),
+            "persona_names": agent.get("persona_names") if isinstance(agent.get("persona_names"), list) else [],
+            "skill_ids": agent.get("skill_ids") if isinstance(agent.get("skill_ids"), list) else [],
+            "system_prompt_id": agent.get("system_prompt_id"),
+            "system_prompt_name": agent.get("system_prompt_name"),
+            "model_id": agent.get("model_id"),
+            "provider": agent.get("provider"),
+        }
+
+    def _clone_list(self, value: Any) -> list:
+        if not isinstance(value, list):
+            return []
+        return [dict(item) if isinstance(item, dict) else item for item in value]
 
     def _is_reachable(self) -> bool:
         parsed = urlparse(self._url)

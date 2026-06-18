@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 import json
 import logging
 import psycopg2
 import psycopg2.extensions
 import psycopg2.extras
 
-from system_prompt_defaults import DEFAULT_INSTRUCTIONS, DEFAULT_SYSTEM_PROMPT_NAME, SEEDED_SYSTEM_PROMPTS
+from app.core.system_prompts import DEFAULT_INSTRUCTIONS, DEFAULT_SYSTEM_PROMPT_NAME, SEEDED_SYSTEM_PROMPTS
 
 logger = logging.getLogger(__name__)
 

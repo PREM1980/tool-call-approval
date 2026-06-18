@@ -1,6 +1,10 @@
+from __future__ import annotations
+
+from typing import Optional
+
 from fastapi import APIRouter, HTTPException, UploadFile, File
 
-from admin_models import (
+from app.schemas.admin import (
     AgentInstanceRequest,
     AgentInstanceResponse,
     AgentInstanceUpdateRequest,
@@ -15,7 +19,7 @@ from admin_models import (
     SystemPromptUpdateRequest,
     SystemPromptResponse,
 )
-from admin_repository import AdminRepository
+from app.repositories.admin_repository import AdminRepository
 
 router = APIRouter()
 _repo: AdminRepository | None = None
@@ -34,7 +38,7 @@ def _get_repo() -> AdminRepository:
 
 # ── Credentials ────────────────────────────────────────────────────────────
 
-@router.get("/credentials", response_model=CredentialsResponse | None)
+@router.get("/credentials", response_model=Optional[CredentialsResponse])
 async def get_credentials():
     creds = _get_repo().get_credentials()
     if not creds:

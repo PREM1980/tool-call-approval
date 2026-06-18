@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -7,8 +9,76 @@ from httpx import ASGITransport, AsyncClient
 from main import app
 
 
+EMPTY_DATA = {
+    "cmds": [],
+    "executed_cmds": [],
+    "url_configs": [],
+    "user_file_uploads": [],
+}
+EMPTY_PLATFORM_CONTEXT = {
+    "k8s_namespace": None,
+    "duplo_base_url": None,
+    "duplo_token": None,
+    "tenant_name": None,
+    "aws_credentials": None,
+    "kubeconfig": None,
+}
+EMPTY_AMBIENT_CONTEXT = {"user_terminal_cmds": []}
+EMPTY_SESSION = {
+    "session_id": None,
+    "instance_id": None,
+    "persona_id": None,
+    "persona_ids": [],
+    "system_prompt_id": None,
+    "model_id": None,
+    "provider": None,
+}
+
+
 def _resp(status: int, body: dict | list) -> httpx.Response:
     return httpx.Response(status, json=body, request=httpx.Request("GET", "http://backend"))
+
+
+def _session_envelope(**session_overrides: str | None) -> dict:
+    session = {
+        **EMPTY_SESSION,
+        "instance_id": "inst-1",
+        "system_prompt_id": "prompt-1",
+        "model_id": "nemotron-3-super",
+        "provider": "LOCAL",
+    }
+    session.update(session_overrides)
+    return {"session": session, "messages": [], "approval": None}
+
+
+def _chat_envelope(message: str = "hello", session_id: str = "abc-123") -> dict:
+    return {
+        "session": {**EMPTY_SESSION, "session_id": session_id},
+        "messages": [
+            {
+                "role": "user",
+                "content": message,
+                "data": EMPTY_DATA,
+                "timestamp": "2026-06-17T10:00:00Z",
+                "user": None,
+                "agent": None,
+                "platform_context": {
+                    **EMPTY_PLATFORM_CONTEXT,
+                    "kubeconfig": "apiVersion: v1",
+                },
+                "ambient_context": EMPTY_AMBIENT_CONTEXT,
+            }
+        ],
+        "approval": None,
+    }
+
+
+def _approval_envelope(session_id: str = "abc-123") -> dict:
+    return {
+        "session": {**EMPTY_SESSION, "session_id": session_id},
+        "messages": [],
+        "approval": {"tool_use_id": "tool-1", "approved": True},
+    }
 
 
 @pytest.fixture
@@ -22,11 +92,15 @@ async def test_create_session(ac):
     mock_client.post.return_value = _resp(200, {"session_id": "abc-123"})
 
     with patch("main._client", mock_client):
-        resp = await ac.post("/api/sessions")
+        resp = await ac.post("/api/sessions", json=_session_envelope())
 
     assert resp.status_code == 200
     assert resp.json() == {"session_id": "abc-123"}
-    mock_client.post.assert_called_once_with("http://localhost:8000/sessions", timeout=30.0)
+    mock_client.post.assert_called_once_with(
+        "http://localhost:8000/sessions",
+        json=_session_envelope(),
+        timeout=30.0,
+    )
 
 
 async def test_create_session_forwards_selected_prompt(ac):
@@ -36,15 +110,67 @@ async def test_create_session_forwards_selected_prompt(ac):
     with patch("main._client", mock_client):
         resp = await ac.post(
             "/api/sessions",
-            json={"instance_id": "inst-1", "system_prompt_id": "prompt-1"},
+            json=_session_envelope(instance_id="inst-1", system_prompt_id="prompt-1"),
         )
 
     assert resp.status_code == 200
     call_args = mock_client.post.call_args
     assert call_args.args[0] == "http://localhost:8000/sessions"
-    assert b'"instance_id":"inst-1"' in call_args.kwargs["content"]
-    assert b'"system_prompt_id":"prompt-1"' in call_args.kwargs["content"]
-    assert call_args.kwargs["headers"] == {"Content-Type": "application/json"}
+    assert call_args.kwargs["json"]["session"]["instance_id"] == "inst-1"
+    assert call_args.kwargs["json"]["session"]["system_prompt_id"] == "prompt-1"
+
+
+async def test_create_session_forwards_selected_persona(ac):
+    mock_client = AsyncMock()
+    mock_client.post.return_value = _resp(200, {"session_id": "abc-123"})
+
+    with patch("main._client", mock_client):
+        resp = await ac.post(
+            "/api/sessions",
+            json=_session_envelope(instance_id=None, persona_id="persona-1"),
+        )
+
+    assert resp.status_code == 200
+    payload = mock_client.post.call_args.kwargs["json"]
+    assert payload["session"]["instance_id"] is None
+    assert payload["session"]["persona_id"] == "persona-1"
+
+
+async def test_create_session_forwards_selected_personas(ac):
+    mock_client = AsyncMock()
+    mock_client.post.return_value = _resp(200, {"session_id": "abc-123"})
+
+    with patch("main._client", mock_client):
+        resp = await ac.post(
+            "/api/sessions",
+            json=_session_envelope(
+                instance_id=None,
+                persona_id="persona-1",
+                persona_ids=["persona-1", "persona-2"],
+            ),
+        )
+
+    assert resp.status_code == 200
+    payload = mock_client.post.call_args.kwargs["json"]
+    assert payload["session"]["persona_id"] == "persona-1"
+    assert payload["session"]["persona_ids"] == ["persona-1", "persona-2"]
+
+
+async def test_serves_ui_index(ac):
+    resp = await ac.get("/")
+
+    assert resp.status_code == 200
+    assert resp.headers["content-type"].startswith("text/html")
+
+
+async def test_create_session_rejects_old_body_shape(ac):
+    mock_client = AsyncMock()
+
+    with patch("main._client", mock_client):
+        resp = await ac.post("/api/sessions", json={"instance_id": "inst-1"})
+
+    assert resp.status_code == 422
+    mock_client.post.assert_not_called()
 
 
 async def test_chat(ac):
@@ -54,14 +180,39 @@ async def test_chat(ac):
     with patch("main._client", mock_client):
         resp = await ac.post(
             "/api/sessions/abc-123/chat",
-            json={"message": "hello"},
+            json=_chat_envelope("hello"),
         )
 
     assert resp.status_code == 200
     assert resp.json() == {"status": "processing"}
     call_args = mock_client.post.call_args
     assert "/sessions/abc-123/chat" in call_args.args[0]
-    assert b'"message":"hello"' in call_args.kwargs["content"]
+    payload = call_args.kwargs["json"]
+    assert payload["approval"] is None
+    assert payload["session"] == {**EMPTY_SESSION, "session_id": "abc-123"}
+    assert payload["messages"][0] == {
+        "role": "user",
+        "content": "hello",
+        "data": EMPTY_DATA,
+        "timestamp": "2026-06-17T10:00:00Z",
+        "user": None,
+        "agent": None,
+        "platform_context": {
+            **EMPTY_PLATFORM_CONTEXT,
+            "kubeconfig": "apiVersion: v1",
+        },
+        "ambient_context": EMPTY_AMBIENT_CONTEXT,
+    }
+
+
+async def test_chat_rejects_old_body_shape(ac):
+    mock_client = AsyncMock()
+
+    with patch("main._client", mock_client):
+        resp = await ac.post("/api/sessions/abc-123/chat", json={"message": "hello"})
+
+    assert resp.status_code == 422
+    mock_client.post.assert_not_called()
 
 
 async def test_history(ac):
@@ -85,13 +236,27 @@ async def test_approve(ac):
     with patch("main._client", mock_client):
         resp = await ac.post(
             "/api/sessions/abc-123/approve",
-            json={"approved": True},
+            json=_approval_envelope(),
         )
 
     assert resp.status_code == 200
     assert resp.json() == {"status": "ok"}
     call_args = mock_client.post.call_args
     assert "/sessions/abc-123/approve" in call_args.args[0]
+    assert call_args.kwargs["json"]["approval"] == {
+        "tool_use_id": "tool-1",
+        "approved": True,
+    }
+
+
+async def test_approve_rejects_old_body_shape(ac):
+    mock_client = AsyncMock()
+
+    with patch("main._client", mock_client):
+        resp = await ac.post("/api/sessions/abc-123/approve", json={"approved": True})
+
+    assert resp.status_code == 422
+    mock_client.post.assert_not_called()
 
 
 async def test_stream(ac):
@@ -135,7 +300,7 @@ async def test_backend_unreachable(ac):
     mock_client.post.side_effect = httpx.ConnectError("connection refused")
 
     with patch("main._client", mock_client):
-        resp = await ac.post("/api/sessions")
+        resp = await ac.post("/api/sessions", json=_session_envelope())
 
     assert resp.status_code == 502
     assert resp.json()["detail"] == "Backend unreachable"
@@ -146,7 +311,7 @@ async def test_backend_timeout(ac):
     mock_client.post.side_effect = httpx.TimeoutException("timed out")
 
     with patch("main._client", mock_client):
-        resp = await ac.post("/api/sessions")
+        resp = await ac.post("/api/sessions", json=_session_envelope())
 
     assert resp.status_code == 504
     assert resp.json()["detail"] == "Backend timeout"

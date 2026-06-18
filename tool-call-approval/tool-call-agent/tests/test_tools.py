@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import patch, MagicMock
-from tools import execute_tool, TOOL_DEFINITIONS, _is_allowed
+from app.tools.registry import execute_tool, TOOL_DEFINITIONS, _is_allowed
 
 
 def test_calculate_addition():
@@ -54,13 +54,13 @@ def _mock_kubectl(returncode: int, stdout: str, stderr: str = "") -> MagicMock:
 
 
 def test_kubectl_success():
-    with patch("tools.subprocess.run", return_value=_mock_kubectl(0, "pod/nginx Running")):
+    with patch("app.tools.registry.subprocess.run", return_value=_mock_kubectl(0, "pod/nginx Running")):
         result = execute_tool("kubectl", {"args": "get pods"})
     assert result == "pod/nginx Running"
 
 
 def test_kubectl_strips_kubectl_prefix():
-    with patch("tools.subprocess.run") as mock_run:
+    with patch("app.tools.registry.subprocess.run") as mock_run:
         mock_run.return_value = _mock_kubectl(0, "ok")
         execute_tool("kubectl", {"args": "kubectl get pods"})
         cmd = mock_run.call_args[0][0]
@@ -69,14 +69,14 @@ def test_kubectl_strips_kubectl_prefix():
 
 
 def test_kubectl_nonzero_exit_returns_stderr():
-    with patch("tools.subprocess.run", return_value=_mock_kubectl(1, "", "Error from server: not found")):
+    with patch("app.tools.registry.subprocess.run", return_value=_mock_kubectl(1, "", "Error from server: not found")):
         result = execute_tool("kubectl", {"args": "get pod missing"})
     assert "Error" in result
     assert "not found" in result
 
 
 def test_kubectl_empty_output():
-    with patch("tools.subprocess.run", return_value=_mock_kubectl(0, "")):
+    with patch("app.tools.registry.subprocess.run", return_value=_mock_kubectl(0, "")):
         result = execute_tool("kubectl", {"args": "get pods"})
     assert result == "(no output)"
 
@@ -160,7 +160,7 @@ def test_kubectl_denied_command_blocked():
 
 
 def test_kubectl_denied_does_not_call_subprocess():
-    with patch("tools.subprocess.run") as mock_run:
+    with patch("app.tools.registry.subprocess.run") as mock_run:
         execute_tool("kubectl", {"args": "cordon node-1"})
         mock_run.assert_not_called()
 

@@ -10,13 +10,19 @@ DEFAULT_MESSAGE = "command to list all my pods?"
 def run(message: str = DEFAULT_MESSAGE) -> None:
     with httpx.Client(timeout=60) as client:
         # 1. Create session
-        session_id = client.post(f"{BASE_URL}/sessions").json()["session_id"]
+        session_id = client.post(
+            f"{BASE_URL}/sessions",
+            json={"session": {}, "messages": []},
+        ).json()["session_id"]
         print(f"Session: {session_id}\n")
 
         # 2. Send message (non-blocking — agent runs in background)
         client.post(
             f"{BASE_URL}/sessions/{session_id}/chat",
-            json={"message": message},
+            json={
+                "session": {"session_id": session_id},
+                "messages": [{"role": "user", "content": message}],
+            },
         )
         print(f"You: {message}\n")
         print("Agent: ", end="", flush=True)
@@ -41,7 +47,14 @@ def run(message: str = DEFAULT_MESSAGE) -> None:
                         approved = answer == "y"
                         httpx.post(
                             f"{BASE_URL}/sessions/{session_id}/approve",
-                            json={"approved": approved},
+                            json={
+                                "session": {"session_id": session_id},
+                                "messages": [],
+                                "approval": {
+                                    "tool_use_id": event.get("tool_use_id"),
+                                    "approved": approved,
+                                },
+                            },
                         )
                     case "tool_result":
                         print(f"\n[tool: {event['tool_name']} → {event['result']}]", end="\n", flush=True)

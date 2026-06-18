@@ -2,7 +2,7 @@ import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from agent_service import _build_pdf, AgentService
+from app.services.agent_service import _build_pdf, AgentService
 
 
 # ── PDF generation ────────────────────────────────────────────────────────────
@@ -79,7 +79,7 @@ def test_save_report_local_multiple_files_in_tmpdir():
 # ── Repository.save_report ────────────────────────────────────────────────────
 
 def test_repository_save_report_inserts_row():
-    from repository import PostgresRepository
+    from app.repositories.agent_repository import PostgresRepository
 
     repo = PostgresRepository(url="postgresql+psycopg2://localhost:5432/postgres")
     mock_conn = MagicMock()
@@ -87,7 +87,7 @@ def test_repository_save_report_inserts_row():
     mock_conn.cursor.return_value.__enter__ = MagicMock(return_value=mock_cursor)
     mock_conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
 
-    with patch("repository.psycopg2.connect", return_value=mock_conn):
+    with patch("app.repositories.agent_repository.psycopg2.connect", return_value=mock_conn):
         repo.save_report("r-id", "s-id", "bucket", "reports/s-id/r-id.pdf", "Title")
 
     mock_cursor.execute.assert_called()

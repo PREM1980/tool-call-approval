@@ -3,7 +3,7 @@ import logging
 
 import pytest
 
-from logging_config import reconfigure_uvicorn_loggers, setup_logging
+from app.core.logging_config import reconfigure_uvicorn_loggers, setup_logging
 
 
 @pytest.fixture(autouse=True)

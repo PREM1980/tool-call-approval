@@ -2,7 +2,45 @@ import asyncio
 import pytest
 from unittest.mock import MagicMock, patch
 
-from repository import IAgentStorage, PostgresRepository
+from app.core.system_prompts import DEFAULT_INSTRUCTIONS
+from app.repositories.agent_repository import IAgentStorage, PostgresRepository
+
+EMPTY_DATA = {
+    "cmds": [],
+    "executed_cmds": [],
+    "url_configs": [],
+    "user_file_uploads": [],
+}
+EMPTY_PLATFORM_CONTEXT = {
+    "k8s_namespace": None,
+    "duplo_base_url": None,
+    "duplo_token": None,
+    "tenant_name": None,
+    "aws_credentials": None,
+    "kubeconfig": None,
+}
+EMPTY_AMBIENT_CONTEXT = {"user_terminal_cmds": []}
+EMPTY_AGENT_METADATA = {
+    "session_id": None,
+    "instance_id": None,
+    "persona_id": None,
+    "persona_ids": [],
+    "persona_name": None,
+    "persona_names": [],
+    "skill_ids": [],
+    "system_prompt_id": None,
+    "system_prompt_name": None,
+    "model_id": None,
+    "provider": None,
+}
+
+
+def test_kubernetes_prompt_maps_cluster_health_to_cluster_status_commands():
+    instructions = " ".join(DEFAULT_INSTRUCTIONS.lower().split())
+    assert "cluster health" in instructions
+    assert "same intent" in instructions
+    assert "same command set" in instructions
+    assert "cluster-info, get nodes -o wide, get namespaces" in DEFAULT_INSTRUCTIONS
 
 
 def test_postgres_repository_is_lazy():
@@ -10,16 +48,15 @@ def test_postgres_repository_is_lazy():
     assert repo._db is None
 
 
-def test_postgres_repository_raises_when_unreachable():
+def test_postgres_repository_returns_none_when_unreachable():
     repo = PostgresRepository(url="postgresql+psycopg2://localhost:9999/postgres")
-    with pytest.raises(RuntimeError, match="not reachable"):
-        repo.get_db()
+    assert repo.get_db() is None
 
 
 def test_postgres_repository_singleton():
     repo = PostgresRepository(url="postgresql+psycopg2://localhost:5432/postgres")
-    with patch("repository.socket.create_connection"), \
-         patch("repository.PostgresDb") as MockDb:
+    with patch("app.repositories.agent_repository.socket.create_connection"), \
+         patch("app.repositories.agent_repository.PostgresDb") as MockDb:
         MockDb.return_value = MagicMock()
         db1 = repo.get_db()
         db2 = repo.get_db()
@@ -27,15 +64,61 @@ def test_postgres_repository_singleton():
         assert MockDb.call_count == 1
 
 
-from session import Session
+def test_get_session_history_preserves_agent_message_metadata():
+    repo = PostgresRepository(url="postgresql+psycopg2://localhost:5432/postgres")
+    mock_conn = MagicMock()
+    mock_cursor = MagicMock()
+    mock_conn.cursor.return_value.__enter__ = MagicMock(return_value=mock_cursor)
+    mock_conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
+    mock_cursor.fetchone.return_value = ([
+        {
+            "role": "user",
+            "content": "hello",
+            "timestamp": "2026-06-17T09:59:00+00:00",
+        },
+        {
+            "role": "assistant",
+            "content": "hi",
+            "timestamp": "2026-06-17T10:00:00+00:00",
+            "agent": {"session_id": "session-1"},
+        },
+    ],)
+
+    with patch.object(repo, "_is_reachable", return_value=True), \
+         patch("app.repositories.agent_repository.psycopg2.connect", return_value=mock_conn):
+        history = repo.get_session_history("session-1")
+
+    assert history == [
+        {
+            "role": "user",
+            "content": "hello",
+            "data": EMPTY_DATA,
+            "timestamp": "2026-06-17T09:59:00+00:00",
+            "user": None,
+            "agent": None,
+            "platform_context": EMPTY_PLATFORM_CONTEXT,
+            "ambient_context": EMPTY_AMBIENT_CONTEXT,
+        },
+        {
+            "role": "assistant",
+            "content": "hi",
+            "data": EMPTY_DATA,
+            "timestamp": "2026-06-17T10:00:00+00:00",
+            "user": None,
+            "agent": {**EMPTY_AGENT_METADATA, "session_id": "session-1"},
+        },
+    ]
+
+
+from app.domain.session import Session
 
 
 def test_session_defaults():
     session = Session(id="abc-123")
     assert session.id == "abc-123"
     assert session.queue.empty()
-    assert not session.approval_event.is_set()
-    assert session.approval_result is False
+    assert session.pending_approvals == {}
+    assert session.approval_results == {}
     assert session.tmpdir is None
 
 
@@ -43,7 +126,7 @@ from agno.models.response import ToolExecution
 from agno.run.agent import RunCompletedEvent, RunContentEvent, RunErrorEvent, RunPausedEvent, ToolCallCompletedEvent
 from agno.run.requirement import RunRequirement
 
-from agent_service import AgentService, _build_model
+from app.services.agent_service import AgentService, _build_model
 
 
 def test_build_model_uses_local_openai_like_provider(monkeypatch):
@@ -51,6 +134,8 @@ def test_build_model_uses_local_openai_like_provider(monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "sk-local-test")
     monkeypatch.setenv("LOCAL_MODEL_ID", "nemotron-3-super")
     monkeypatch.setenv("LOCAL_BASE_URL", "https://models.k8s.aip.mitre.org/v1")
+    monkeypatch.delenv("LOCAL_VERIFY_SSL", raising=False)
+    monkeypatch.delenv("LOCAL_CA_BUNDLE", raising=False)
 
     with patch("agno.models.openai.OpenAILike") as MockOpenAILike:
         model = _build_model()
@@ -70,6 +155,8 @@ def test_build_model_uses_local_model_id_and_base_url_env(monkeypatch):
     monkeypatch.setenv("BASE_URL", "https://local-models.example/v1")
     monkeypatch.delenv("LOCAL_MODEL_ID", raising=False)
     monkeypatch.delenv("LOCAL_BASE_URL", raising=False)
+    monkeypatch.delenv("LOCAL_VERIFY_SSL", raising=False)
+    monkeypatch.delenv("LOCAL_CA_BUNDLE", raising=False)
 
     with patch("agno.models.openai.OpenAILike") as MockOpenAILike:
         model = _build_model()
@@ -88,7 +175,7 @@ def test_build_model_can_disable_local_tls_verification(monkeypatch):
     monkeypatch.setenv("LOCAL_VERIFY_SSL", "false")
 
     with patch("agno.models.openai.OpenAILike") as MockOpenAILike, \
-         patch("agent_service.httpx.AsyncClient") as MockAsyncClient:
+         patch("app.services.agent_service.httpx.AsyncClient") as MockAsyncClient:
         model = _build_model()
 
     MockAsyncClient.assert_called_once_with(verify=False)
@@ -145,6 +232,7 @@ class MockStorage(IAgentStorage):
         system_prompt_id=None,
         system_prompt_name=None,
         system_prompt_instructions_snapshot=None,
+        message=None,
     ):
         self.messages.append({
             "session_id": session_id,
@@ -154,6 +242,7 @@ class MockStorage(IAgentStorage):
             "system_prompt_id": system_prompt_id,
             "system_prompt_name": system_prompt_name,
             "system_prompt_instructions_snapshot": system_prompt_instructions_snapshot,
+            "message": message,
         })
 
     def get_session_history(self, session_id):
@@ -168,9 +257,23 @@ class MockAdminRepo:
         return None
 
     def get_persona(self, persona_id):
+        if persona_id == "persona-1":
+            return {"id": "persona-1", "name": "ops_persona", "skill_ids": ["skill-1"]}
+        if persona_id == "persona-2":
+            return {"id": "persona-2", "name": "security_persona", "skill_ids": ["skill-2", "skill-1"]}
         return None
 
     def get_skill_content(self, skill_id):
+        if skill_id == "skill-1":
+            return (
+                "ops.md",
+                "---\nname: ops\ndescription: Ops skill\n---\n# Ops\nUse safe commands.",
+            )
+        if skill_id == "skill-2":
+            return (
+                "security.md",
+                "---\nname: security\ndescription: Security skill\n---\n# Security\nCheck policy.",
+            )
         return None
 
     def get_all_agent_instances(self):
@@ -179,13 +282,13 @@ class MockAdminRepo:
 
 @pytest.fixture
 def service():
-    with patch("agent_service.Agent"), patch("agent_service.AwsBedrock"):
+    with patch("app.services.agent_service.Agent"), patch("app.services.agent_service.AwsBedrock"):
         svc = AgentService(repository=MockStorage(), admin_repository=MockAdminRepo())
     return svc
 
 
 def test_create_session_returns_session_with_id(service):
-    with patch("agent_service.Agent"), patch("agent_service.AwsBedrock"):
+    with patch("app.services.agent_service.Agent"), patch("app.services.agent_service.AwsBedrock"):
         session = service.create_session()
     assert session.id is not None
     assert len(session.id) == 36  # UUID
@@ -201,7 +304,7 @@ def test_create_session_uses_selected_system_prompt(service):
         return_value="active instructions"
     )
 
-    with patch("agent_service.Agent") as MockAgent, patch("agent_service.AwsBedrock"):
+    with patch("app.services.agent_service.Agent") as MockAgent, patch("app.services.agent_service.AwsBedrock"):
         service.create_session(system_prompt_id="prompt-1")
 
     assert MockAgent.call_args.kwargs["instructions"] == "selected instructions"
@@ -215,11 +318,98 @@ def test_create_session_defers_prompt_metadata_until_first_message(service):
         "instructions": "selected instructions",
     })
 
-    with patch("agent_service.Agent"), patch("agent_service.AwsBedrock"):
+    with patch("app.services.agent_service.Agent"), patch("app.services.agent_service.AwsBedrock"):
         service.create_session(instance_id="inst-1", system_prompt_id="prompt-1")
 
     assert service._repository.session_records == []
     assert service._repository.messages == []
+
+
+def test_create_session_loads_direct_persona_skills(service):
+    with patch("app.services.agent_service.Agent") as MockAgent, \
+         patch("app.services.agent_service.AwsBedrock"), \
+         patch("app.services.agent_service.Skills") as MockSkills, \
+         patch("app.services.agent_service.LocalSkills") as MockLocalSkills:
+        session = service.create_session(persona_id="persona-1")
+
+    assert session.persona_id == "persona-1"
+    assert session.persona_name == "ops_persona"
+    assert session.skill_ids == ["skill-1"]
+    assert MockAgent.call_args.kwargs["skills"] is MockSkills.return_value
+    MockLocalSkills.assert_called_once()
+
+
+def test_create_session_loads_multiple_persona_skills(service):
+    with patch("app.services.agent_service.Agent") as MockAgent, \
+         patch("app.services.agent_service.AwsBedrock"), \
+         patch("app.services.agent_service.Skills") as MockSkills, \
+         patch("app.services.agent_service.LocalSkills") as MockLocalSkills:
+        session = service.create_session(
+            persona_id="persona-1",
+            persona_ids=["persona-1", "persona-2"],
+        )
+
+    assert session.persona_id == "persona-1"
+    assert session.persona_ids == ["persona-1", "persona-2"]
+    assert session.persona_name == "ops_persona"
+    assert session.persona_names == ["ops_persona", "security_persona"]
+    assert session.skill_ids == ["skill-1", "skill-2"]
+    assert MockAgent.call_args.kwargs["skills"] is MockSkills.return_value
+    MockLocalSkills.assert_called_once()
+
+
+def test_load_persona_skill_uses_frontmatter_name_for_directory(service, tmp_path):
+    service._admin_repository.get_persona = MagicMock(return_value={
+        "id": "persona-3",
+        "name": "report_persona",
+        "skill_ids": ["skill-3"],
+    })
+    service._admin_repository.get_skill_content = MagicMock(return_value=(
+        "SKILL.md",
+        "---\nname: kubernetes-report-formatter\ndescription: Format reports\n---\n# Reports\nFormat reports.",
+    ))
+
+    with patch("app.services.agent_service.Skills"), \
+         patch("app.services.agent_service.LocalSkills"), \
+         patch("app.services.agent_service.tempfile.mkdtemp", return_value=str(tmp_path)):
+        service._load_personas_skills(["persona-3"])
+
+    skill_file = tmp_path / "kubernetes-report-formatter" / "SKILL.md"
+    assert skill_file.exists()
+    assert skill_file.read_text() == (
+        "---\nname: kubernetes-report-formatter\ndescription: Format reports\n---\n# Reports\nFormat reports."
+    )
+
+
+def test_agent_message_metadata_includes_persona_snapshot(service):
+    with patch("app.services.agent_service.Agent"), patch("app.services.agent_service.AwsBedrock"):
+        session = service.create_session(persona_id="persona-1")
+
+    service.record_agent_message(session, "hello")
+
+    agent = service._repository.messages[-1]["message"]["agent"]
+    assert agent["persona_id"] == "persona-1"
+    assert agent["persona_ids"] == ["persona-1"]
+    assert agent["persona_name"] == "ops_persona"
+    assert agent["persona_names"] == ["ops_persona"]
+    assert agent["skill_ids"] == ["skill-1"]
+
+
+def test_agent_message_metadata_includes_multiple_persona_snapshot(service):
+    with patch("app.services.agent_service.Agent"), patch("app.services.agent_service.AwsBedrock"):
+        session = service.create_session(
+            persona_id="persona-1",
+            persona_ids=["persona-1", "persona-2"],
+        )
+
+    service.record_agent_message(session, "hello")
+
+    agent = service._repository.messages[-1]["message"]["agent"]
+    assert agent["persona_id"] == "persona-1"
+    assert agent["persona_ids"] == ["persona-1", "persona-2"]
+    assert agent["persona_name"] == "ops_persona"
+    assert agent["persona_names"] == ["ops_persona", "security_persona"]
+    assert agent["skill_ids"] == ["skill-1", "skill-2"]
 
 
 def test_record_user_message_persists_prompt_metadata_with_first_message(service):
@@ -229,7 +419,7 @@ def test_record_user_message_persists_prompt_metadata_with_first_message(service
         "instructions": "selected instructions",
     })
 
-    with patch("agent_service.Agent"), patch("agent_service.AwsBedrock"):
+    with patch("app.services.agent_service.Agent"), patch("app.services.agent_service.AwsBedrock"):
         session = service.create_session(instance_id="inst-1", system_prompt_id="prompt-1")
 
     service.record_user_message(session, "hello")
@@ -242,6 +432,7 @@ def test_record_user_message_persists_prompt_metadata_with_first_message(service
         "system_prompt_id": "prompt-1",
         "system_prompt_name": "default_agent",
         "system_prompt_instructions_snapshot": "selected instructions",
+        "message": None,
     }]
 
 
@@ -250,21 +441,22 @@ def test_get_session_returns_none_for_unknown(service):
 
 
 def test_get_session_returns_session(service):
-    with patch("agent_service.Agent"), patch("agent_service.AwsBedrock"):
+    with patch("app.services.agent_service.Agent"), patch("app.services.agent_service.AwsBedrock"):
         session = service.create_session()
     assert service.get_session(session.id) is session
 
 
 def test_approve_sets_result_and_fires_event(service):
-    with patch("agent_service.Agent"), patch("agent_service.AwsBedrock"):
+    with patch("app.services.agent_service.Agent"), patch("app.services.agent_service.AwsBedrock"):
         session = service.create_session()
-    service.approve(session, approved=True)
-    assert session.approval_result is True
-    assert session.approval_event.is_set()
+    session.pending_approvals["tool-1"] = asyncio.Event()
+    service.approve(session, "tool-1", True)
+    assert session.approval_results["tool-1"] is True
+    assert session.pending_approvals["tool-1"].is_set()
 
 
 async def test_on_content_puts_message_on_queue(service):
-    with patch("agent_service.Agent"), patch("agent_service.AwsBedrock"):
+    with patch("app.services.agent_service.Agent"), patch("app.services.agent_service.AwsBedrock"):
         session = service.create_session()
     event = RunContentEvent(content="Hello!")
     await service._on_content(session, event, [], [])
@@ -273,7 +465,7 @@ async def test_on_content_puts_message_on_queue(service):
 
 
 async def test_on_completed_puts_done_and_removes_session(service):
-    with patch("agent_service.Agent"), patch("agent_service.AwsBedrock"):
+    with patch("app.services.agent_service.Agent"), patch("app.services.agent_service.AwsBedrock"):
         session = service.create_session()
     session_id = session.id
     await service._on_completed(session, RunCompletedEvent(), [], [])
@@ -284,7 +476,7 @@ async def test_on_completed_puts_done_and_removes_session(service):
 
 
 async def test_on_error_puts_error_and_done(service):
-    with patch("agent_service.Agent"), patch("agent_service.AwsBedrock"):
+    with patch("app.services.agent_service.Agent"), patch("app.services.agent_service.AwsBedrock"):
         session = service.create_session()
     event = RunErrorEvent(content="boom")
     await service._on_error(session, event, [], [])
@@ -297,14 +489,14 @@ async def test_on_error_puts_error_and_done(service):
 
 
 async def test_dispatch_ignores_unknown_event(service):
-    with patch("agent_service.Agent"), patch("agent_service.AwsBedrock"):
+    with patch("app.services.agent_service.Agent"), patch("app.services.agent_service.AwsBedrock"):
         session = service.create_session()
     result = await service._dispatch(session, object(), [], [])
     assert result is False
 
 
 async def test_run_happy_path(service):
-    with patch("agent_service.Agent"), patch("agent_service.AwsBedrock"):
+    with patch("app.services.agent_service.Agent"), patch("app.services.agent_service.AwsBedrock"):
         session = service.create_session()
 
     mock_agent = MagicMock()
@@ -316,7 +508,7 @@ async def test_run_happy_path(service):
     mock_agent.arun = fake_arun
     service._sessions[session.id] = (session, mock_agent)
 
-    with patch("agent_service.langfuse_context"):
+    with patch("app.services.agent_service.langfuse_context"):
         await service.run(session, "Hi")
 
     events = []
@@ -335,11 +527,32 @@ async def test_run_happy_path(service):
         "system_prompt_id": None,
         "system_prompt_name": None,
         "system_prompt_instructions_snapshot": None,
+        "message": {
+            "role": "assistant",
+            "content": "Hello!",
+            "data": EMPTY_DATA,
+            "timestamp": service._repository.messages[-1]["message"]["timestamp"],
+            "user": None,
+            "agent": {
+                "session_id": session.id,
+                "instance_id": None,
+                "persona_id": None,
+                "persona_ids": [],
+                "persona_name": None,
+                "persona_names": [],
+                "skill_ids": [],
+                "system_prompt_id": None,
+                "system_prompt_name": "kubernetes_agent",
+                "model_id": None,
+                "provider": None,
+            },
+        },
     }
+    assert service._repository.messages[-1]["message"]["timestamp"]
 
 
 async def test_run_tool_approved(service):
-    with patch("agent_service.Agent"), patch("agent_service.AwsBedrock"):
+    with patch("app.services.agent_service.Agent"), patch("app.services.agent_service.AwsBedrock"):
         session = service.create_session()
 
     tool_exec = ToolExecution(
@@ -367,11 +580,11 @@ async def test_run_tool_approved(service):
 
     async def approve_after_delay():
         await asyncio.sleep(0.05)
-        service.approve(session, approved=True)
+        service.approve(session, "tool_123", True)
 
     asyncio.create_task(approve_after_delay())
 
-    with patch("agent_service.langfuse_context"):
+    with patch("app.services.agent_service.langfuse_context"):
         await service.run(session, "What is 2+2?")
 
     events = []
@@ -384,8 +597,107 @@ async def test_run_tool_approved(service):
     assert "message" in types
 
 
+async def test_run_persists_approved_kubectl_command_data(service):
+    with patch("app.services.agent_service.Agent"), patch("app.services.agent_service.AwsBedrock"):
+        session = service.create_session()
+
+    tool_exec = ToolExecution(
+        tool_call_id="tool_kubectl",
+        tool_name="kubectl",
+        tool_args={"args": "get namespaces"},
+        requires_confirmation=True,
+    )
+    requirement = RunRequirement(tool_execution=tool_exec)
+    paused_event = RunPausedEvent(tools=[tool_exec], requirements=[requirement], run_id="run-k")
+
+    mock_agent = MagicMock()
+
+    async def fake_arun(*args, **kwargs):
+        yield paused_event
+
+    async def fake_acontinue_run(*args, **kwargs):
+        yield ToolCallCompletedEvent(
+            tool=tool_exec,
+            content="kubectl(args=get namespaces) completed in 0.25s",
+        )
+        yield RunContentEvent(content="Namespaces listed.")
+        yield RunCompletedEvent()
+
+    mock_agent.arun = fake_arun
+    mock_agent.acontinue_run = fake_acontinue_run
+    service._sessions[session.id] = (session, mock_agent)
+
+    async def approve_after_delay():
+        await asyncio.sleep(0.05)
+        service.approve(session, "tool_kubectl", True)
+
+    asyncio.create_task(approve_after_delay())
+
+    with patch("app.services.agent_service.langfuse_context"):
+        await service.run(session, "get namespaces")
+
+    assert service._repository.messages[-1]["message"]["data"] == {
+        "cmds": [{"command": "kubectl get namespaces", "execute": True}],
+        "executed_cmds": [{
+            "command": "kubectl get namespaces",
+            "output": "kubectl(args=get namespaces) completed in 0.25s",
+        }],
+        "url_configs": [],
+        "user_file_uploads": [],
+    }
+
+
+async def test_run_stops_original_stream_after_resumed_tool_run_completes(service):
+    with patch("app.services.agent_service.Agent"), patch("app.services.agent_service.AwsBedrock"):
+        session = service.create_session()
+
+    tool_exec = ToolExecution(
+        tool_call_id="tool_nodes",
+        tool_name="kubectl",
+        tool_args={"args": "get nodes -o wide"},
+        requires_confirmation=True,
+    )
+    requirement = RunRequirement(tool_execution=tool_exec)
+    paused_event = RunPausedEvent(tools=[tool_exec], requirements=[requirement], run_id="run-nodes")
+
+    mock_agent = MagicMock()
+
+    async def fake_arun(*args, **kwargs):
+        yield paused_event
+        raise AssertionError("original stream continued after resumed run completed")
+
+    async def fake_acontinue_run(*args, **kwargs):
+        yield ToolCallCompletedEvent(
+            tool=tool_exec,
+            content="kubectl(args=get nodes -o wide) completed in 0.23s",
+        )
+        yield RunContentEvent(content="Nodes listed.")
+        yield RunCompletedEvent()
+
+    mock_agent.arun = fake_arun
+    mock_agent.acontinue_run = fake_acontinue_run
+    service._sessions[session.id] = (session, mock_agent)
+
+    async def approve_after_delay():
+        await asyncio.sleep(0.05)
+        service.approve(session, "tool_nodes", True)
+
+    asyncio.create_task(approve_after_delay())
+
+    with patch("app.services.agent_service.langfuse_context"):
+        final_output = await service._run_agent(session, mock_agent, "get all nodes")
+
+    events = []
+    while not session.queue.empty():
+        events.append(await session.queue.get())
+
+    assert final_output == "Nodes listed."
+    assert [event["type"] for event in events].count("tool_call_pending") == 1
+    assert not any(event["type"] == "error" for event in events)
+
+
 async def test_run_tool_rejected(service):
-    with patch("agent_service.Agent"), patch("agent_service.AwsBedrock"):
+    with patch("app.services.agent_service.Agent"), patch("app.services.agent_service.AwsBedrock"):
         session = service.create_session()
 
     tool_exec = ToolExecution(
@@ -411,11 +723,11 @@ async def test_run_tool_rejected(service):
 
     async def reject_after_delay():
         await asyncio.sleep(0.05)
-        service.approve(session, approved=False)
+        service.approve(session, "tool_456", False)
 
     asyncio.create_task(reject_after_delay())
 
-    with patch("agent_service.langfuse_context"):
+    with patch("app.services.agent_service.langfuse_context"):
         await service.run(session, "What's the weather?")
 
     events = []
@@ -427,14 +739,61 @@ async def test_run_tool_rejected(service):
     assert "tool_rejected" in types
 
 
+async def test_run_persists_rejected_kubectl_command_data(service):
+    with patch("app.services.agent_service.Agent"), patch("app.services.agent_service.AwsBedrock"):
+        session = service.create_session()
+
+    tool_exec = ToolExecution(
+        tool_call_id="tool_reject",
+        tool_name="kubectl",
+        tool_args={"args": "delete namespace prod"},
+        requires_confirmation=True,
+    )
+    requirement = RunRequirement(tool_execution=tool_exec)
+    paused_event = RunPausedEvent(tools=[tool_exec], requirements=[requirement], run_id="run-r")
+
+    mock_agent = MagicMock()
+
+    async def fake_arun(*args, **kwargs):
+        yield paused_event
+
+    async def fake_acontinue_run(*args, **kwargs):
+        yield RunContentEvent(content="I did not run that command.")
+        yield RunCompletedEvent()
+
+    mock_agent.arun = fake_arun
+    mock_agent.acontinue_run = fake_acontinue_run
+    service._sessions[session.id] = (session, mock_agent)
+
+    async def reject_after_delay():
+        await asyncio.sleep(0.05)
+        service.approve(session, "tool_reject", False)
+
+    asyncio.create_task(reject_after_delay())
+
+    with patch("app.services.agent_service.langfuse_context"):
+        await service.run(session, "delete namespace prod")
+
+    assert service._repository.messages[-1]["message"]["data"] == {
+        "cmds": [{
+            "command": "kubectl delete namespace prod",
+            "execute": False,
+            "rejection_reason": "User rejected tool call",
+        }],
+        "executed_cmds": [],
+        "url_configs": [],
+        "user_file_uploads": [],
+    }
+
+
 def test_create_session_no_instance_has_tmpdir(service):
-    with patch("agent_service.Agent"), patch("agent_service.AwsBedrock"):
+    with patch("app.services.agent_service.Agent"), patch("app.services.agent_service.AwsBedrock"):
         session = service.create_session(instance_id=None)
     assert session.tmpdir is not None
 
 
 def test_create_session_with_unknown_instance_has_tmpdir(service):
-    with patch("agent_service.Agent"), patch("agent_service.AwsBedrock"):
+    with patch("app.services.agent_service.Agent"), patch("app.services.agent_service.AwsBedrock"):
         session = service.create_session(instance_id="nonexistent-uuid")
     assert session.tmpdir is not None
 
@@ -454,9 +813,9 @@ def test_create_session_with_instance_writes_skills(service, tmp_path):
     service._admin_repository.get_persona = MagicMock(return_value=persona)
     service._admin_repository.get_skill_content = MagicMock(return_value=skill_data)
 
-    with patch("agent_service.Agent"), patch("agent_service.AwsBedrock"), \
-         patch("agent_service.Skills"), patch("agent_service.LocalSkills"), \
-         patch("agent_service.tempfile.mkdtemp", return_value=str(tmp_path)):
+    with patch("app.services.agent_service.Agent"), patch("app.services.agent_service.AwsBedrock"), \
+         patch("app.services.agent_service.Skills"), patch("app.services.agent_service.LocalSkills"), \
+         patch("app.services.agent_service.tempfile.mkdtemp", return_value=str(tmp_path)):
         session = service.create_session(instance_id="inst-uuid")
 
     assert session.tmpdir == str(tmp_path)
@@ -466,7 +825,7 @@ def test_create_session_with_instance_writes_skills(service, tmp_path):
 
 
 def test_remove_session_deletes_tmpdir(service, tmp_path):
-    with patch("agent_service.Agent"), patch("agent_service.AwsBedrock"):
+    with patch("app.services.agent_service.Agent"), patch("app.services.agent_service.AwsBedrock"):
         session = service.create_session()
     session.tmpdir = str(tmp_path)
     service._remove_session(session.id)
@@ -481,7 +840,7 @@ def test_create_session_skips_missing_skill(service, tmp_path):
     service._admin_repository.get_persona = MagicMock(return_value=persona)
     service._admin_repository.get_skill_content = MagicMock(return_value=None)
 
-    with patch("agent_service.Agent"), patch("agent_service.AwsBedrock"):
+    with patch("app.services.agent_service.Agent"), patch("app.services.agent_service.AwsBedrock"):
         session = service.create_session(instance_id="i")
 
     assert session.tmpdir is not None
