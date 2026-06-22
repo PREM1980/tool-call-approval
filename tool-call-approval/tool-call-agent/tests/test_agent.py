@@ -488,6 +488,31 @@ async def test_on_error_puts_error_and_done(service):
     assert "done" in types
 
 
+async def test_on_error_probes_unknown_local_model_error(service):
+    with patch("app.services.agent_service.Agent"), patch("app.services.agent_service.AwsBedrock"):
+        session = service.create_session(model_id="nemotron-3-super", provider="LOCAL")
+    event = RunErrorEvent(content="Unknown model error")
+
+    with patch(
+        "app.services.agent_service._probe_local_model_error",
+        return_value="Model backend error for LOCAL/nemotron-3-super (HTTP 500): no existing backendRef provided",
+    ) as probe:
+        await service._on_error(session, event, [], [])
+
+    items = []
+    while not session.queue.empty():
+        items.append(await session.queue.get())
+
+    probe.assert_called_once_with(session)
+    assert items == [
+        {
+            "type": "error",
+            "content": "Model backend error for LOCAL/nemotron-3-super (HTTP 500): no existing backendRef provided",
+        },
+        {"type": "done"},
+    ]
+
+
 async def test_dispatch_ignores_unknown_event(service):
     with patch("app.services.agent_service.Agent"), patch("app.services.agent_service.AwsBedrock"):
         session = service.create_session()
@@ -694,6 +719,51 @@ async def test_run_stops_original_stream_after_resumed_tool_run_completes(servic
     assert final_output == "Nodes listed."
     assert [event["type"] for event in events].count("tool_call_pending") == 1
     assert not any(event["type"] == "error" for event in events)
+
+
+async def test_run_agent_reports_root_level_upstream_model_error(service):
+    with patch("app.services.agent_service.Agent"), patch("app.services.agent_service.AwsBedrock"):
+        session = service.create_session(model_id="nemotron-3-super", provider="LOCAL")
+
+    class FakeResponse:
+        status_code = 503
+
+        def json(self):
+            return {
+                "message": "failure to get a peer from the ring-balancer",
+                "request_id": "req-123",
+            }
+
+    class FakeApiStatusError(Exception):
+        response = FakeResponse()
+
+    mock_agent = MagicMock()
+
+    async def fake_arun(*args, **kwargs):
+        raise RuntimeError("Unknown model error") from FakeApiStatusError()
+        yield
+
+    mock_agent.arun = fake_arun
+
+    with patch("app.services.agent_service.langfuse_context"):
+        final_output = await service._run_agent(session, mock_agent, "hello")
+
+    events = []
+    while not session.queue.empty():
+        events.append(await session.queue.get())
+
+    assert final_output == ""
+    assert events == [
+        {
+            "type": "error",
+            "content": (
+                "Unexpected error: Model backend error for LOCAL/nemotron-3-super "
+                "(HTTP 503): failure to get a peer from the ring-balancer "
+                "(request_id: req-123)"
+            ),
+        },
+        {"type": "done"},
+    ]
 
 
 async def test_run_tool_rejected(service):

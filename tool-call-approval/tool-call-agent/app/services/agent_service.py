@@ -48,6 +48,127 @@ _FRONTMATTER_RE = re.compile(r"\A---\s*\n(?P<body>.*?)\n---", re.DOTALL)
 _SKILL_NAME_RE = re.compile(r"^\s*name\s*:\s*(?P<name>.+?)\s*$", re.MULTILINE)
 
 
+def _iter_exception_chain(error: BaseException):
+    seen: set[int] = set()
+    stack: list[BaseException] = [error]
+    while stack:
+        current = stack.pop(0)
+        if id(current) in seen:
+            continue
+        seen.add(id(current))
+        yield current
+        if current.__cause__ is not None:
+            stack.append(current.__cause__)
+        if current.__context__ is not None:
+            stack.append(current.__context__)
+
+
+def _error_body_details(body: Any) -> tuple[str | None, str | None]:
+    if isinstance(body, dict):
+        nested_error = body.get("error")
+        if isinstance(nested_error, dict):
+            message = nested_error.get("message") or body.get("message")
+            request_id = nested_error.get("request_id") or body.get("request_id")
+        else:
+            message = body.get("message") or body.get("detail")
+            request_id = body.get("request_id") or body.get("requestId")
+        return (
+            str(message).strip() if message else None,
+            str(request_id).strip() if request_id else None,
+        )
+    if isinstance(body, str) and body.strip():
+        return body.strip(), None
+    return None, None
+
+
+def _extract_upstream_model_error(error: BaseException) -> tuple[int | None, str, str | None] | None:
+    for current in _iter_exception_chain(error):
+        response = getattr(current, "response", None)
+        if response is None:
+            continue
+        status_code = getattr(response, "status_code", None)
+        try:
+            body = response.json()
+        except Exception:
+            body = getattr(response, "text", None)
+        message, request_id = _error_body_details(body)
+        if message and message != "Unknown model error":
+            return status_code, message, request_id
+    return None
+
+
+def _format_model_backend_error(
+    session: "Session",
+    status_code: int | None,
+    message: str,
+    request_id: str | None = None,
+) -> str:
+    provider = session.provider or getenv("LLM_PROVIDER", "AWS")
+    model_id = session.model_id or getenv("MODEL_ID") or getenv("LOCAL_MODEL_ID")
+    backend = f"{provider}/{model_id}" if model_id else provider
+    status = f"HTTP {status_code}" if status_code else "upstream"
+    formatted = f"Model backend error for {backend} ({status}): {message}"
+    if request_id:
+        formatted = f"{formatted} (request_id: {request_id})"
+    return formatted
+
+
+def _format_agent_error(session: "Session", error: BaseException) -> str:
+    upstream = _extract_upstream_model_error(error)
+    if upstream is None:
+        return str(error)
+    return _format_model_backend_error(session, *upstream)
+
+
+async def _probe_local_model_error(session: "Session") -> str | None:
+    provider = (session.provider or getenv("LLM_PROVIDER", "AWS")).upper()
+    if provider != "LOCAL":
+        return None
+
+    api_key = getenv("OPENAI_API_KEY")
+    if not api_key:
+        return None
+
+    model_id = session.model_id or getenv("MODEL_ID") or getenv("LOCAL_MODEL_ID", _LOCAL_MODEL_ID)
+    base_url = (getenv("BASE_URL") or getenv("LOCAL_BASE_URL", _LOCAL_BASE_URL)).rstrip("/")
+    verify_ssl = getenv("LOCAL_VERIFY_SSL", "true").lower() not in {"0", "false", "no"}
+    local_ca_bundle = getenv("LOCAL_CA_BUNDLE")
+    verify: bool | str = local_ca_bundle or verify_ssl
+
+    try:
+        async with httpx.AsyncClient(verify=verify, timeout=10.0) as client:
+            response = await client.post(
+                f"{base_url}/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": model_id,
+                    "messages": [{"role": "user", "content": "health check"}],
+                    "stream": False,
+                    "max_tokens": 1,
+                },
+            )
+    except Exception as probe_error:
+        return _format_model_backend_error(session, None, str(probe_error))
+
+    if response.status_code < 400:
+        return (
+            f"Model backend error for {provider}/{model_id}: Unknown model error. "
+            "A follow-up model probe succeeded; retry the request."
+        )
+
+    try:
+        body = response.json()
+    except Exception:
+        body = response.text
+    message, request_id = _error_body_details(body)
+    if not message:
+        message = response.text.strip() or "Unknown model error"
+    return _format_model_backend_error(session, response.status_code, message, request_id)
+
+
 def _build_model(model_id: str | None = None, provider: str | None = None) -> Any:
     provider = (provider or getenv("LLM_PROVIDER", "AWS")).upper()
     if provider == "GCP":
@@ -514,10 +635,11 @@ class AgentService:
                         break
                 break
             except Exception as e:
-                error_str = str(e)
-                if "ThrottlingException" in error_str and attempt < _THROTTLE_MAX_RETRIES:
+                raw_error = str(e)
+                if "ThrottlingException" in raw_error and attempt < _THROTTLE_MAX_RETRIES:
                     await asyncio.sleep(_THROTTLE_BASE_DELAY * (2 ** attempt))
                     continue
+                error_str = _format_agent_error(session, e)
                 langfuse_context.update_current_observation(level="ERROR", status_message=error_str)
                 await session.queue.put({"type": "error", "content": f"Unexpected error: {error_str}"})
                 await session.queue.put({"type": "done"})
@@ -639,7 +761,16 @@ class AgentService:
     async def _on_error(
         self, session: Session, event: RunErrorEvent, tool_spans: list, response_parts: list
     ) -> bool:
-        await session.queue.put({"type": "error", "content": f"Agent error: {event.content}"})
+        content = str(event.content or "Unknown agent error")
+        if content == "Unknown model error":
+            content = await _probe_local_model_error(session) or _format_model_backend_error(
+                session,
+                None,
+                content,
+            )
+        else:
+            content = f"Agent error: {content}"
+        await session.queue.put({"type": "error", "content": content})
         await session.queue.put({"type": "done"})
         self._remove_session(session.id)
         return True
