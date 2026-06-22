@@ -1,0 +1,47 @@
+<h2>Registration/Auth Boundary</h2>
+<p class="subtitle">Existing agent/session persistence remains unchanged; the new database owns identity and access.</p>
+
+<div class="mockup">
+  <div class="mockup-header">Proposed Data Flow</div>
+  <div class="mockup-body">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;align-items:stretch">
+      <div class="placeholder" style="min-height:180px">
+        <div class="label">Angular UI</div>
+        <h3>Login</h3>
+        <p>All users authenticate before chat.</p>
+        <h3>Users Page</h3>
+        <p>Visible only to role <strong>admin</strong>.</p>
+        <h3>Chat</h3>
+        <p>Shows only sessions owned by the logged-in user.</p>
+      </div>
+
+      <div class="placeholder" style="min-height:180px">
+        <div class="label">FastAPI Auth Layer</div>
+        <h3>AuthService</h3>
+        <p>Login, password hashing, token creation.</p>
+        <h3>UserService</h3>
+        <p>Admin creates users and roles.</p>
+        <h3>SessionOwnershipService</h3>
+        <p>Maps chat session IDs to user IDs.</p>
+      </div>
+
+      <div class="placeholder" style="min-height:180px">
+        <div class="label">PostgreSQL</div>
+        <h3>registration DB</h3>
+        <p>users, roles, password hashes, session ownership.</p>
+        <h3>existing DB</h3>
+        <p>unchanged Agno/session tables and chat contents.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="options">
+  <div class="option" data-choice="approve-architecture" onclick="toggleSelect(this)">
+    <div class="letter">✓</div>
+    <div class="content">
+      <h3>Approve This Boundary</h3>
+      <p>Use a separate <code>registration</code> database for auth and ownership; keep existing session storage untouched.</p>
+    </div>
+  </div>
+</div>

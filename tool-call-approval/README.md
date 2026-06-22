@@ -1,17 +1,31 @@
-# Tool Call Approval - Real Agent Mode
+# Tool Call Approval
 
-This guide runs the real Kubernetes operations agent locally with the Angular UI.
+A human-in-the-loop tool call approval system built on the Agno framework. The
+application lets an LLM agent execute tools (e.g. Kubernetes operations) only
+after a human approves each call.
+
+The repository is organized into several projects, each with its own README:
+
+| Project | Description |
+|---|---|
+| [tool-call-agent](tool-call-agent/) | Python agent server powered by Agno + LLM providers |
+| [tool-call-api](tool-call-api/) | FastAPI web gateway between the UI and agent |
+| [tool-call-ui](tool-call-ui/) | Angular frontend for chat and tool approval |
+| [tool-call-k8s](tool-call-k8s/) | Optional Kubernetes deployment management service |
+
 The local stack is:
 
 ```text
 tool-call-ui (:4200) -> tool-call-api (:8080) -> tool-call-agent (:8000)
 ```
 
-Use real agent mode when you want the app to call an actual LLM provider
-(AWS Bedrock, GCP Vertex AI, or a local OpenAI-compatible endpoint) and require
-human approval before tools run.
+Refer to each project's README for detailed setup and usage instructions.
 
-## Prerequisites
+---
+
+## Quick Start (Full Stack)
+
+### Prerequisites
 
 - Python 3.12+
 - Node.js/npm compatible with Angular 20

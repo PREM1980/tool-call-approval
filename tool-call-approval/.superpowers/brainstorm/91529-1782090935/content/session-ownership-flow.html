@@ -1,0 +1,31 @@
+<h2>How A Chat Session Gets Its User</h2>
+<p class="subtitle">The app links users to Agno sessions by session ID in the new registration database.</p>
+
+<div class="mockup">
+  <div class="mockup-header">Create Session</div>
+  <div class="mockup-body">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div class="placeholder">
+        <div class="label">existing DB</div>
+        <h3>ai.session_records</h3>
+        <p><strong>session_id:</strong> 9a8b...</p>
+        <p><strong>messages:</strong> []</p>
+        <p>No user column needed.</p>
+      </div>
+      <div class="placeholder">
+        <div class="label">registration DB</div>
+        <h3>user_chat_sessions</h3>
+        <p><strong>user_id:</strong> admin-user-id</p>
+        <p><strong>session_id:</strong> 9a8b...</p>
+        <p><strong>created_at:</strong> now</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="mockup">
+  <div class="mockup-header">Read Sessions</div>
+  <div class="mockup-body">
+    <p>Logged-in user -> registration DB returns owned session IDs -> existing DB returns summaries for only those IDs.</p>
+  </div>
+</div>
