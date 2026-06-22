@@ -8,8 +8,10 @@ data:
   BASE_URL: https://models.k8s.aip.mitre.org/v1
   LOCAL_VERIFY_SSL: "false"
   POSTGRES_URL: postgresql+psycopg2://postgres:postgres@postgres:5432/postgres
+  REGISTRATION_DATABASE_URL: postgresql+psycopg2://postgres:postgres@postgres:5432/registration
   GOOGLE_CLOUD_PROJECT: provs-487517
   GOOGLE_CLOUD_LOCATION: us-east5
   GOOGLE_APPLICATION_CREDENTIALS: /etc/gcp/service-account.json
   LANGFUSE_HOST: http://host.docker.internal:3000
   AUTO_APPROVE_TOOLS: "false"
+  JWT_ACCESS_TOKEN_MINUTES: "480"

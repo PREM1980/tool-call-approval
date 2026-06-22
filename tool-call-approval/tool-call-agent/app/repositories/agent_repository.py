@@ -21,7 +21,7 @@ class IAgentStorage(ABC):
     def get_db(self) -> PostgresDb | None: ...
 
     @abstractmethod
-    def list_sessions(self) -> list[dict]: ...
+    def list_sessions(self, session_ids: list[str] | None = None) -> list[dict]: ...
 
     @abstractmethod
     def create_session_record(
@@ -78,7 +78,9 @@ class PostgresRepository(IAgentStorage):
             self._db = db
         return self._db
 
-    def list_sessions(self) -> list[dict]:
+    def list_sessions(self, session_ids: list[str] | None = None) -> list[dict]:
+        if session_ids == []:
+            return []
         if not self._is_reachable():
             return []
         url = self._url.replace("postgresql+psycopg2://", "postgresql://")
@@ -87,7 +89,12 @@ class PostgresRepository(IAgentStorage):
             try:
                 self._ensure_session_records_table(conn)
                 with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-                    cur.execute("""
+                    session_filter = ""
+                    params: tuple[Any, ...] = ()
+                    if session_ids is not None:
+                        session_filter = "AND session_id = ANY(%s)"
+                        params = (session_ids,)
+                    cur.execute(f"""
                         SELECT session_id,
                                EXTRACT(EPOCH FROM created_at)::BIGINT AS created_at,
                                EXTRACT(EPOCH FROM updated_at)::BIGINT AS updated_at,
@@ -110,8 +117,9 @@ class PostgresRepository(IAgentStorage):
                             FROM jsonb_array_elements(messages) AS message
                             WHERE message->>'role' = 'user'
                         )
+                        {session_filter}
                         ORDER BY updated_at DESC
-                    """)
+                    """, params)
                     return [dict(r) for r in cur.fetchall()]
             finally:
                 conn.close()

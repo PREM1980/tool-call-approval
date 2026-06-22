@@ -5,9 +5,11 @@ from types import SimpleNamespace
 from unittest.mock import Mock, patch
 import app.api.main as main_app
 from main import app
+from app.domain.user import User
 from app.domain.session import Session
 
 client = TestClient(app)
+AUTH_USER = User(id="00000000-0000-0000-0000-000000000001", username="admin", role="admin")
 
 EMPTY_DATA = {
     "cmds": [],
@@ -77,34 +79,86 @@ def _approval_envelope(session_id: str | None = None) -> dict:
     }
 
 
+def _auth_headers() -> dict[str, str]:
+    token = main_app._token_service.create_access_token(AUTH_USER)
+    return {"Authorization": f"Bearer {token}"}
+
+
+def _allow_auth(user: User = AUTH_USER):
+    return patch.object(main_app._auth_service, "get_current_user", return_value=user)
+
+
+def _allow_owner(owns: bool = True):
+    return patch.object(main_app._session_ownership_service, "user_owns_session", return_value=owns)
+
+
 def test_create_session_returns_session_id():
     with patch.object(
         main_app.service,
         "create_session",
         return_value=SimpleNamespace(id="session-123"),
-    ):
-        response = client.post("/sessions", json=_session_envelope())
+    ), _allow_auth(), patch.object(
+        main_app._session_ownership_service,
+        "record_owner",
+    ) as record_owner:
+        response = client.post("/sessions", json=_session_envelope(), headers=_auth_headers())
 
     assert response.status_code == 200
     assert response.json() == {"session_id": "session-123"}
+    record_owner.assert_called_once_with(AUTH_USER, "session-123")
+
+
+def test_create_session_requires_authentication():
+    response = client.post("/sessions", json=_session_envelope())
+
+    assert response.status_code == 401
+
+
+def test_list_sessions_returns_only_owned_sessions():
+    with _allow_auth(), \
+         patch.object(main_app._session_ownership_service, "get_session_ids_for_user", return_value=["owned-1"]), \
+         patch.object(main_app._repository, "list_sessions", return_value=[]) as list_sessions:
+        response = client.get("/sessions", headers=_auth_headers())
+
+    assert response.status_code == 200
+    list_sessions.assert_called_once_with(["owned-1"])
 
 
 def test_chat_unknown_session_returns_404():
-    response = client.post(
-        "/sessions/nonexistent/chat", json=_chat_envelope("hello", "nonexistent")
-    )
+    with _allow_auth(), _allow_owner():
+        response = client.post(
+            "/sessions/nonexistent/chat",
+            json=_chat_envelope("hello", "nonexistent"),
+            headers=_auth_headers(),
+        )
+    assert response.status_code == 404
+
+
+def test_chat_unowned_session_returns_404():
+    sid = "session-123"
+    with _allow_auth(), _allow_owner(False):
+        response = client.post(
+            f"/sessions/{sid}/chat",
+            json=_chat_envelope("hello", sid),
+            headers=_auth_headers(),
+        )
+
     assert response.status_code == 404
 
 
 def test_approve_unknown_session_returns_404():
-    response = client.post(
-        "/sessions/nonexistent/approve", json=_approval_envelope("nonexistent")
-    )
+    with _allow_auth(), _allow_owner():
+        response = client.post(
+            "/sessions/nonexistent/approve",
+            json=_approval_envelope("nonexistent"),
+            headers=_auth_headers(),
+        )
     assert response.status_code == 404
 
 
 def test_stream_unknown_session_returns_404():
-    response = client.get("/sessions/nonexistent/stream")
+    with _allow_auth(), _allow_owner():
+        response = client.get("/sessions/nonexistent/stream", headers=_auth_headers())
     assert response.status_code == 404
 
 
@@ -115,8 +169,13 @@ def test_chat_known_session_returns_processing():
     with patch("app.api.main.asyncio.create_task"), \
          patch.object(main_app.service, "get_session", return_value=session), \
          patch.object(main_app.service, "run", new=Mock(return_value=object())), \
-         patch.object(main_app.service, "record_user_message") as record_user_message:
-        response = client.post(f"/sessions/{sid}/chat", json=_chat_envelope("hello", sid))
+         patch.object(main_app.service, "record_user_message") as record_user_message, \
+         _allow_auth(), _allow_owner():
+        response = client.post(
+            f"/sessions/{sid}/chat",
+            json=_chat_envelope("hello", sid),
+            headers=_auth_headers(),
+        )
 
     assert response.status_code == 200
     assert response.json()["status"] == "processing"
@@ -127,16 +186,23 @@ def test_chat_known_session_returns_processing():
 
 
 def test_chat_rejects_old_body_shape():
-    response = client.post("/sessions/session-123/chat", json={"message": "hello"})
+    with _allow_auth(), _allow_owner():
+        response = client.post(
+            "/sessions/session-123/chat",
+            json={"message": "hello"},
+            headers=_auth_headers(),
+        )
 
     assert response.status_code == 422
 
 
 def test_chat_rejects_mismatched_session_id():
-    response = client.post(
-        "/sessions/session-123/chat",
-        json=_chat_envelope("hello", "different-session"),
-    )
+    with _allow_auth(), _allow_owner():
+        response = client.post(
+            "/sessions/session-123/chat",
+            json=_chat_envelope("hello", "different-session"),
+            headers=_auth_headers(),
+        )
 
     assert response.status_code == 400
 
@@ -146,8 +212,13 @@ def test_approve_known_session_returns_ok():
     session = Session(id=sid)
 
     with patch.object(main_app.service, "get_session", return_value=session), \
-         patch.object(main_app.service, "approve") as approve:
-        response = client.post(f"/sessions/{sid}/approve", json=_approval_envelope(sid))
+         patch.object(main_app.service, "approve") as approve, \
+         _allow_auth(), _allow_owner():
+        response = client.post(
+            f"/sessions/{sid}/approve",
+            json=_approval_envelope(sid),
+            headers=_auth_headers(),
+        )
 
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
@@ -155,7 +226,12 @@ def test_approve_known_session_returns_ok():
 
 
 def test_approve_rejects_old_body_shape():
-    response = client.post("/sessions/session-123/approve", json={"approved": True})
+    with _allow_auth(), _allow_owner():
+        response = client.post(
+            "/sessions/session-123/approve",
+            json={"approved": True},
+            headers=_auth_headers(),
+        )
 
     assert response.status_code == 422
 
@@ -173,8 +249,12 @@ def test_create_session_with_null_instance_id():
         main_app.service,
         "create_session",
         return_value=SimpleNamespace(id="session-123"),
-    ):
-        response = client.post("/sessions", json=_session_envelope(instance_id=None))
+    ), _allow_auth(), patch.object(main_app._session_ownership_service, "record_owner"):
+        response = client.post(
+            "/sessions",
+            json=_session_envelope(instance_id=None),
+            headers=_auth_headers(),
+        )
 
     assert response.status_code == 200
     assert "session_id" in response.json()
@@ -186,8 +266,12 @@ def test_create_session_with_instance_id_string():
         main_app.service,
         "create_session",
         return_value=SimpleNamespace(id="session-123"),
-    ):
-        response = client.post("/sessions", json=_session_envelope(instance_id=str(uuid.uuid4())))
+    ), _allow_auth(), patch.object(main_app._session_ownership_service, "record_owner"):
+        response = client.post(
+            "/sessions",
+            json=_session_envelope(instance_id=str(uuid.uuid4())),
+            headers=_auth_headers(),
+        )
 
     assert response.status_code == 200
     assert "session_id" in response.json()
@@ -198,7 +282,10 @@ def test_create_session_passes_system_prompt_id_to_service():
         main_app.service,
         "create_session",
         return_value=SimpleNamespace(id="session-123"),
-    ) as create_session:
+    ) as create_session, _allow_auth(), patch.object(
+        main_app._session_ownership_service,
+        "record_owner",
+    ):
         response = client.post(
             "/sessions",
             json=_session_envelope(
@@ -207,6 +294,7 @@ def test_create_session_passes_system_prompt_id_to_service():
                 model_id="nemotron-3-super",
                 provider="LOCAL",
             ),
+            headers=_auth_headers(),
         )
 
     assert response.status_code == 200
@@ -226,7 +314,10 @@ def test_create_session_passes_persona_id_to_service():
         main_app.service,
         "create_session",
         return_value=SimpleNamespace(id="session-123"),
-    ) as create_session:
+    ) as create_session, _allow_auth(), patch.object(
+        main_app._session_ownership_service,
+        "record_owner",
+    ):
         response = client.post(
             "/sessions",
             json=_session_envelope(
@@ -236,6 +327,7 @@ def test_create_session_passes_persona_id_to_service():
                 model_id="nemotron-3-super",
                 provider="LOCAL",
             ),
+            headers=_auth_headers(),
         )
 
     assert response.status_code == 200
@@ -254,7 +346,10 @@ def test_create_session_passes_persona_ids_to_service():
         main_app.service,
         "create_session",
         return_value=SimpleNamespace(id="session-123"),
-    ) as create_session:
+    ) as create_session, _allow_auth(), patch.object(
+        main_app._session_ownership_service,
+        "record_owner",
+    ):
         response = client.post(
             "/sessions",
             json=_session_envelope(
@@ -265,6 +360,7 @@ def test_create_session_passes_persona_ids_to_service():
                 model_id="nemotron-3-super",
                 provider="LOCAL",
             ),
+            headers=_auth_headers(),
         )
 
     assert response.status_code == 200
@@ -280,9 +376,9 @@ def test_create_session_passes_persona_ids_to_service():
 
 def test_create_session_no_body_is_rejected():
     response = client.post("/sessions")
-    assert response.status_code == 422
+    assert response.status_code == 401
 
 
 def test_create_session_rejects_old_body_shape():
     response = client.post("/sessions", json={"instance_id": "inst-1"})
-    assert response.status_code == 422
+    assert response.status_code == 401

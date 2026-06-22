@@ -5,7 +5,14 @@
       <span class="hitl-badge">Human in the loop</span>
     </a>
     <div class="topbar-nav">
+      @if (auth.isAdmin()) {
+        <a class="topbar-link" routerLink="/users" routerLinkActive="active">Users</a>
+      }
       <a class="topbar-link" routerLink="/admin" routerLinkActive="active">Admin</a>
+      @if (auth.currentUser(); as user) {
+        <span class="topbar-user">{{ user.username }}</span>
+      }
+      <button type="button" class="topbar-logout" (click)="logout()">Logout</button>
     </div>
   </nav>
   <div class="flex-grow-1 overflow-hidden d-flex flex-column">

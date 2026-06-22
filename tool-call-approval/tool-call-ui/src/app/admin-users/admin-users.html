@@ -1,0 +1,92 @@
+<div class="users-page">
+  <header class="users-header">
+    <span class="users-kicker">Real Admin</span>
+    <h1>User Registration</h1>
+  </header>
+
+  <div class="users-grid">
+    <section class="user-form-panel">
+      <h2>Create User</h2>
+
+      @if (error) {
+        <div class="alert alert-danger py-2">{{ error }}</div>
+      }
+      @if (success) {
+        <div class="alert alert-success py-2">{{ success }}</div>
+      }
+
+      <form (ngSubmit)="createUser()" class="user-form">
+        <label class="form-label" for="newUsername">Username</label>
+        <input
+          class="form-control form-control-lg"
+          id="newUsername"
+          name="username"
+          [(ngModel)]="username"
+          required
+        />
+
+        <label class="form-label" for="newPassword">Password</label>
+        <input
+          class="form-control form-control-lg"
+          id="newPassword"
+          name="password"
+          type="password"
+          [(ngModel)]="password"
+          required
+        />
+
+        <label class="form-label" for="role">Role</label>
+        <select class="form-select form-select-lg" id="role" name="role" [(ngModel)]="role">
+          <option value="user">User</option>
+          <option value="admin">Admin</option>
+        </select>
+
+        <button
+          class="btn btn-primary btn-lg user-submit"
+          type="submit"
+          [disabled]="saving || !username.trim() || !password">
+          {{ saving ? 'Creating...' : 'Create User' }}
+        </button>
+      </form>
+    </section>
+
+    <section class="user-list-panel">
+      <div class="user-list-title">
+        <div>
+          <h2>Users</h2>
+          <p>{{ users.length }} active account{{ users.length === 1 ? '' : 's' }}</p>
+        </div>
+        <button type="button" class="btn btn-outline-secondary btn-sm" (click)="loadUsers()">
+          Refresh
+        </button>
+      </div>
+
+      @if (loading) {
+        <div class="users-loading">Loading users...</div>
+      }
+
+      @if (!loading && users.length === 0) {
+        <div class="users-empty">No users yet.</div>
+      }
+
+      @if (users.length > 0) {
+        <div class="users-table">
+          <div class="users-row users-row-head">
+            <span>Username</span>
+            <span>Role</span>
+            <span>Status</span>
+          </div>
+          @for (user of users; track user.id) {
+            <div class="users-row">
+              <strong>{{ user.username }}</strong>
+              <span class="role-pill" [class.role-pill-admin]="user.role === 'admin'">
+                {{ user.role }}
+              </span>
+              <span class="status-pill">Active</span>
+            </div>
+          }
+        </div>
+      }
+    </section>
+  </div>
+</div>

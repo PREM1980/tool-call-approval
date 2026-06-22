@@ -158,6 +158,9 @@ services:
       - ./tool-call-agent/.env
     environment:
       POSTGRES_URL: postgresql+psycopg2://postgres:postgres@postgres:5432/postgres
+      REGISTRATION_DATABASE_URL: postgresql+psycopg2://postgres:postgres@postgres:5432/registration
+      JWT_SECRET_KEY: local-development-jwt-secret
+      JWT_ACCESS_TOKEN_MINUTES: "480"
       LANGFUSE_HOST: http://langfuse-web:3000
       GOOGLE_APPLICATION_CREDENTIALS: /etc/gcp/service-account.json
     volumes:

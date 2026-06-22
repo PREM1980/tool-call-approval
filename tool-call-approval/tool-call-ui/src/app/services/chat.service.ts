@@ -1,8 +1,9 @@
-import { Injectable } from '@angular/core';
+import { inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Subject, firstValueFrom } from 'rxjs';
 import { ApiMessage, ApprovalContext, MessageEnvelope, SessionContext, SseEvent } from '../models/types';
 import { createMessageEnvelope, emptySessionContext, normalizeSessionContext } from './envelope';
+import { AuthService } from './auth.service';
 
 const API_URL = '/api';
 
@@ -11,6 +12,7 @@ export class ChatService {
   private sessionId: string | null = null;
   private sessionContext: SessionContext = emptySessionContext();
   private eventSource: EventSource | null = null;
+  private authService = inject(AuthService);
 
   readonly sseEvents$ = new Subject<SseEvent>();
 
@@ -61,7 +63,9 @@ export class ChatService {
 
   connectStream(): void {
     if (!this.sessionId) return;
-    const es = new EventSource(`${API_URL}/sessions/${this.sessionId}/stream`);
+    const token = this.authService.accessToken();
+    const suffix = token ? `?access_token=${encodeURIComponent(token)}` : '';
+    const es = new EventSource(`${API_URL}/sessions/${this.sessionId}/stream${suffix}`);
     this.eventSource?.close();
     this.eventSource = es;
     es.onmessage = (event: MessageEvent) => {

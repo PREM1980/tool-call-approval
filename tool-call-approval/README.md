@@ -66,6 +66,8 @@ AWS_ACCESS_KEY_ID=your_access_key
 AWS_SECRET_ACCESS_KEY=your_secret_key
 AWS_DEFAULT_REGION=us-east-1
 POSTGRES_URL=postgresql+psycopg2://postgres:postgres@localhost:5433/postgres
+REGISTRATION_DATABASE_URL=postgresql+psycopg2://postgres:postgres@localhost:5433/registration
+JWT_SECRET_KEY=change-this-local-development-secret
 LANGFUSE_PUBLIC_KEY=pk-lf-local-tool-call-approval
 LANGFUSE_SECRET_KEY=sk-lf-local-tool-call-approval
 LANGFUSE_HOST=http://localhost:3000
@@ -79,6 +81,8 @@ GOOGLE_APPLICATION_CREDENTIALS=/absolute/path/to/service-account.json
 GOOGLE_CLOUD_PROJECT=your-gcp-project-id
 GOOGLE_CLOUD_LOCATION=us-east5
 POSTGRES_URL=postgresql+psycopg2://postgres:postgres@localhost:5433/postgres
+REGISTRATION_DATABASE_URL=postgresql+psycopg2://postgres:postgres@localhost:5433/registration
+JWT_SECRET_KEY=change-this-local-development-secret
 LANGFUSE_PUBLIC_KEY=pk-lf-local-tool-call-approval
 LANGFUSE_SECRET_KEY=sk-lf-local-tool-call-approval
 LANGFUSE_HOST=http://localhost:3000
@@ -93,9 +97,20 @@ MODEL_ID=nemotron-3-super
 BASE_URL=https://models.k8s.aip.mitre.org/v1
 LOCAL_VERIFY_SSL=false
 POSTGRES_URL=postgresql+psycopg2://postgres:postgres@localhost:5433/postgres
+REGISTRATION_DATABASE_URL=postgresql+psycopg2://postgres:postgres@localhost:5433/registration
+JWT_SECRET_KEY=change-this-local-development-secret
 LANGFUSE_PUBLIC_KEY=pk-lf-local-tool-call-approval
 LANGFUSE_SECRET_KEY=sk-lf-local-tool-call-approval
 LANGFUSE_HOST=http://localhost:3000
+```
+
+`POSTGRES_URL` remains the existing chat/agent database. `REGISTRATION_DATABASE_URL`
+is a separate database used only for users, roles, login, and chat-session
+ownership. On startup, the agent creates the `registration` database if it is
+missing and seeds the first app admin:
+
+```text
+admin / admin
 ```
 
 The Admin credentials page stores app settings such as kubeconfig, but the real
@@ -151,6 +166,10 @@ Open:
 ```text
 http://localhost:4200
 ```
+
+Log in with `admin` / `admin`, then open `Users` from the top navigation to
+create additional admins or regular users. Each user only sees sessions created
+while logged in as that user.
 
 Use the `SSE` mode in the chat UI for real agent mode. The WebSocket toggle is
 for the mock/direct backend path and is not the normal real-agent path.

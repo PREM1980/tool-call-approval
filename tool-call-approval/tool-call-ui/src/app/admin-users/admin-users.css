@@ -1,0 +1,164 @@
+.users-page {
+  min-height: 100%;
+  padding: 32px;
+  overflow-y: auto;
+  background: #edf4f8;
+}
+
+.users-header {
+  margin-bottom: 24px;
+}
+
+.users-kicker {
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  color: #0d6efd;
+}
+
+.users-header h1 {
+  margin: 8px 0 6px;
+  color: #132033;
+  font-size: clamp(2.2rem, 5vw, 4.6rem);
+  font-weight: 900;
+  line-height: 0.95;
+}
+
+.users-header p {
+  max-width: 680px;
+  color: #5f6f83;
+  font-size: 1rem;
+}
+
+.users-grid {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.82fr) minmax(0, 1.18fr);
+  gap: 20px;
+}
+
+.user-form-panel,
+.user-list-panel {
+  border: 1px solid #d8e1e8;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 18px 50px rgba(15, 23, 42, 0.08);
+}
+
+.user-form-panel {
+  padding: 26px;
+}
+
+.user-form-panel h2,
+.user-list-panel h2 {
+  margin: 0;
+  color: #132033;
+  font-size: 1.55rem;
+  font-weight: 900;
+}
+
+.user-form-panel p,
+.user-list-title p {
+  color: #667085;
+}
+
+.user-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.user-submit {
+  margin-top: 12px;
+  font-weight: 900;
+}
+
+.user-list-panel {
+  padding: 0;
+  overflow: hidden;
+}
+
+.user-list-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 24px 26px;
+  border-bottom: 1px solid #e4ebf1;
+  background: #f8fafc;
+}
+
+.users-table {
+  padding: 14px;
+}
+
+.users-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px 110px;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 7px;
+}
+
+.users-row:not(.users-row-head) {
+  background: #fff;
+  border: 1px solid #e4ebf1;
+  margin-bottom: 8px;
+}
+
+.users-row-head {
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.role-pill,
+.status-pill {
+  width: fit-content;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 900;
+}
+
+.role-pill {
+  color: #075985;
+  background: #e0f2fe;
+}
+
+.role-pill-admin {
+  color: #5b21b6;
+  background: #ede9fe;
+}
+
+.status-pill {
+  color: #047857;
+  background: #d1fae5;
+}
+
+.users-loading,
+.users-empty {
+  padding: 28px;
+  color: #667085;
+}
+
+@media (max-width: 900px) {
+  .users-page {
+    padding: 20px;
+  }
+
+  .users-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .users-row {
+    grid-template-columns: 1fr auto;
+  }
+
+  .users-row span:last-child {
+    grid-column: 2;
+  }
+}

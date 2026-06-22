@@ -22,7 +22,7 @@
 .hitl-badge {
   font-size: 0.6rem;
   font-weight: 500;
-  letter-spacing: 0.05em;
+  letter-spacing: 0;
   text-transform: uppercase;
   color: #a5b4fc;
   background: rgba(99, 102, 241, 0.18);
@@ -30,7 +30,11 @@
   padding: 2px 7px;
 }
 
-.topbar-nav { display: flex; gap: 4px; }
+.topbar-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
 
 .topbar-link {
   font-size: 0.8rem;
@@ -43,3 +47,28 @@
 }
 .topbar-link:hover { color: #e2e8f0; background: #1e293b; }
 .topbar-link.active { color: #a5b4fc; background: #312e81; }
+
+.topbar-user {
+  margin-left: 8px;
+  padding: 4px 9px;
+  border: 1px solid #334155;
+  border-radius: 999px;
+  color: #cbd5e1;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.topbar-logout {
+  padding: 5px 10px;
+  border: 1px solid #475569;
+  border-radius: 6px;
+  background: transparent;
+  color: #cbd5e1;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.topbar-logout:hover {
+  background: #1e293b;
+  color: #f8fafc;
+}

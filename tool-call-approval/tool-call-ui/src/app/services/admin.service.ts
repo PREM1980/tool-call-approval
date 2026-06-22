@@ -51,6 +51,12 @@ export interface SystemPromptData {
   updated_at: string;
 }
 
+export interface AppUser {
+  id: string;
+  username: string;
+  role: 'admin' | 'user';
+}
+
 @Injectable({ providedIn: 'root' })
 export class AdminService {
   constructor(private http: HttpClient) {}
@@ -170,5 +176,13 @@ export class AdminService {
 
   activateSystemPrompt(id: string) {
     return firstValueFrom(this.http.post<SystemPromptData>(`${API}/system-prompts/${id}/activate`, {}));
+  }
+
+  listUsers() {
+    return firstValueFrom(this.http.get<AppUser[]>(`${API}/users`));
+  }
+
+  createUser(username: string, password: string, role: 'admin' | 'user') {
+    return firstValueFrom(this.http.post<AppUser>(`${API}/users`, { username, password, role }));
   }
 }

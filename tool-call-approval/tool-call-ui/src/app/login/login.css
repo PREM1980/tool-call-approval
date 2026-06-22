@@ -1,0 +1,89 @@
+.login-page {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(360px, 0.95fr);
+  align-items: stretch;
+  background: #eef4f8;
+}
+
+.login-hero {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: clamp(36px, 7vw, 84px);
+  color: #fff;
+  background:
+    linear-gradient(135deg, rgba(8, 19, 35, 0.96), rgba(24, 72, 94, 0.94)),
+    url('/favicon.ico');
+}
+
+.login-eyebrow {
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  color: #7dd3fc;
+}
+
+.login-hero h1 {
+  max-width: 720px;
+  margin: 24px 0 18px;
+  font-size: clamp(2.75rem, 7vw, 5.8rem);
+  font-weight: 900;
+  line-height: 0.96;
+}
+
+.login-hero p {
+  max-width: 560px;
+  color: #d9edf7;
+  font-size: 1.08rem;
+  line-height: 1.65;
+}
+
+.login-panel {
+  align-self: center;
+  width: min(480px, calc(100% - 48px));
+  margin: 0 auto;
+  padding: 34px;
+  border: 1px solid #d8e1e8;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.18);
+}
+
+.login-panel h2 {
+  margin: 0 0 4px;
+  color: #132033;
+  font-size: 2rem;
+  font-weight: 900;
+}
+
+.login-subtitle {
+  margin-bottom: 24px;
+  color: #667085;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.login-submit {
+  margin-top: 12px;
+  font-weight: 900;
+}
+
+@media (max-width: 860px) {
+  .login-page {
+    grid-template-columns: 1fr;
+  }
+
+  .login-hero {
+    min-height: 42vh;
+  }
+
+  .login-panel {
+    margin: 28px auto;
+  }
+}

@@ -53,6 +53,12 @@ LOCAL_VERIFY_SSL=false
 LANGFUSE_PUBLIC_KEY=pk-lf-local-tool-call-approval
 LANGFUSE_SECRET_KEY=sk-lf-local-tool-call-approval
 LANGFUSE_HOST=http://localhost:3000
+
+# Persistence and UI auth
+POSTGRES_URL=postgresql+psycopg2://postgres:postgres@localhost:5433/postgres
+REGISTRATION_DATABASE_URL=postgresql+psycopg2://postgres:postgres@localhost:5433/registration
+JWT_SECRET_KEY=change-this-local-development-secret
+JWT_ACCESS_TOKEN_MINUTES=480
 ```
 
 ### 3. Start Langfuse
@@ -296,7 +302,9 @@ docker run --rm \
   -e AWS_DEFAULT_REGION=us-east-1 \
   -e AWS_ACCESS_KEY_ID=your_key \
   -e AWS_SECRET_ACCESS_KEY=your_secret \
-  -e POSTGRES_URL=postgresql+psycopg2://postgres:postgres@host.docker.internal:5432/postgres \
+  -e POSTGRES_URL=postgresql+psycopg2://postgres:postgres@host.docker.internal:5433/postgres \
+  -e REGISTRATION_DATABASE_URL=postgresql+psycopg2://postgres:postgres@host.docker.internal:5433/registration \
+  -e JWT_SECRET_KEY=change-this-local-development-secret \
   -e LANGFUSE_PUBLIC_KEY=pk-lf-local-tool-call-approval \
   -e LANGFUSE_SECRET_KEY=sk-lf-local-tool-call-approval \
   -e LANGFUSE_HOST=http://host.docker.internal:3000 \
