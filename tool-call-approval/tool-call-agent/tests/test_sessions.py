@@ -1,11 +1,35 @@
 import psycopg2
 import pytest
 from fastapi.testclient import TestClient
+from unittest.mock import patch
 
+import app.api.main as main_app
+from app.domain.user import User
 from main import app
 
 TEST_URL = "postgresql://localhost:5432/postgres"
 http = TestClient(app)
+AUTH_USER = User(id="00000000-0000-0000-0000-000000000001", username="admin", role="admin")
+
+
+def _auth_headers() -> dict[str, str]:
+    return {"Authorization": "Bearer test-token"}
+
+
+def _allow_auth(user: User = AUTH_USER):
+    return patch.object(main_app._auth_service, "get_current_user", return_value=user)
+
+
+def _owned_session_ids(session_ids: list[str]):
+    return patch.object(
+        main_app._session_ownership_service,
+        "get_session_ids_for_user",
+        return_value=session_ids,
+    )
+
+
+def _allow_owner(owns: bool = True):
+    return patch.object(main_app._session_ownership_service, "user_owns_session", return_value=owns)
 
 
 @pytest.fixture(autouse=True)
@@ -32,7 +56,9 @@ def clean_sessions():
 
 
 def test_list_sessions_empty():
-    response = http.get("/sessions")
+    with _allow_auth(), _owned_session_ids([]):
+        response = http.get("/sessions", headers=_auth_headers())
+
     assert response.status_code == 200
     assert response.json() == []
 
@@ -61,7 +87,9 @@ def test_list_sessions_returns_session():
     conn.commit()
     conn.close()
 
-    response = http.get("/sessions")
+    with _allow_auth(), _owned_session_ids(["test-id-1"]):
+        response = http.get("/sessions", headers=_auth_headers())
+
     assert response.status_code == 200
     data = response.json()
     assert len(data) == 1
@@ -85,7 +113,9 @@ def test_list_sessions_ordered_by_updated_at_desc():
     conn.commit()
     conn.close()
 
-    data = http.get("/sessions").json()
+    with _allow_auth(), _owned_session_ids(["older", "newer"]):
+        data = http.get("/sessions", headers=_auth_headers()).json()
+
     assert data[0]["session_id"] == "newer"
     assert data[1]["session_id"] == "older"
 
@@ -101,8 +131,27 @@ def test_list_sessions_excludes_empty_message_records():
     conn.commit()
     conn.close()
 
-    data = http.get("/sessions").json()
+    with _allow_auth(), _owned_session_ids(["no-messages", "has-message"]):
+        data = http.get("/sessions", headers=_auth_headers()).json()
+
     assert [row["session_id"] for row in data] == ["has-message"]
+
+
+def test_list_sessions_hides_legacy_unowned_records():
+    conn = psycopg2.connect(TEST_URL)
+    with conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO ai.session_records (session_id, messages, created_at, updated_at)
+            VALUES ('legacy-session', '[{"role": "user", "content": "old question"}]', NOW(), NOW())
+        """)
+    conn.commit()
+    conn.close()
+
+    with _allow_auth(), _owned_session_ids([]):
+        response = http.get("/sessions", headers=_auth_headers())
+
+    assert response.status_code == 200
+    assert response.json() == []
 
 
 def test_get_history_reads_session_records_messages():
@@ -120,10 +169,14 @@ def test_get_history_reads_session_records_messages():
     conn.commit()
     conn.close()
 
-    response = http.get("/sessions/history-id/history")
+    with _allow_auth(), _allow_owner():
+        response = http.get("/sessions/history-id/history", headers=_auth_headers())
 
     assert response.status_code == 200
-    assert response.json() == [
-        {"role": "user", "content": "hello"},
-        {"role": "assistant", "content": "hi there"},
+    data = response.json()
+    assert [(message["role"], message["content"]) for message in data] == [
+        ("user", "hello"),
+        ("assistant", "hi there"),
     ]
+    assert "platform_context" in data[0]
+    assert "ambient_context" in data[0]

@@ -179,6 +179,29 @@ class RegistrationRepository:
         finally:
             conn.close()
 
+    def update_user_role(self, user_id: str, role: UserRole) -> User | None:
+        conn = self._connect()
+        try:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute(
+                    """
+                    UPDATE users
+                    SET role = %s,
+                        updated_at = NOW()
+                    WHERE id = %s::uuid
+                    RETURNING id, username, role, is_active
+                    """,
+                    (role, user_id),
+                )
+                row = cur.fetchone()
+            conn.commit()
+            return self._user_from_row(row) if row else None
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
     def record_session_owner(self, user_id: str, session_id: str) -> None:
         conn = self._connect()
         try:

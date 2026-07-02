@@ -71,6 +71,7 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
   private sseSubscription!: Subscription;
   private shouldScrollToBottom = false;
   private kubeconfig: string | null = null;
+  private hasActiveSession = false;
   private pendingReportTitles = new Map<string, string>();
   private activeToolData: MessageData = this.emptyMessageData();
   private activeToolCommands = new Map<string, Command>();
@@ -102,6 +103,10 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
     return this.systemPrompts.find(prompt => prompt.id === this.selectedSystemPromptId)?.name ?? '';
   }
 
+  get canSendMessage(): boolean {
+    return this.hasActiveSession;
+  }
+
   async ngOnInit(): Promise<void> {
     const [creds, personas, skills, systemPrompts] = await Promise.all([
       this.adminService.getCredentials().catch(() => null),
@@ -118,6 +123,7 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
     if (this.resumeSessionId) {
       await this.loadExistingSession(this.resumeSessionId);
     } else {
+      this.hasActiveSession = false;
       await this.initConnection();
     }
   }
@@ -142,12 +148,14 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
     this.messages = [];
     this.pendingToolCalls = [];
     this.isWaiting = false;
+    this.hasActiveSession = false;
     this.resetActiveToolData();
     await this.initConnection();
     this.isSwitching = false;
   }
 
   async onProviderChange(): Promise<void> {
+    this.selectedSystemPromptId = null;
     await this.newSession();
   }
 
@@ -156,8 +164,8 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
   }
 
   async onSystemPromptSelect(promptId: string): Promise<void> {
-    if (this.isSwitching || this.isWaiting || promptId === this.selectedSystemPromptId) return;
-    this.selectedSystemPromptId = promptId;
+    if (this.isSwitching || this.isWaiting) return;
+    this.selectedSystemPromptId = promptId === this.selectedSystemPromptId ? null : promptId;
     await this.newSession();
   }
 
@@ -169,6 +177,7 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
     this.messages = [];
     this.pendingToolCalls = [];
     this.isWaiting = false;
+    this.hasActiveSession = false;
     this.resetActiveToolData();
     this.mode = newMode;
     await this.initConnection();
@@ -177,7 +186,7 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
 
   async sendMessage(): Promise<void> {
     const text = this.userInput.trim();
-    if (!text) return;
+    if (!text || !this.canSendMessage) return;
     this.userInput = '';
     const userMessage = this.addMessage('user', text);
     this.isWaiting = true;
@@ -208,6 +217,7 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
   private async loadExistingSession(sessionId: string): Promise<void> {
     this.mode = 'sse';
     this.chatService.setSession(sessionId);
+    this.hasActiveSession = true;
     const history = await this.sessionsService.getHistory(sessionId).catch(() => []);
     this.messages = history.map(m => ({
       id: crypto.randomUUID(),
@@ -229,6 +239,7 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
   }
 
   private async initConnection(): Promise<void> {
+    if (this.systemPrompts.length > 0 && !this.selectedSystemPromptId) return;
     const personaIds = [...this.selectedPersonaIds];
     await this.activeService.createSession(
       null,
@@ -238,6 +249,7 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
       this.selectedProvider,
       personaIds,
     );
+    this.hasActiveSession = true;
     this.subscribeToEvents(this.activeService);
   }
 
@@ -281,7 +293,7 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
     ) {
       return this.selectedSystemPromptId;
     }
-    return prompts.find(prompt => prompt.is_active)?.id ?? prompts[0]?.id ?? null;
+    return null;
   }
 
   private subscribeToEvents(service: ChatService | WebsocketChatService): void {

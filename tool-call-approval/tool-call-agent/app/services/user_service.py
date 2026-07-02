@@ -9,6 +9,7 @@ from app.security.passwords import PasswordHasher
 class UserRepository(Protocol):
     def create_user(self, username: str, password_hash: str, role: UserRole) -> User: ...
     def list_users(self) -> list[User]: ...
+    def update_user_role(self, user_id: str, role: UserRole) -> User | None: ...
 
 
 class UserService:
@@ -32,3 +33,11 @@ class UserService:
 
     def list_users(self) -> list[User]:
         return self._repository.list_users()
+
+    def update_user_role(self, user_id: str, role: str) -> User:
+        if role not in {"admin", "user"}:
+            raise ValueError("Role must be admin or user")
+        user = self._repository.update_user_role(user_id, role)
+        if user is None:
+            raise LookupError("User not found")
+        return user

@@ -118,3 +118,75 @@ def test_admin_can_list_users():
 
     assert response.status_code == 200
     assert [user["username"] for user in response.json()] == ["admin", "alice"]
+
+
+def test_admin_can_update_user_role():
+    updated_user = User(id=PLAIN_USER.id, username="alice", role="admin")
+    with patch.object(main_app._auth_service, "get_current_user", return_value=ADMIN_USER), \
+         patch.object(main_app._user_service, "update_user_role", return_value=updated_user) as update_user_role:
+        response = client.patch(
+            f"/admin/users/{PLAIN_USER.id}",
+            json={"role": "admin"},
+            headers=_auth_headers(),
+        )
+
+    assert response.status_code == 200
+    assert response.json()["username"] == "alice"
+    assert response.json()["role"] == "admin"
+    update_user_role.assert_called_once_with(PLAIN_USER.id, "admin")
+
+
+def test_non_admin_cannot_update_user_role():
+    with patch.object(main_app._auth_service, "get_current_user", return_value=PLAIN_USER):
+        response = client.patch(
+            f"/admin/users/{ADMIN_USER.id}",
+            json={"role": "user"},
+            headers=_auth_headers(PLAIN_USER),
+        )
+
+    assert response.status_code == 403
+
+
+def test_update_user_role_rejects_invalid_role():
+    with patch.object(main_app._auth_service, "get_current_user", return_value=ADMIN_USER), \
+         patch.object(
+             main_app._user_service,
+             "update_user_role",
+             side_effect=ValueError("Role must be admin or user"),
+         ):
+        response = client.patch(
+            f"/admin/users/{PLAIN_USER.id}",
+            json={"role": "owner"},
+            headers=_auth_headers(),
+        )
+
+    assert response.status_code == 422
+
+
+def test_update_user_role_returns_404_for_missing_user():
+    with patch.object(main_app._auth_service, "get_current_user", return_value=ADMIN_USER), \
+         patch.object(
+             main_app._user_service,
+             "update_user_role",
+             side_effect=LookupError("User not found"),
+         ):
+        response = client.patch(
+            "/admin/users/00000000-0000-0000-0000-000000000099",
+            json={"role": "admin"},
+            headers=_auth_headers(),
+        )
+
+    assert response.status_code == 404
+
+
+def test_admin_cannot_change_own_role():
+    with patch.object(main_app._auth_service, "get_current_user", return_value=ADMIN_USER), \
+         patch.object(main_app._user_service, "update_user_role") as update_user_role:
+        response = client.patch(
+            f"/admin/users/{ADMIN_USER.id}",
+            json={"role": "user"},
+            headers=_auth_headers(),
+        )
+
+    assert response.status_code == 400
+    update_user_role.assert_not_called()

@@ -88,11 +88,40 @@ describe('Chat', () => {
     expect(adminService.listSystemPrompts).toHaveBeenCalled();
   });
 
-  it('should populate prompts and select the active prompt on init', async () => {
+  it('should populate prompts without selecting one on init', async () => {
     const prompts: SystemPromptData[] = [
       {
         id: 'prompt-1',
-        name: 'default',
+        name: 'default_agent',
+        instructions: 'default instructions',
+        is_active: false,
+        created_at: '',
+        updated_at: '',
+      },
+      {
+        id: 'prompt-2',
+        name: 'kubernetes_agent',
+        instructions: 'kubernetes instructions',
+        is_active: true,
+        created_at: '',
+        updated_at: '',
+      },
+    ];
+    adminService.listSystemPrompts.and.returnValue(Promise.resolve(prompts));
+    chatService.createSession.calls.reset();
+
+    await component.ngOnInit();
+
+    expect(component.systemPrompts).toEqual(prompts);
+    expect(component.selectedSystemPromptId).toBeNull();
+    expect(chatService.createSession).not.toHaveBeenCalled();
+  });
+
+  it('should keep no prompt selected when switching to GCP', async () => {
+    const prompts: SystemPromptData[] = [
+      {
+        id: 'prompt-1',
+        name: 'default_agent',
         instructions: 'default instructions',
         is_active: false,
         created_at: '',
@@ -109,8 +138,83 @@ describe('Chat', () => {
     ];
     adminService.listSystemPrompts.and.returnValue(Promise.resolve(prompts));
     await component.ngOnInit();
-    expect(component.systemPrompts).toEqual(prompts);
-    expect(component.selectedSystemPromptId).toBe('prompt-2');
+    chatService.createSession.calls.reset();
+
+    component.selectedSystemPromptId = 'prompt-2';
+    component.selectedProvider = 'GCP';
+    await component.onProviderChange();
+
+    expect(component.selectedSystemPromptId).toBeNull();
+    expect(chatService.createSession).not.toHaveBeenCalled();
+  });
+
+  it('should create a session when the user selects a system prompt', async () => {
+    component.systemPrompts = [
+      {
+        id: 'prompt-1',
+        name: 'default_agent',
+        instructions: 'default instructions',
+        is_active: false,
+        created_at: '',
+        updated_at: '',
+      },
+      {
+        id: 'prompt-2',
+        name: 'kubernetes_agent',
+        instructions: 'kubernetes instructions',
+        is_active: true,
+        created_at: '',
+        updated_at: '',
+      },
+    ];
+    component.selectedProvider = 'GCP';
+    component.selectedSystemPromptId = null;
+    chatService.createSession.calls.reset();
+
+    await component.onSystemPromptSelect('prompt-1');
+
+    expect(component.selectedSystemPromptId as string | null).toBe('prompt-1');
+    expect(chatService.createSession.calls.count()).toBe(1);
+    expect(chatService.createSession.calls.mostRecent().args).toEqual([
+      null,
+      undefined,
+      'prompt-1',
+      undefined,
+      'GCP',
+      [],
+    ]);
+  });
+
+  it('should deselect a selected system prompt when clicked again', async () => {
+    component.systemPrompts = [
+      {
+        id: 'prompt-1',
+        name: 'default_agent',
+        instructions: 'default instructions',
+        is_active: false,
+        created_at: '',
+        updated_at: '',
+      },
+      {
+        id: 'prompt-2',
+        name: 'kubernetes_agent',
+        instructions: 'kubernetes instructions',
+        is_active: true,
+        created_at: '',
+        updated_at: '',
+      },
+    ];
+    component.selectedProvider = 'GCP';
+    component.selectedSystemPromptId = null;
+    chatService.createSession.calls.reset();
+
+    await component.onSystemPromptSelect('prompt-1');
+    await component.onSystemPromptSelect('prompt-1');
+
+    expect(component.selectedSystemPromptId).toBeNull();
+    expect(component.canSendMessage).toBeFalse();
+    expect(chatService.closeStream).toHaveBeenCalled();
+    expect(chatService.createSession.calls.count()).toBe(1);
   });
 
   it('should label the selected system prompt instead of the admin default in chat', () => {
@@ -180,6 +284,13 @@ describe('Chat', () => {
     expect(fixture.nativeElement.querySelector('.chat-topbar .provider-picker')).toBeNull();
   });
 
+  it('should render a bold chat workspace header beside the session controls', () => {
+    const title = fixture.nativeElement.querySelector('.chat-title') as HTMLElement | null;
+
+    expect(title?.textContent?.trim()).toBe('Chat');
+    expect(fixture.nativeElement.querySelector('.chat-topbar .chat-btn-new')).toBeTruthy();
+  });
+
   it('should order provider and model before system prompt and personas in the sidebar', () => {
     component.systemPrompts = [
       {
@@ -226,7 +337,7 @@ describe('Chat', () => {
 
     const sidebar = fixture.nativeElement.querySelector('.chat-sidebar') as HTMLElement;
 
-    expect(getComputedStyle(sidebar).gap).toBe('30px');
+    expect(getComputedStyle(sidebar).gap).toBe('24px');
   });
 
   it('should render sidebar section labels with stronger visual emphasis', () => {
@@ -254,8 +365,8 @@ describe('Chat', () => {
     const label = fixture.nativeElement.querySelector('.context-label') as HTMLElement;
     const styles = getComputedStyle(label);
 
-    expect(styles.fontWeight).toBe('700');
-    expect(styles.color).toBe('rgb(203, 213, 225)');
+    expect(styles.fontWeight).toBe('900');
+    expect(styles.color).toBe('rgb(19, 32, 51)');
     expect(styles.textTransform).toBe('uppercase');
   });
 

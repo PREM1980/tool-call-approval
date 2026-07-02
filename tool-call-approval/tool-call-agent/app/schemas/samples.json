@@ -1,0 +1,92 @@
+{
+  "chat_request": {
+    "session": {
+      "session_id": "sess-abc-123",
+      "instance_id": "inst-001",
+      "persona_id": "devops-agent",
+      "persona_ids": ["devops-agent", "k8s-helper"],
+      "system_prompt_id": "sp-default",
+      "model_id": "us.anthropic.claude-sonnet-4-20250514-v1:0",
+      "provider": "aws-bedrock"
+    },
+    "messages": [
+      {
+        "role": "user",
+        "content": "List all pods in the staging namespace",
+        "data": {
+          "cmds": [
+            {
+              "command": "kubectl get pods -n staging",
+              "execute": false,
+              "rejection_reason": null,
+              "files": null
+            }
+          ],
+          "executed_cmds": [
+            {
+              "command": "kubectl config current-context",
+              "output": "arn:aws:eks:us-east-1:123456789:cluster/staging"
+            }
+          ],
+          "url_configs": [
+            {
+              "url": "https://grafana.internal/d/k8s-pods",
+              "description": "Pod monitoring dashboard"
+            }
+          ],
+          "user_file_uploads": [
+            {
+              "file_path": "/tmp/kubeconfig.yaml",
+              "file_content": "apiVersion: v1\nkind: Config\nclusters: []",
+              "refers_persistent_file": null
+            }
+          ]
+        },
+        "timestamp": "2026-06-29T10:30:00Z",
+        "user": "prem",
+        "agent": null,
+        "platform_context": {
+          "k8s_namespace": "staging",
+          "duplo_base_url": "https://app.duplocloud.net",
+          "duplo_token": "REDACTED",
+          "tenant_name": "staging-tenant",
+          "aws_credentials": {
+            "access_key_id": "AKIA...",
+            "secret_access_key": "REDACTED",
+            "region": "us-east-1"
+          },
+          "kubeconfig": "/home/user/.kube/config"
+        },
+        "ambient_context": {
+          "user_terminal_cmds": [
+            {
+              "command": "kubectl get ns",
+              "output": "NAME      STATUS   AGE\nstaging   Active   30d\ndefault   Active   90d"
+            }
+          ]
+        }
+      },
+      {
+        "role": "assistant",
+        "content": "Here are the pods in the staging namespace...",
+        "data": {
+          "cmds": [
+            {
+              "command": "kubectl get pods -n staging -o wide",
+              "execute": true,
+              "rejection_reason": null,
+              "files": null
+            }
+          ],
+          "executed_cmds": [],
+          "url_configs": [],
+          "user_file_uploads": []
+        },
+        "timestamp": "2026-06-29T10:30:05Z",
+        "user": null,
+        "agent": "devops-agent"
+      }
+    ],
+    "approval": null
+  }
+}

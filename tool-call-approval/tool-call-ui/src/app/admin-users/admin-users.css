@@ -94,7 +94,7 @@
 
 .users-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 120px 110px;
+  grid-template-columns: minmax(0, 1fr) 128px 86px 110px;
   align-items: center;
   gap: 12px;
   padding: 14px 16px;
@@ -115,23 +115,22 @@
   text-transform: uppercase;
 }
 
-.role-pill,
+.role-select {
+  min-width: 0;
+  font-weight: 800;
+}
+
+.role-save {
+  min-width: 74px;
+  font-weight: 900;
+}
+
 .status-pill {
   width: fit-content;
   padding: 4px 9px;
   border-radius: 999px;
   font-size: 0.74rem;
   font-weight: 900;
-}
-
-.role-pill {
-  color: #075985;
-  background: #e0f2fe;
-}
-
-.role-pill-admin {
-  color: #5b21b6;
-  background: #ede9fe;
 }
 
 .status-pill {
@@ -158,7 +157,12 @@
     grid-template-columns: 1fr auto;
   }
 
-  .users-row span:last-child {
-    grid-column: 2;
+  .users-row-head {
+    display: none;
+  }
+
+  .users-row strong,
+  .users-row .status-pill {
+    grid-column: 1 / -1;
   }
 }

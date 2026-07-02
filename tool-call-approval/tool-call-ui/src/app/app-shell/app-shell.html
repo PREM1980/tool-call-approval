@@ -8,7 +8,7 @@
       @if (auth.isAdmin()) {
         <a class="topbar-link" routerLink="/users" routerLinkActive="active">Users</a>
       }
-      <a class="topbar-link" routerLink="/admin" routerLinkActive="active">Admin</a>
+      <a class="topbar-link" routerLink="/admin" routerLinkActive="active">Config</a>
       @if (auth.currentUser(); as user) {
         <span class="topbar-user">{{ user.username }}</span>
       }

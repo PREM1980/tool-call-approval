@@ -46,10 +46,10 @@
 - Create: `tool-call-approval/tool-call-agent/app/schemas/auth.py`
 - Create: `tool-call-approval/tool-call-agent/app/security/__init__.py`
 
-- [ ] Write failing tests for password hashing, token roundtrip, admin seed, user creation, duplicate username, and ownership mapping.
-- [ ] Run `cd tool-call-approval/tool-call-agent && /private/tmp/tool-call-approval-venv/bin/python -m pytest tests/test_auth.py -q`; expect import/test failures because the new modules do not exist.
-- [ ] Implement the auth domain with PBKDF2 hashes, signed tokens, registration tables, and services.
-- [ ] Re-run the focused auth tests; expect pass.
+- [x] Write failing tests for password hashing, token roundtrip, admin seed, user creation, duplicate username, and ownership mapping.
+- [x] Run `cd tool-call-approval/tool-call-agent && /private/tmp/tool-call-approval-venv/bin/python -m pytest tests/test_auth.py -q`; expect import/test failures because the new modules do not exist.
+- [x] Implement the auth domain with PBKDF2 hashes, signed tokens, registration tables, and services.
+- [x] Re-run the focused auth tests; expect pass.
 
 ### Task 2: Protect Agent Session APIs
 
@@ -60,11 +60,11 @@
 - Modify: `tool-call-approval/tool-call-agent/app/repositories/agent_repository.py`
 - Modify: `tool-call-approval/tool-call-agent/app/repositories/__init__.py`
 
-- [ ] Write failing API tests for missing token, creating session with ownership, owned session listing, unowned history returning `404`, and legacy unowned rows hidden.
-- [ ] Run the focused tests and confirm they fail for missing auth/ownership.
-- [ ] Wire `RegistrationRepository`, `AuthService`, `TokenService`, and `SessionOwnershipService` into `app/api/main.py`.
-- [ ] Add `session_ids` filtering to `PostgresRepository.list_sessions`.
-- [ ] Re-run focused backend session/auth tests; expect pass.
+- [x] Write failing API tests for missing token, creating session with ownership, owned session listing, unowned history returning `404`, and legacy unowned rows hidden.
+- [x] Run the focused tests and confirm they fail for missing auth/ownership.
+- [x] Wire `RegistrationRepository`, `AuthService`, `TokenService`, and `SessionOwnershipService` into `app/api/main.py`.
+- [x] Add `session_ids` filtering to `PostgresRepository.list_sessions`.
+- [x] Re-run focused backend session/auth tests; expect pass.
 
 ### Task 3: Add Auth And User Routes
 
@@ -74,10 +74,10 @@
 - Modify: `tool-call-approval/tool-call-agent/tests/test_main.py`
 - Create: `tool-call-approval/tool-call-agent/tests/test_user_admin_api.py`
 
-- [ ] Write failing route tests for `/auth/login`, `/auth/me`, `/admin/users` admin success, `/admin/users` non-admin `403`, and duplicate username `409`.
-- [ ] Run the focused route tests and confirm failure.
-- [ ] Implement auth router and real-admin user endpoints.
-- [ ] Re-run route tests; expect pass.
+- [x] Write failing route tests for `/auth/login`, `/auth/me`, `/admin/users` admin success, `/admin/users` non-admin `403`, and duplicate username `409`.
+- [x] Run the focused route tests and confirm failure.
+- [x] Implement auth router and real-admin user endpoints.
+- [x] Re-run route tests; expect pass.
 
 ### Task 4: Proxy Auth Through `tool-call-api`
 
@@ -85,10 +85,10 @@
 - Modify: `tool-call-approval/tool-call-api/main.py`
 - Modify: `tool-call-approval/tool-call-api/tests/test_main.py`
 
-- [ ] Write failing proxy tests that `/api/auth/login` forwards to `/auth/login` and protected `/api/sessions` forwards the `Authorization` header.
-- [ ] Run `cd tool-call-approval/tool-call-api && /private/tmp/tool-call-approval-venv/bin/python -m pytest tests/test_main.py -q`; expect failures.
-- [ ] Add auth proxying and authorization-header forwarding.
-- [ ] Re-run proxy tests; expect pass.
+- [x] Write failing proxy tests that `/api/auth/login` forwards to `/auth/login` and protected `/api/sessions` forwards the `Authorization` header.
+- [x] Run `cd tool-call-approval/tool-call-api && /private/tmp/tool-call-approval-venv/bin/python -m pytest tests/test_main.py -q`; expect failures.
+- [x] Add auth proxying and authorization-header forwarding.
+- [x] Re-run proxy tests; expect pass.
 
 ### Task 5: Angular Auth Flow
 
@@ -107,10 +107,10 @@
 - Modify: `tool-call-approval/tool-call-ui/src/app/app-shell/app-shell.css`
 - Modify/Create tests for auth service, guards, and login component.
 
-- [ ] Write failing Angular tests for login storing token/current user, interceptor adding bearer token, auth guard redirecting, and admin guard blocking users.
-- [ ] Run targeted Angular tests; expect failures.
-- [ ] Implement service, interceptor, guards, login route, topbar username/logout, and protected routes.
-- [ ] Re-run targeted Angular tests; expect pass.
+- [x] Write failing Angular tests for login storing token/current user, interceptor adding bearer token, auth guard redirecting, and admin guard blocking users.
+- [x] Run targeted Angular tests; expect failures.
+- [x] Implement service, interceptor, guards, login route, topbar username/logout, and protected routes.
+- [x] Re-run targeted Angular tests; expect pass.
 
 ### Task 6: Angular Admin Users Page
 
@@ -122,10 +122,10 @@
 - Modify: `tool-call-approval/tool-call-ui/src/app/app.routes.ts`
 - Create: `tool-call-approval/tool-call-ui/src/app/admin-users/admin-users.spec.ts`
 
-- [ ] Write failing Angular tests that admins can submit username/password/role and list users.
-- [ ] Run the focused tests; expect failures.
-- [ ] Implement Bootstrap-based admin users UI with custom bold styling.
-- [ ] Re-run focused tests; expect pass.
+- [x] Write failing Angular tests that admins can submit username/password/role and list users.
+- [x] Run the focused tests; expect failures.
+- [x] Implement Bootstrap-based admin users UI with custom bold styling.
+- [x] Re-run focused tests; expect pass.
 
 ### Task 7: Configuration And Verification
 
@@ -135,10 +135,10 @@
 - Modify: `tool-call-approval/k8s/tool-call-agent/configmap.yaml`
 - Modify: `tool-call-approval/README.md`
 
-- [ ] Add `REGISTRATION_DATABASE_URL`, `JWT_SECRET_KEY`, and `JWT_ACCESS_TOKEN_MINUTES` examples.
-- [ ] Run backend test suites for changed services.
-- [ ] Run `cd tool-call-approval/tool-call-ui && npm run build`.
-- [ ] Run `git diff --check`.
+- [x] Add `REGISTRATION_DATABASE_URL`, `JWT_SECRET_KEY`, and `JWT_ACCESS_TOKEN_MINUTES` examples.
+- [x] Run backend test suites for changed services.
+- [x] Run `cd tool-call-approval/tool-call-ui && npm run build`.
+- [x] Run `git diff --check`.
 
 ## Self-Review
 

@@ -28,7 +28,7 @@ from app.domain.user import User
 from app.repositories.admin_repository import AdminRepository
 from app.repositories.agent_repository import PostgresRepository
 from app.repositories.registration_repository import RegistrationRepository
-from app.schemas.auth import CreateUserRequest, LoginRequest, TokenResponse, UserResponse
+from app.schemas.auth import CreateUserRequest, LoginRequest, TokenResponse, UpdateUserRequest, UserResponse
 from app.schemas.messages import (
     ApprovalRequest,
     ChatRequest,
@@ -167,6 +167,23 @@ async def create_user(
     except ValueError as e:
         if "already exists" in str(e):
             raise HTTPException(status_code=409, detail="Username already exists")
+        raise HTTPException(status_code=422, detail=str(e))
+    return _user_response(user)
+
+
+@app.patch("/admin/users/{user_id}", response_model=UserResponse)
+async def update_user(
+    user_id: str,
+    request: UpdateUserRequest,
+    current_user: User = Depends(_require_admin),
+) -> UserResponse:
+    if user_id == current_user.id and request.role != current_user.role:
+        raise HTTPException(status_code=400, detail="You cannot change your own role")
+    try:
+        user = _user_service.update_user_role(user_id, request.role)
+    except LookupError:
+        raise HTTPException(status_code=404, detail="User not found")
+    except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
     return _user_response(user)
 

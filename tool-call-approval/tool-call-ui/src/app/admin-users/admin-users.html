@@ -74,14 +74,30 @@
           <div class="users-row users-row-head">
             <span>Username</span>
             <span>Role</span>
+            <span>Action</span>
             <span>Status</span>
           </div>
           @for (user of users; track user.id) {
             <div class="users-row">
               <strong>{{ user.username }}</strong>
-              <span class="role-pill" [class.role-pill-admin]="user.role === 'admin'">
-                {{ user.role }}
-              </span>
+              <select
+                class="form-select form-select-sm role-select"
+                [attr.data-testid]="'role-select-' + user.id"
+                [name]="'role-' + user.id"
+                [(ngModel)]="roleDrafts[user.id]"
+              >
+                <option value="user">User</option>
+                <option value="admin">Admin</option>
+              </select>
+              <button
+                type="button"
+                class="btn btn-outline-primary btn-sm role-save"
+                [attr.data-testid]="'save-role-' + user.id"
+                [disabled]="isSavingRole(user.id) || !roleChanged(user)"
+                (click)="updateUserRole(user)"
+              >
+                {{ isSavingRole(user.id) ? 'Saving...' : 'Save' }}
+              </button>
               <span class="status-pill">Active</span>
             </div>
           }

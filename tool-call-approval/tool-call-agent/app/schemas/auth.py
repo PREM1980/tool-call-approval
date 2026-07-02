@@ -28,3 +28,7 @@ class CreateUserRequest(StrictBaseModel):
     username: str
     password: str
     role: str
+
+
+class UpdateUserRequest(StrictBaseModel):
+    role: str

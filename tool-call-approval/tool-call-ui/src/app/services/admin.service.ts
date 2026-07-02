@@ -185,4 +185,8 @@ export class AdminService {
   createUser(username: string, password: string, role: 'admin' | 'user') {
     return firstValueFrom(this.http.post<AppUser>(`${API}/users`, { username, password, role }));
   }
+
+  updateUserRole(id: string, role: 'admin' | 'user') {
+    return firstValueFrom(this.http.patch<AppUser>(`${API}/users/${id}`, { role }));
+  }
 }

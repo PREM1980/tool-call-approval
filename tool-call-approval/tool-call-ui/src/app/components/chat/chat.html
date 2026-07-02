@@ -1,19 +1,24 @@
 <div class="chat-shell">
 
   <div class="chat-topbar">
+    <div class="chat-heading">
+      <h1 class="chat-title">Chat</h1>
+    </div>
     <div class="topbar-spacer"></div>
-    <button type="button" class="chat-btn-new"
-      [disabled]="isSwitching || isWaiting"
-      (click)="newSession()">+ New</button>
-    <div class="mode-toggle">
-      <button type="button" class="mode-btn"
-        [class.active]="mode === 'sse'"
-        [disabled]="isSwitching"
-        (click)="switchMode('sse')">SSE</button>
-      <button type="button" class="mode-btn"
-        [class.active]="mode === 'websocket'"
-        [disabled]="isSwitching"
-        (click)="switchMode('websocket')">WebSocket</button>
+    <div class="chat-actions">
+      <button type="button" class="chat-btn-new"
+        [disabled]="isSwitching || isWaiting"
+        (click)="newSession()">+ New</button>
+      <div class="mode-toggle">
+        <button type="button" class="mode-btn"
+          [class.active]="mode === 'sse'"
+          [disabled]="isSwitching"
+          (click)="switchMode('sse')">SSE</button>
+        <button type="button" class="mode-btn"
+          [class.active]="mode === 'websocket'"
+          [disabled]="isSwitching"
+          (click)="switchMode('websocket')">WebSocket</button>
+      </div>
     </div>
   </div>
 
@@ -222,11 +227,11 @@
           [(ngModel)]="userInput"
           name="userInput"
           placeholder="Ask about your Kubernetes cluster..."
-          [disabled]="isWaiting || pendingToolCalls.length > 0"
+          [disabled]="!canSendMessage || isWaiting || pendingToolCalls.length > 0"
           autocomplete="off"
         />
         <button class="chat-send" type="submit"
-          [disabled]="isWaiting || pendingToolCalls.length > 0 || !userInput.trim()">Send</button>
+          [disabled]="!canSendMessage || isWaiting || pendingToolCalls.length > 0 || !userInput.trim()">Send</button>
       </form>
     </div>
   </div>
