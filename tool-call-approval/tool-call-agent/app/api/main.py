@@ -310,7 +310,15 @@ async def approve_tool(
         raise HTTPException(status_code=404, detail="Session not found")
     if request.approval is None:
         raise HTTPException(status_code=422, detail="Approval details are required")
-    service.approve(session, request.approval.tool_use_id, request.approval.approved)
+    try:
+        service.approve(
+            session,
+            request.approval.tool_use_id,
+            request.approval.approved,
+            request.approval.tool_input,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
     logger.info(
         "tool approval received",
         extra={

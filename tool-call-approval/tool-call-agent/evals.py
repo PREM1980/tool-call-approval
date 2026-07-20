@@ -1,5 +1,5 @@
 """
-Prompt evals for the Kubernetes operations agent using AgentAsJudgeEval.
+Prompt evals for the Kubernetes operations agent using a LangChain judge.
 
 Run all evals:   python evals.py
 Run one eval:    python evals.py tool_over_prose
@@ -18,14 +18,17 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from agno.eval.agent_as_judge import AgentAsJudgeEval
-from agno.models.vertexai.claude import Claude as VertexAIClaude
+from langchain_core.messages import HumanMessage
+from langchain_google_vertexai import ChatVertexAI
 
-_JUDGE_MODEL = VertexAIClaude(
-    id="claude-sonnet-4-6",
-    project_id=getenv("GOOGLE_CLOUD_PROJECT"),
-    region=getenv("GOOGLE_CLOUD_LOCATION", "us-east5"),
-)
+
+def _judge_model() -> ChatVertexAI:
+    return ChatVertexAI(
+        model_name="claude-sonnet-4-6",
+        project=getenv("GOOGLE_CLOUD_PROJECT"),
+        location=getenv("GOOGLE_CLOUD_LOCATION", "us-east5"),
+        temperature=0,
+    )
 
 
 @dataclass
@@ -464,22 +467,25 @@ EVALS: list[Eval] = [
 
 def run_eval(ev: Eval) -> dict:
     """Run one eval and return a summary dict."""
-    judge = AgentAsJudgeEval(
-        name=ev.name,
-        criteria=ev.criteria,
-        scoring_strategy="binary",
-        model=_JUDGE_MODEL,
-        print_results=True,
-        print_summary=True,
-    )
-    result = judge.run(cases=ev.cases, print_results=True, print_summary=True)
-    passed = sum(1 for r in result.results if r.passed) if result else 0
-    total = len(result.results) if result else 0
-    details = [
-        {"input": r.input[:120], "passed": r.passed, "reason": r.reason}
-        for r in (result.results if result else [])
-    ]
-    return {"name": ev.name, "passed": passed, "total": total, "details": details}
+    judge = _judge_model()
+    details = []
+    for case in ev.cases:
+        prompt = f"""Evaluate the candidate response against the criterion.
+
+Criterion:
+{ev.criteria}
+
+User input:
+{case['input']}
+
+Candidate response:
+{case['output']}
+
+Reply with exactly `PASS: <brief reason>` or `FAIL: <brief reason>`."""
+        verdict = str(judge.invoke([HumanMessage(content=prompt)]).content).strip()
+        passed = verdict.upper().startswith("PASS:")
+        details.append({"input": case["input"][:120], "passed": passed, "reason": verdict})
+    return {"name": ev.name, "passed": sum(item["passed"] for item in details), "total": len(details), "details": details}
 
 
 def _safe(text: str) -> str:

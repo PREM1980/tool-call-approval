@@ -222,7 +222,7 @@ def test_approve_known_session_returns_ok():
 
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
-    approve.assert_called_once_with(session, "tool-1", True)
+    approve.assert_called_once_with(session, "tool-1", True, None)
 
 
 def test_approve_rejects_old_body_shape():
