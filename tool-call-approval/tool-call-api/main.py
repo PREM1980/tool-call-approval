@@ -163,10 +163,13 @@ async def history(session_id: str, request: Request) -> JSONResponse:
 
 @app.post("/api/sessions/{session_id}/approve")
 async def approve(session_id: str, request: ApprovalRequest, raw_request: Request) -> JSONResponse:
+    payload = _payload(request)
+    if payload.get("approval", {}).get("tool_input") is None:
+        payload["approval"].pop("tool_input", None)
     return await _proxy(
         _get_client().post(
             f"{_BACKEND}/sessions/{session_id}/approve",
-            json=_payload(request),
+            json=payload,
             **_with_auth(raw_request, timeout=30.0),
         )
     )
