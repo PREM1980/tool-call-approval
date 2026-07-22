@@ -2,6 +2,7 @@ import json
 import os
 import subprocess
 from pathlib import Path
+from typing import Optional
 
 _KUBECONFIG_PATH = os.getenv("KUBECONFIG_PATH", "/data/kubeconfig.yaml")
 _KUBECTL_TIMEOUT = 30
@@ -18,7 +19,7 @@ def _kubeconfig_exists() -> bool:
     return Path(_KUBECONFIG_PATH).exists()
 
 
-def _run(args: list[str], stdin: str | None = None) -> str:
+def _run(args: list[str], stdin: Optional[str] = None) -> str:
     if not _kubeconfig_exists():
         raise RuntimeError("kubeconfig not configured")
     result = subprocess.run(
