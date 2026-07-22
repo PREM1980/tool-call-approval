@@ -25,7 +25,7 @@ variables:
     - unset SSL_CERT_FILE REQUESTS_CA_BUNDLE CURL_CA_BUNDLE
     - python3 --version
     - python3 -m venv "${CI_PROJECT_DIR}/.ci-venv"
-    - ${CI_PROJECT_DIR}/.ci-venv/bin/python -m pip install --no-cache-dir --upgrade pip
+    - ${CI_PROJECT_DIR}/.ci-venv/bin/python -m pip install --no-cache-dir --upgrade pip eval_type_backport
   script:
     - cd "${SERVICE_DIR}"
     - ${CI_PROJECT_DIR}/.ci-venv/bin/python -m pip install --no-cache-dir -r requirements.txt
