@@ -17,11 +17,17 @@ variables:
   stage: test
   tags:
     - shared
+  # Shell executors ignore this image; it remains useful if the runner is
+  # changed to a Docker executor later.
   image: python:${PYTHON_VERSION}-slim
+  before_script:
+    - python3 --version
+    - python3 -m venv "${CI_PROJECT_DIR}/.ci-venv"
+    - ${CI_PROJECT_DIR}/.ci-venv/bin/python -m pip install --no-cache-dir --upgrade pip
   script:
     - cd "${SERVICE_DIR}"
-    - pip install --no-cache-dir -r requirements.txt
-    - pytest tests/ -v
+    - ${CI_PROJECT_DIR}/.ci-venv/bin/python -m pip install --no-cache-dir -r requirements.txt
+    - ${CI_PROJECT_DIR}/.ci-venv/bin/python -m pytest tests/ -v
 
 test-agent:
   extends: .test-python-service
@@ -42,9 +48,6 @@ test-k8s:
   stage: build
   tags:
     - shared
-  image:
-    name: gcr.io/kaniko-project/executor:v1.23.2-debug
-    entrypoint: [""]
   script:
     - |
       set -eu
@@ -54,19 +57,16 @@ test-k8s:
       : "${ARTIFACTORY_TOKEN:?Set ARTIFACTORY_TOKEN in GitLab CI/CD variables}"
 
       IMAGE_REPOSITORY="${ARTIFACTORY_DOCKER_REGISTRY}/${ARTIFACTORY_DOCKER_REPO}/${IMAGE_NAME}"
-      mkdir -p /kaniko/.docker
-      printf '{"auths":{"%s":{"username":"%s","password":"%s"}}}' \
-        "${ARTIFACTORY_DOCKER_REGISTRY}" "${ARTIFACTORY_USER}" "${ARTIFACTORY_TOKEN}" \
-        > /kaniko/.docker/config.json
-
-      /kaniko/executor \
-        --context="${CI_PROJECT_DIR}/${SERVICE_DIR}" \
-        --dockerfile="${CI_PROJECT_DIR}/${SERVICE_DIR}/Dockerfile" \
-        --destination="${IMAGE_REPOSITORY}:${CI_COMMIT_SHORT_SHA}" \
-        --destination="${IMAGE_REPOSITORY}:${IMAGE_VERSION}" \
-        --destination="${IMAGE_REPOSITORY}:latest" \
-        --customPlatform=linux/amd64 \
-        --skip-tls-verify
+      docker version
+      printf '%s' "${ARTIFACTORY_TOKEN}" | docker login "${ARTIFACTORY_DOCKER_REGISTRY}" \
+        --username "${ARTIFACTORY_USER}" --password-stdin
+      docker buildx build \
+        --platform linux/amd64 \
+        --push \
+        --tag "${IMAGE_REPOSITORY}:${CI_COMMIT_SHORT_SHA}" \
+        --tag "${IMAGE_REPOSITORY}:${IMAGE_VERSION}" \
+        --tag "${IMAGE_REPOSITORY}:latest" \
+        "${CI_PROJECT_DIR}/${SERVICE_DIR}"
 
 build-and-push-agent:
   extends: .build-and-push-image
