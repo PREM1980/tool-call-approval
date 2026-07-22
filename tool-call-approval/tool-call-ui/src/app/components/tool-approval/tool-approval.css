@@ -1,7 +1,7 @@
 .approval-card {
-  background: #1e293b;
-  border: 1px solid #334155;
-  border-left: 3px solid #f59e0b;
+  background: #fff;
+  border: 1px solid #d8e1e8;
+  border-left: 3px solid #0d6efd;
   border-radius: 8px;
 }
 
@@ -15,12 +15,16 @@
 .approval-icon { font-size: 1.1rem; flex-shrink: 0; }
 
 .approval-command {
-  flex: 1;
   font-size: 0.82rem;
   font-family: ui-monospace, monospace;
-  color: #93c5fd;
+  color: #0d6efd;
   word-break: break-all;
 }
+
+.approval-details { flex: 1; min-width: 0; }
+.approval-parameters { display: grid; gap: 6px; margin-top: 8px; }
+.approval-parameters label { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 8px; align-items: center; color: #5f6f83; font-size: 0.75rem; }
+.approval-parameters input { width: 100%; box-sizing: border-box; border: 1px solid #d8e1e8; border-radius: 4px; padding: 4px 6px; background: #f8fafc; color: #132033; font: inherit; }
 
 .approval-btn {
   font-size: 0.75rem;
@@ -34,7 +38,7 @@
   transition: background 0.12s;
 }
 .approval-btn:disabled { opacity: 0.4; cursor: default; }
-.approval-btn.deny  { border-color: #ef4444; color: #fca5a5; }
+.approval-btn.deny  { border-color: #ef4444; color: #b91c1c; }
 .approval-btn.deny:hover:not(:disabled)  { background: rgba(239, 68, 68, 0.15); }
-.approval-btn.allow { border-color: #22c55e; color: #86efac; }
+.approval-btn.allow { border-color: #22c55e; color: #15803d; }
 .approval-btn.allow:hover:not(:disabled) { background: rgba(34, 197, 94, 0.15); }

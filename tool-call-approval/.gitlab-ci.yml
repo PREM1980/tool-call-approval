@@ -1,0 +1,116 @@
+stages:
+  - test
+  - build
+  - deploy
+  - secret-detection
+
+include:
+  - template: Security/SAST.gitlab-ci.yml
+  - template: Security/Secret-Detection.gitlab-ci.yml
+
+variables:
+  IMAGE_VERSION: "v1.0"
+  PYTHON_VERSION: "3.12"
+  SECRET_DETECTION_ENABLED: "true"
+
+.test-python-service:
+  stage: test
+  tags:
+    - shared
+  image: python:${PYTHON_VERSION}-slim
+  script:
+    - cd "${SERVICE_DIR}"
+    - pip install --no-cache-dir -r requirements.txt
+    - pytest tests/ -v
+
+test-agent:
+  extends: .test-python-service
+  variables:
+    SERVICE_DIR: tool-call-agent
+
+test-api:
+  extends: .test-python-service
+  variables:
+    SERVICE_DIR: tool-call-api
+
+test-k8s:
+  extends: .test-python-service
+  variables:
+    SERVICE_DIR: tool-call-k8s
+
+.build-and-push-image:
+  stage: build
+  tags:
+    - shared
+  image:
+    name: gcr.io/kaniko-project/executor:v1.23.2-debug
+    entrypoint: [""]
+  script:
+    - |
+      set -eu
+      : "${ARTIFACTORY_DOCKER_REGISTRY:?Set ARTIFACTORY_DOCKER_REGISTRY to the registry host (without https://)}"
+      : "${ARTIFACTORY_DOCKER_REPO:?Set ARTIFACTORY_DOCKER_REPO to the Docker repository key}"
+      : "${ARTIFACTORY_USER:?Set ARTIFACTORY_USER in GitLab CI/CD variables}"
+      : "${ARTIFACTORY_TOKEN:?Set ARTIFACTORY_TOKEN in GitLab CI/CD variables}"
+
+      IMAGE_REPOSITORY="${ARTIFACTORY_DOCKER_REGISTRY}/${ARTIFACTORY_DOCKER_REPO}/${IMAGE_NAME}"
+      mkdir -p /kaniko/.docker
+      printf '{"auths":{"%s":{"username":"%s","password":"%s"}}}' \
+        "${ARTIFACTORY_DOCKER_REGISTRY}" "${ARTIFACTORY_USER}" "${ARTIFACTORY_TOKEN}" \
+        > /kaniko/.docker/config.json
+
+      /kaniko/executor \
+        --context="${CI_PROJECT_DIR}/${SERVICE_DIR}" \
+        --dockerfile="${CI_PROJECT_DIR}/${SERVICE_DIR}/Dockerfile" \
+        --destination="${IMAGE_REPOSITORY}:${CI_COMMIT_SHORT_SHA}" \
+        --destination="${IMAGE_REPOSITORY}:${IMAGE_VERSION}" \
+        --destination="${IMAGE_REPOSITORY}:latest" \
+        --customPlatform=linux/amd64 \
+        --skip-tls-verify
+
+build-and-push-agent:
+  extends: .build-and-push-image
+  variables:
+    IMAGE_NAME: tool-call-agent
+    SERVICE_DIR: tool-call-agent
+
+build-and-push-api:
+  extends: .build-and-push-image
+  variables:
+    IMAGE_NAME: tool-call-api
+    SERVICE_DIR: tool-call-api
+
+build-and-push-k8s:
+  extends: .build-and-push-image
+  variables:
+    IMAGE_NAME: tool-call-k8s
+    SERVICE_DIR: tool-call-k8s
+
+# Enable this manual GitOps step after setting GITLAB_PUSH_TOKEN (write_repository).
+update-k8s-images:
+  stage: deploy
+  tags:
+    - shared
+  image: alpine/git:latest
+  needs: [build-and-push-agent, build-and-push-api, build-and-push-k8s]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual
+  script:
+    - |
+      set -eu
+      : "${GITLAB_PUSH_TOKEN:?Set GITLAB_PUSH_TOKEN with write_repository scope}"
+      IMAGE_PREFIX="${ARTIFACTORY_DOCKER_REGISTRY}/${ARTIFACTORY_DOCKER_REPO}"
+      sed -i "s#${IMAGE_PREFIX}/tool-call-agent:.*#${IMAGE_PREFIX}/tool-call-agent:${CI_COMMIT_SHORT_SHA}#" k8s-deploy/deployment.yaml
+      sed -i "s#${IMAGE_PREFIX}/tool-call-api:.*#${IMAGE_PREFIX}/tool-call-api:${CI_COMMIT_SHORT_SHA}#" k8s-deploy/deployment.yaml
+      sed -i "s#${IMAGE_PREFIX}/tool-call-k8s:.*#${IMAGE_PREFIX}/tool-call-k8s:${CI_COMMIT_SHORT_SHA}#" k8s-deploy/deployment.yaml
+      git config user.email "ci@gitlab.local"
+      git config user.name "GitLab CI"
+      git remote set-url origin "https://gitlab-ci-token:${GITLAB_PUSH_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
+      git add k8s-deploy/deployment.yaml
+      git diff --cached --quiet && exit 0
+      git commit -m "Deploy application images:${CI_COMMIT_SHORT_SHA} [skip ci]"
+      git push origin HEAD:"${CI_COMMIT_BRANCH}"
+
+secret_detection:
+  stage: secret-detection

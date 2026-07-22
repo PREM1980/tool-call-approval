@@ -4,8 +4,8 @@
   justify-content: space-between;
   padding: 0 20px;
   height: 48px;
-  background: #0f172a;
-  border-bottom: 1px solid #1e293b;
+  background: #fff;
+  border-bottom: 1px solid #d8e1e8;
   flex-shrink: 0;
 }
 
@@ -15,31 +15,60 @@
   gap: 8px;
   font-size: 0.875rem;
   font-weight: 600;
-  color: #f1f5f9;
+  color: #132033;
   text-decoration: none;
 }
 
 .hitl-badge {
   font-size: 0.6rem;
   font-weight: 500;
-  letter-spacing: 0.05em;
+  letter-spacing: 0;
   text-transform: uppercase;
-  color: #a5b4fc;
-  background: rgba(99, 102, 241, 0.18);
+  color: #0d6efd;
+  background: #e8f1ff;
   border-radius: 4px;
   padding: 2px 7px;
 }
 
-.topbar-nav { display: flex; gap: 4px; }
+.topbar-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
 
 .topbar-link {
   font-size: 0.8rem;
   font-weight: 500;
-  color: #64748b;
+  color: #667085;
   text-decoration: none;
   padding: 5px 11px;
   border-radius: 6px;
   transition: color 0.12s, background 0.12s;
 }
-.topbar-link:hover { color: #e2e8f0; background: #1e293b; }
-.topbar-link.active { color: #a5b4fc; background: #312e81; }
+.topbar-link:hover { color: #132033; background: #f3f4f6; }
+.topbar-link.active { color: #0d6efd; background: #e8f1ff; }
+
+.topbar-user {
+  margin-left: 8px;
+  padding: 4px 9px;
+  border: 1px solid #d8e1e8;
+  border-radius: 999px;
+  color: #5f6f83;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.topbar-logout {
+  padding: 5px 10px;
+  border: 1px solid #d8e1e8;
+  border-radius: 6px;
+  background: transparent;
+  color: #5f6f83;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.topbar-logout:hover {
+  background: #f3f4f6;
+  color: #132033;
+}

@@ -1,7 +1,21 @@
 <div class="approval-card">
   <div class="approval-body">
     <span class="approval-icon">⚙️</span>
-    <code class="approval-command">{{ formattedCommand }}</code>
+    <div class="approval-details">
+      <code class="approval-command">{{ formattedCommand }}</code>
+      <div class="approval-parameters">
+        @for (parameter of parameters; track parameter.key) {
+          <label>
+            <span>{{ parameter.key }}</span>
+            <input
+              [name]="parameter.key"
+              [(ngModel)]="editableInput[parameter.key]"
+              [disabled]="disabled"
+            />
+          </label>
+        }
+      </div>
+    </div>
     <button type="button" class="approval-btn deny" [disabled]="disabled" (click)="reject()">✕ Deny</button>
     <button type="button" class="approval-btn allow" [disabled]="disabled" (click)="approve()">✓ Allow</button>
   </div>

@@ -3,5 +3,8 @@
 .env.*
 !.env.example
 
+# Local brainstorming companion artifacts
+.superpowers/
+
 # K8s secrets — never commit real values
 k8s/**/secret.yaml

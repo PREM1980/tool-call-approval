@@ -30,4 +30,22 @@ describe('ToolApproval', () => {
     };
     expect(component.formattedCommand).toBe('calculate: 2+2');
   });
+
+  it('should emit edited parameters when approved', () => {
+    component.toolCall = {
+      tool_use_id: 'id-3',
+      tool_name: 'get_weather',
+      tool_input: { city: 'London' },
+    };
+    component.ngOnChanges({
+      toolCall: { currentValue: component.toolCall, previousValue: null, firstChange: true, isFirstChange: () => true },
+    });
+    component.editableInput['city'] = 'Boston';
+    let decision: unknown;
+    component.approved.subscribe(value => decision = value);
+
+    component.approve();
+
+    expect(decision).toEqual({ approved: true, tool_input: { city: 'Boston' } });
+  });
 });

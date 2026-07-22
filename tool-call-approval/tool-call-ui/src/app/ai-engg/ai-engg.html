@@ -1,14 +1,43 @@
 <div class="aiengg-shell">
-  <div class="aiengg-tabs">
-    <button type="button" class="aiengg-tab" [class.active]="tab === 'chat'" (click)="goToChat()">Chat</button>
-    <button type="button" class="aiengg-tab" [class.active]="tab === 'sessions'" (click)="tab = 'sessions'">Sessions</button>
-  </div>
+  <aside class="conversation-rail" aria-label="Chat history">
+    <div class="conversation-rail-header">
+      <div>
+        <p class="conversation-rail-kicker">Workspace</p>
+        <h1>Conversations</h1>
+      </div>
+      <div class="conversation-rail-actions">
+        <button type="button" class="new-chat-button" (click)="startNewChat()" aria-label="New chat" title="New chat">+</button>
+        <button type="button" class="rail-icon-button" title="Refresh chats" (click)="refreshSessions()" [disabled]="loadingSessions">↻</button>
+      </div>
+    </div>
+
+    <div class="conversation-rail-scroll">
+      @if (loadingSessions) {
+        <p class="rail-status">Loading chats…</p>
+      } @else if (sessionsError) {
+        <p class="rail-status rail-status--error">{{ sessionsError }}</p>
+      } @else if (sessions.length === 0) {
+        <p class="rail-status">Your conversations will appear here.</p>
+      } @else {
+        <div class="conversation-list">
+          @for (session of sessions; track session.session_id) {
+            <button
+              type="button"
+              class="conversation-item"
+              [class.active]="resumeSessionId === session.session_id"
+              [title]="sessionTitle(session)"
+              (click)="openSessionInChat(session.session_id)">
+              <span class="conversation-item-title">{{ sessionTitle(session) }}</span>
+            </button>
+          }
+        </div>
+      }
+    </div>
+  </aside>
+
   <div class="aiengg-content">
-    @if (tab === 'chat') {
-      <app-chat [resumeSessionId]="resumeSessionId" />
-    }
-    @if (tab === 'sessions') {
-      <app-sessions (openChat)="openSessionInChat($event)" />
-    }
+    <app-chat
+      [resumeSessionId]="resumeSessionId"
+      (sessionChanged)="refreshSessions()" />
   </div>
 </div>

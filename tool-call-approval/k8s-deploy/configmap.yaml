@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tool-call-approval-config
+  namespace: tool-call-approval
+data:
+  AGENT_BACKEND_URL: http://tool-call-agent:8000
+  K8S_BACKEND_URL: http://tool-call-k8s:8001
+  CORS_ORIGIN: http://tool-call-api
+  LLM_PROVIDER: GCP
+  MODEL_ID: nemotron-3-super
+  BASE_URL: https://models.k8s.aip.mitre.org/v1
+  LOCAL_VERIFY_SSL: "false"
+  AUTO_APPROVE_TOOLS: "false"
+  JWT_ACCESS_TOKEN_MINUTES: "480"

@@ -103,6 +103,50 @@ async def test_create_session(ac):
     )
 
 
+async def test_auth_login_proxy(ac):
+    mock_client = AsyncMock()
+    mock_client.post.return_value = _resp(
+        200,
+        {
+            "access_token": "token-123",
+            "token_type": "bearer",
+            "user": {"id": "user-1", "username": "admin", "role": "admin"},
+        },
+    )
+
+    with patch("main._client", mock_client):
+        resp = await ac.post(
+            "/api/auth/login",
+            json={"username": "admin", "password": "admin"},
+        )
+
+    assert resp.status_code == 200
+    assert resp.json()["access_token"] == "token-123"
+    mock_client.post.assert_called_once_with(
+        "http://localhost:8000/auth/login",
+        json={"username": "admin", "password": "admin"},
+        timeout=30.0,
+    )
+
+
+async def test_list_sessions_forwards_authorization_header(ac):
+    mock_client = AsyncMock()
+    mock_client.get.return_value = _resp(200, [])
+
+    with patch("main._client", mock_client):
+        resp = await ac.get(
+            "/api/sessions",
+            headers={"Authorization": "Bearer token-123"},
+        )
+
+    assert resp.status_code == 200
+    mock_client.get.assert_called_once_with(
+        "http://localhost:8000/sessions",
+        timeout=30.0,
+        headers={"Authorization": "Bearer token-123"},
+    )
+
+
 async def test_create_session_forwards_selected_prompt(ac):
     mock_client = AsyncMock()
     mock_client.post.return_value = _resp(200, {"session_id": "abc-123"})

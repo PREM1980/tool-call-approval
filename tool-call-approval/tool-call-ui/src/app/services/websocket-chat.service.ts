@@ -82,7 +82,11 @@ export class WebsocketChatService {
     }));
   }
 
-  async approveTool(tool_use_id: string, approved: boolean): Promise<void> {
+  async approveTool(
+    tool_use_id: string,
+    approved: boolean,
+    tool_input?: Record<string, unknown>,
+  ): Promise<void> {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       throw new Error('No active WebSocket connection');
     }
@@ -91,7 +95,7 @@ export class WebsocketChatService {
       ...this.envelope(
         { ...this.sessionContext, session_id: this.sessionId },
         [],
-        { tool_use_id, approved },
+        { tool_use_id, approved, tool_input },
       ),
     }));
   }

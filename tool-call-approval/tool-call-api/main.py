@@ -74,49 +74,100 @@ def _payload(request: MessageEnvelope) -> dict:
     return request.model_dump(mode="json")
 
 
-@app.get("/api/sessions")
-async def list_sessions() -> JSONResponse:
+def _auth_headers(request: Request) -> dict[str, str] | None:
+    authorization = request.headers.get("authorization")
+    if not authorization:
+        return None
+    return {"Authorization": authorization}
+
+
+def _json_headers(request: Request) -> dict[str, str] | None:
+    headers: dict[str, str] = {}
+    if ct := request.headers.get("content-type"):
+        headers["Content-Type"] = ct
+    if authorization := request.headers.get("authorization"):
+        headers["Authorization"] = authorization
+    return headers or None
+
+
+def _with_auth(request: Request, **kwargs) -> dict:
+    headers = _auth_headers(request)
+    if headers:
+        kwargs["headers"] = headers
+    return kwargs
+
+
+@app.post("/api/auth/login")
+async def login_proxy(request: Request) -> JSONResponse:
+    body = await request.json()
     return await _proxy(
-        _get_client().get(f"{_BACKEND}/sessions", timeout=30.0)
+        _get_client().post(
+            f"{_BACKEND}/auth/login",
+            json=body,
+            timeout=30.0,
+        )
+    )
+
+
+@app.get("/api/auth/me")
+async def me_proxy(request: Request) -> JSONResponse:
+    return await _proxy(
+        _get_client().get(
+            f"{_BACKEND}/auth/me",
+            **_with_auth(request, timeout=30.0),
+        )
+    )
+
+
+@app.get("/api/sessions")
+async def list_sessions(request: Request) -> JSONResponse:
+    return await _proxy(
+        _get_client().get(
+            f"{_BACKEND}/sessions",
+            **_with_auth(request, timeout=30.0),
+        )
     )
 
 
 @app.post("/api/sessions")
-async def create_session(request: CreateSessionRequest) -> JSONResponse:
+async def create_session(request: CreateSessionRequest, raw_request: Request) -> JSONResponse:
     return await _proxy(
         _get_client().post(
             f"{_BACKEND}/sessions",
             json=_payload(request),
-            timeout=30.0,
+            **_with_auth(raw_request, timeout=30.0),
         )
     )
 
 
 @app.post("/api/sessions/{session_id}/chat")
-async def chat(session_id: str, request: ChatRequest) -> JSONResponse:
+async def chat(session_id: str, request: ChatRequest, raw_request: Request) -> JSONResponse:
     return await _proxy(
         _get_client().post(
             f"{_BACKEND}/sessions/{session_id}/chat",
             json=_payload(request),
-            timeout=30.0,
+            **_with_auth(raw_request, timeout=30.0),
         )
     )
 
 
 @app.get("/api/sessions/{session_id}/history")
-async def history(session_id: str) -> JSONResponse:
+async def history(session_id: str, request: Request) -> JSONResponse:
     return await _proxy(
-        _get_client().get(f"{_BACKEND}/sessions/{session_id}/history", timeout=30.0)
+        _get_client().get(
+            f"{_BACKEND}/sessions/{session_id}/history",
+            **_with_auth(request, timeout=30.0),
+        )
     )
 
 
 @app.post("/api/sessions/{session_id}/approve")
-async def approve(session_id: str, request: ApprovalRequest) -> JSONResponse:
+async def approve(session_id: str, request: ApprovalRequest, raw_request: Request) -> JSONResponse:
     return await _proxy(
         _get_client().post(
             f"{_BACKEND}/sessions/{session_id}/approve",
             json=_payload(request),
-            timeout=30.0,
+            **_with_auth(raw_request, timeout=30.0),
         )
     )
 
@@ -124,15 +175,13 @@ async def approve(session_id: str, request: ApprovalRequest) -> JSONResponse:
 @app.api_route("/api/admin/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
 async def admin_proxy(path: str, request: Request) -> JSONResponse:
     body = await request.body()
-    headers = {}
-    if ct := request.headers.get("content-type"):
-        headers["Content-Type"] = ct
+    headers = _json_headers(request)
     return await _proxy(
         _get_client().request(
             request.method,
             f"{_BACKEND}/admin/{path}",
             content=body or None,
-            headers=headers if headers else None,
+            headers=headers,
             params=dict(request.query_params),
             timeout=30.0,
         )
@@ -171,10 +220,19 @@ async def k8s_config_proxy(request: Request) -> JSONResponse:
 
 
 @app.get("/api/sessions/{session_id}/stream")
-async def stream_events(session_id: str) -> StreamingResponse:
+async def stream_events(session_id: str, request: Request) -> StreamingResponse:
+    headers = _auth_headers(request)
+    stream_kwargs: dict = {}
+    if headers:
+        stream_kwargs["headers"] = headers
+    if request.query_params:
+        stream_kwargs["params"] = dict(request.query_params)
+
     async def event_generator() -> AsyncIterator[str]:
         async with _get_client().stream(
-            "GET", f"{_BACKEND}/sessions/{session_id}/stream"
+            "GET",
+            f"{_BACKEND}/sessions/{session_id}/stream",
+            **stream_kwargs,
         ) as resp:
             async for chunk in resp.aiter_text():
                 yield chunk

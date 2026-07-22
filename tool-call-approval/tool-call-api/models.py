@@ -85,6 +85,7 @@ class SessionContext(StrictBaseModel):
 class ApprovalContext(StrictBaseModel):
     approved: bool
     tool_use_id: str | None = None
+    tool_input: dict[str, Any] | None = None
 
 
 class MessageEnvelope(StrictBaseModel):

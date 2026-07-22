@@ -85,6 +85,9 @@ class SessionContext(StrictBaseModel):
 class ApprovalContext(StrictBaseModel):
     approved: bool
     tool_use_id: str | None = None
+    # A user may change values already proposed by the agent, but cannot add
+    # arbitrary arguments to a pending tool call.
+    tool_input: dict[str, Any] | None = None
 
 
 class MessageEnvelope(StrictBaseModel):

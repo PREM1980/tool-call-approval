@@ -12,6 +12,8 @@ class Session:
     # Per-tool approval used by the HITL batch path
     pending_approvals: dict[str, asyncio.Event] = field(default_factory=dict)
     approval_results: dict[str, bool] = field(default_factory=dict)
+    approval_inputs: dict[str, dict[str, Any]] = field(default_factory=dict)
+    pending_tool_inputs: dict[str, dict[str, Any]] = field(default_factory=dict)
     kubeconfig: str | None = None
     tmpdir: str | None = None
     instance_id: str | None = None
