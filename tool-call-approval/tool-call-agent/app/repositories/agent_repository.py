@@ -60,10 +60,9 @@ class PostgresRepository(IAgentStorage):
                     return [self._normalize_message(m.get("role", "user"), m.get("content") or "", m) for m in (row[0] if row else []) if isinstance(m, dict) and m.get("role") in {"user", "assistant"}]
         except Exception as exc: logger.warning("get_session_history failed: %s", exc); return []
     def save_report(self, report_id: str, session_id: str, s3_bucket: str, s3_key: str, title: str) -> None:
-        if not self._is_reachable():
-            return
         try:
-            with psycopg2.connect(self._psycopg_url()) as conn:
+            conn = psycopg2.connect(self._psycopg_url())
+            try:
                 with conn.cursor() as cur:
                     cur.execute("""CREATE TABLE IF NOT EXISTS ai.reports (
                         id TEXT PRIMARY KEY, session_id TEXT NOT NULL,
@@ -75,6 +74,9 @@ class PostgresRepository(IAgentStorage):
                         "INSERT INTO ai.reports (id, session_id, s3_bucket, s3_key, title) VALUES (%s, %s, %s, %s, %s)",
                         (report_id, session_id, s3_bucket, s3_key, title),
                     )
+                conn.commit()
+            finally:
+                conn.close()
         except Exception as exc:
             logger.warning("save_report failed: %s", exc)
     def _ensure_session_records_table(self, conn: Any) -> None:

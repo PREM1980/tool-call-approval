@@ -287,10 +287,19 @@ class AgentService:
         @tool
         async def save_report(title: str, content: str) -> str:
             """Generate a PDF report for this session and return a download URL."""
-            report_id = str(uuid4())
-            Path(session.tmpdir or tempfile.gettempdir(), f"{report_id}.pdf").write_bytes(_build_pdf(title, content))
-            return f"/sessions/{session.id}/reports/{report_id}"
+            return self._save_report_local(
+                session.tmpdir or tempfile.gettempdir(), session.id, title, content
+            )
         return save_report
+
+    def _save_report_local(
+        self, tmpdir: str, session_id: str, title: str, content: str
+    ) -> str:
+        """Write a session-scoped PDF report and return its download URL."""
+        report_id = str(uuid4())
+        Path(tmpdir).mkdir(parents=True, exist_ok=True)
+        Path(tmpdir, f"{report_id}.pdf").write_bytes(_build_pdf(title, content))
+        return f"/sessions/{session_id}/reports/{report_id}"
 
     async def _await_approval(self, session: Session, tool_id: str, name: str,
                               args: dict[str, Any]) -> tuple[bool, dict[str, Any]]:
