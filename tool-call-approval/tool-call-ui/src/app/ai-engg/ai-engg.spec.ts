@@ -2,7 +2,7 @@ import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { AiEngg } from './ai-engg';
 import { Chat } from '../components/chat/chat';
-import { Sessions } from './sessions/sessions';
+import { SessionsService } from '../services/sessions.service';
 
 @Component({
   selector: 'app-chat',
@@ -11,25 +11,18 @@ import { Sessions } from './sessions/sessions';
 })
 class ChatStub {
   @Input() resumeSessionId?: string | null;
-}
-
-@Component({
-  selector: 'app-sessions',
-  standalone: true,
-  template: '',
-})
-class SessionsStub {
-  @Output() openChat = new EventEmitter<string>();
+  @Output() sessionChanged = new EventEmitter<void>();
 }
 
 describe('AiEngg', () => {
   async function setup(): Promise<ComponentFixture<AiEngg>> {
     await TestBed.configureTestingModule({
       imports: [AiEngg],
+      providers: [{ provide: SessionsService, useValue: { getAll: () => Promise.resolve([]) } }],
     })
       .overrideComponent(AiEngg, {
-        remove: { imports: [Chat, Sessions] },
-        add: { imports: [ChatStub, SessionsStub] },
+        remove: { imports: [Chat] },
+        add: { imports: [ChatStub] },
       })
       .compileComponents();
 
@@ -40,27 +33,13 @@ describe('AiEngg', () => {
 
   afterEach(() => TestBed.resetTestingModule());
 
-  it('uses a high-contrast inactive Sessions tab treatment', async () => {
+  it('renders the conversation rail', async () => {
     const fixture = await setup();
-    const sessionsTab = Array.from(
-      fixture.nativeElement.querySelectorAll('.aiengg-tab'),
-    ).find((tab) => (tab as HTMLElement).textContent?.trim() === 'Sessions') as HTMLElement;
-    const styles = getComputedStyle(sessionsTab);
-
-    expect(styles.backgroundColor).toBe('rgb(255, 255, 255)');
-    expect(styles.borderColor).toBe('rgb(216, 225, 232)');
-    expect(styles.color).toBe('rgb(19, 32, 51)');
+    expect(fixture.nativeElement.querySelector('.conversation-rail')).not.toBeNull();
   });
 
-  it('uses a gray active tab treatment instead of blue', async () => {
+  it('provides a new chat action', async () => {
     const fixture = await setup();
-    const chatTab = Array.from(
-      fixture.nativeElement.querySelectorAll('.aiengg-tab'),
-    ).find((tab) => (tab as HTMLElement).textContent?.trim() === 'Chat') as HTMLElement;
-    const styles = getComputedStyle(chatTab);
-
-    expect(styles.backgroundColor).toBe('rgb(51, 65, 85)');
-    expect(styles.borderColor).toBe('rgb(51, 65, 85)');
-    expect(styles.color).toBe('rgb(255, 255, 255)');
+    expect(fixture.nativeElement.querySelector('.new-chat-button')).not.toBeNull();
   });
 });

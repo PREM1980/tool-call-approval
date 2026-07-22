@@ -1,122 +1,9 @@
 <div class="chat-shell">
 
-  <div class="chat-topbar">
-    <div class="chat-heading">
-      <h1 class="chat-title">Chat</h1>
-    </div>
-    <div class="topbar-spacer"></div>
-    <div class="chat-actions">
-      <button type="button" class="chat-btn-new"
-        [disabled]="isSwitching || isWaiting"
-        (click)="newSession()">+ New</button>
-      <div class="mode-toggle">
-        <button type="button" class="mode-btn"
-          [class.active]="mode === 'sse'"
-          [disabled]="isSwitching"
-          (click)="switchMode('sse')">SSE</button>
-        <button type="button" class="mode-btn"
-          [class.active]="mode === 'websocket'"
-          [disabled]="isSwitching"
-          (click)="switchMode('websocket')">WebSocket</button>
-      </div>
-    </div>
-  </div>
-
-  <div class="chat-layout" [class.chat-layout--no-sidebar]="systemPrompts.length === 0 && personas.length === 0">
-    @if (systemPrompts.length > 0 || personas.length > 0) {
-      <aside class="chat-sidebar" aria-label="Chat context">
-        <div class="provider-picker">
-          <span class="context-label">Provider</span>
-          <div class="mode-toggle">
-            @for (p of availableProviders; track p) {
-              <button type="button" class="mode-btn"
-                [class.active]="selectedProvider === p"
-                [disabled]="isSwitching || isWaiting"
-                (click)="selectedProvider = p; onProviderChange()">{{ p }}</button>
-            }
-          </div>
-        </div>
-
-        @if (selectedProvider === 'LOCAL') {
-          <div class="model-picker">
-            <label class="context-label" for="modelSelect">Model</label>
-            <select class="instance-select"
-              id="modelSelect"
-              [(ngModel)]="selectedModelId"
-              (ngModelChange)="onModelChange()"
-              name="modelSelect"
-              [disabled]="isSwitching || isWaiting"
-              title="Model">
-              @for (model of availableModels; track model) {
-                <option [value]="model">{{ model }}</option>
-              }
-            </select>
-          </div>
-        }
-
-        @if (systemPrompts.length > 0) {
-          <div class="prompt-picker" aria-label="System prompts">
-            <span class="context-label">System prompt</span>
-            <div class="prompt-list" role="listbox" aria-label="System prompts">
-              @for (prompt of systemPrompts; track prompt.id) {
-                <button
-                  type="button"
-                  class="prompt-item"
-                  role="option"
-                  [class.active]="selectedSystemPromptId === prompt.id"
-                  [attr.aria-selected]="selectedSystemPromptId === prompt.id"
-                  [disabled]="isSwitching || isWaiting"
-                  [title]="prompt.name"
-                  (click)="onSystemPromptSelect(prompt.id)">
-                  <span class="prompt-name">{{ prompt.name }}</span>
-                  @if (selectedSystemPromptId === prompt.id) {
-                    <span class="prompt-badge prompt-badge--selected">Selected</span>
-                  } @else if (prompt.is_active) {
-                    <span class="prompt-badge prompt-badge--default">Default</span>
-                  }
-                </button>
-              }
-            </div>
-          </div>
-        }
-
-        <div class="persona-picker">
-          <span class="context-label">Personas</span>
-          @if (personas.length > 0) {
-            <div class="persona-list" role="group" aria-label="Personas">
-              @for (persona of personas; track persona.id) {
-                <label class="persona-item" [class.active]="isPersonaSelected(persona.id)" [title]="persona.name">
-                  <input
-                    type="checkbox"
-                    [checked]="isPersonaSelected(persona.id)"
-                    [disabled]="isSwitching || isWaiting"
-                    (change)="togglePersonaSelection(persona.id, $any($event.target).checked)"
-                  />
-                  <span class="persona-name">{{ persona.name }}</span>
-                </label>
-              }
-            </div>
-            <span class="context-hint">{{ selectedPersonaSkillSummary() }}</span>
-          } @else {
-            <span class="persona-empty">No personas configured</span>
-          }
-          </div>
-      </aside>
-    }
+  <div class="chat-layout chat-layout--no-sidebar">
 
     <div class="chat-main">
       <div class="chat-messages" #messageList>
-        @if (messages.length === 0) {
-          <div class="chat-empty">
-            <p class="chat-empty-prompt">Try asking:</p>
-            <div class="chat-empty-chips">
-              @for (suggestion of emptyStateSuggestions; track $index) {
-                <span class="suggestion-chip">"{{ suggestion }}"</span>
-              }
-            </div>
-          </div>
-        }
-
         @for (message of messages; track message.id) {
           @if (message.reportUrl) {
             <div class="msg-row msg-system">
@@ -221,17 +108,86 @@
       </div>
 
       <form class="chat-input-bar" (ngSubmit)="sendMessage()">
-        <input
+        <textarea
           class="chat-input"
-          type="text"
           [(ngModel)]="userInput"
           name="userInput"
           placeholder="Ask about your Kubernetes cluster..."
           [disabled]="!canSendMessage || isWaiting || pendingToolCalls.length > 0"
-          autocomplete="off"
-        />
-        <button class="chat-send" type="submit"
-          [disabled]="!canSendMessage || isWaiting || pendingToolCalls.length > 0 || !userInput.trim()">Send</button>
+          (keydown)="onQueryKeydown($event)"
+          rows="3"
+        ></textarea>
+        <div class="composer-toolbar">
+          <div class="composer-selectors">
+            <label class="composer-field" for="providerSelect">
+              <span>Provider</span>
+              <select id="providerSelect" [(ngModel)]="selectedProvider" (ngModelChange)="onProviderChange()"
+                name="providerSelect" [disabled]="isSwitching || isWaiting" title="Provider">
+                @for (provider of availableProviders; track provider) {
+                  <option [value]="provider">{{ provider }}</option>
+                }
+              </select>
+            </label>
+            @if (selectedProvider === 'LOCAL') {
+              <label class="composer-field" for="modelSelect">
+                <span>Model</span>
+                <select id="modelSelect" [(ngModel)]="selectedModelId" (ngModelChange)="onModelChange()"
+                  name="modelSelect" [disabled]="isSwitching || isWaiting" title="Model">
+                  @for (model of availableModels; track model) {
+                    <option [value]="model">{{ model }}</option>
+                  }
+                </select>
+              </label>
+            }
+            <label class="composer-field" for="personaSelect">
+              <span>Persona</span>
+              <select id="personaSelect" [ngModel]="selectedPersonaIds[0] ?? ''"
+                (ngModelChange)="onPersonaChange($event)" name="personaSelect"
+                [disabled]="personas.length === 0 || isSwitching || isWaiting" title="Persona">
+                <option value="">Default assistant</option>
+                @for (persona of personas; track persona.id) {
+                  <option [value]="persona.id">{{ persona.name }}</option>
+                }
+              </select>
+            </label>
+            <label class="composer-field composer-field--prompt" for="systemPromptSelect">
+              <span>System prompt</span>
+              <select id="systemPromptSelect" [ngModel]="selectedSystemPromptId ?? ''"
+                (ngModelChange)="onSystemPromptSelect($event)" name="systemPromptSelect"
+                [disabled]="systemPrompts.length === 0 || isSwitching || isWaiting" title="System prompt">
+                @if (!selectedSystemPromptId) {
+                  <option value="" disabled>Select a system prompt</option>
+                }
+                @for (prompt of systemPrompts; track prompt.id) {
+                  <option [value]="prompt.id">{{ prompt.name }}</option>
+                }
+              </select>
+            </label>
+            <label class="composer-field composer-field--template" for="promptTemplateSelect">
+              <span>Prompt template</span>
+              <select id="promptTemplateSelect" [(ngModel)]="selectedPromptTemplate"
+                (ngModelChange)="selectPromptTemplate($event)" name="promptTemplateSelect"
+                [disabled]="isWaiting" title="Prompt template">
+                <option value="">Try asking…</option>
+                @for (suggestion of emptyStateSuggestions; track suggestion) {
+                  <option [value]="suggestion">{{ suggestion }}</option>
+                }
+              </select>
+            </label>
+            <div class="composer-mode-toggle mode-toggle" aria-label="Connection mode">
+              <button type="button" class="mode-btn"
+                [class.active]="mode === 'sse'"
+                (click)="switchMode('sse')">SSE</button>
+              <button type="button" class="mode-btn"
+                [class.active]="mode === 'websocket'"
+                (click)="switchMode('websocket')">WebSocket</button>
+            </div>
+          </div>
+          <button class="chat-send" type="submit" aria-label="Send message" title="Send message"
+            [disabled]="!canSendMessage || isWaiting || pendingToolCalls.length > 0 || !userInput.trim()">
+            <span class="chat-send-icon" aria-hidden="true"></span>
+          </button>
+        </div>
       </form>
     </div>
   </div>

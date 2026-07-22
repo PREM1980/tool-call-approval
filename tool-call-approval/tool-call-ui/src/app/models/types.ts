@@ -126,6 +126,12 @@ export interface SessionContext {
 export interface ApprovalContext {
   approved: boolean;
   tool_use_id?: string | null;
+  tool_input?: Record<string, unknown> | null;
+}
+
+export interface ApprovalDecision {
+  approved: boolean;
+  tool_input: Record<string, unknown>;
 }
 
 export interface MessageEnvelope {

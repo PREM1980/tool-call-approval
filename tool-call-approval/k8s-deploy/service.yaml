@@ -1,0 +1,48 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: tool-call-approval
+spec:
+  selector:
+    app: postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tool-call-agent
+  namespace: tool-call-approval
+spec:
+  selector:
+    app: tool-call-agent
+  ports:
+    - port: 8000
+      targetPort: 8000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tool-call-k8s
+  namespace: tool-call-approval
+spec:
+  selector:
+    app: tool-call-k8s
+  ports:
+    - port: 8001
+      targetPort: 8001
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tool-call-api
+  namespace: tool-call-approval
+spec:
+  type: ClusterIP
+  selector:
+    app: tool-call-api
+  ports:
+    - port: 80
+      targetPort: 8080

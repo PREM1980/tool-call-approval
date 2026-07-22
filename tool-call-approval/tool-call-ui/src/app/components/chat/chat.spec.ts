@@ -670,7 +670,7 @@ describe('Chat', () => {
       tool_name: 'kubectl',
       tool_input: { args: 'get namespaces' },
     });
-    await component.handleApproval('tool-1', true);
+    await component.handleApproval('tool-1', { approved: true, tool_input: { args: 'get namespaces' } });
     sseSubject.next({
       type: 'tool_result',
       tool_use_id: 'tool-1',
@@ -712,7 +712,7 @@ describe('Chat', () => {
       tool_name: 'kubectl',
       tool_input: { args: 'delete namespace prod' },
     });
-    await component.handleApproval('tool-2', false);
+    await component.handleApproval('tool-2', { approved: false, tool_input: { args: 'delete namespace prod' } });
     sseSubject.next({
       type: 'tool_rejected',
       tool_use_id: 'tool-2',
@@ -880,8 +880,8 @@ describe('Chat', () => {
       tool_name: 'calculate',
       tool_input: { expression: '2+2' },
     }];
-    await component.handleApproval('abc', true);
-    expect(chatService.approveTool).toHaveBeenCalledWith('abc', true);
+    await component.handleApproval('abc', { approved: true, tool_input: { expression: '2+2' } });
+    expect(chatService.approveTool).toHaveBeenCalledWith('abc', true, { expression: '2+2' });
     expect(component.pendingToolCalls.length).toBe(0);
   });
 });

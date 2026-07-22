@@ -93,7 +93,11 @@ export class ChatService {
     );
   }
 
-  async approveTool(tool_use_id: string, approved: boolean): Promise<void> {
+  async approveTool(
+    tool_use_id: string,
+    approved: boolean,
+    tool_input?: Record<string, unknown>,
+  ): Promise<void> {
     if (!this.sessionId) throw new Error('No active session');
     await firstValueFrom(
       this.http.post(
@@ -101,7 +105,7 @@ export class ChatService {
         this.envelope(
           { ...this.sessionContext, session_id: this.sessionId },
           [],
-          { tool_use_id, approved },
+          { tool_use_id, approved, tool_input },
         ),
       )
     );

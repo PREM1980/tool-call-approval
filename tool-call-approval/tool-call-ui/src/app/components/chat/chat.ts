@@ -1,9 +1,13 @@
 import {
   ChangeDetectorRef,
   Component,
+  EventEmitter,
   Input,
+  OnChanges,
   OnInit,
   OnDestroy,
+  Output,
+  SimpleChanges,
   ViewChild,
   ElementRef,
   AfterViewChecked,
@@ -16,13 +20,14 @@ import { ChatService } from '../../services/chat.service';
 import { SessionsService } from '../../services/sessions.service';
 import { WebsocketChatService } from '../../services/websocket-chat.service';
 import { ToolApproval } from '../tool-approval/tool-approval';
-import { AmbientContext, ApiMessage, Command, ExecutedCommand, Message, MessageData, PlatformContext, SseEvent, ToolCall } from '../../models/types';
+import { AmbientContext, ApiMessage, ApprovalDecision, Command, ExecutedCommand, Message, MessageData, PlatformContext, SseEvent, ToolCall } from '../../models/types';
 import { formatMarkdownBlocks, MarkdownBlock } from '../../shared/markdown-blocks';
 
 export type ConnectionMode = 'sse' | 'websocket';
 
 const KUBERNETES_SUGGESTIONS = [
   'List all pods in the default namespace',
+  'list all applications in argo cd',
   'Scale the frontend deployment to 3 replicas',
   'Show me recent events in the kube-system namespace',
 ];
@@ -40,9 +45,10 @@ const GENERIC_SUGGESTIONS = [
   templateUrl: './chat.html',
   styleUrl: './chat.css',
 })
-export class Chat implements OnInit, OnDestroy, AfterViewChecked {
+export class Chat implements OnInit, OnChanges, OnDestroy, AfterViewChecked {
   @ViewChild('messageList') private messageListRef!: ElementRef;
   @Input() resumeSessionId?: string | null;
+  @Output() sessionChanged = new EventEmitter<void>();
 
   messages: Message[] = [];
   userInput = '';
@@ -55,18 +61,12 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
   selectedPersonaIds: string[] = [];
   systemPrompts: SystemPromptData[] = [];
   selectedSystemPromptId: string | null = null;
+  selectedPromptTemplate = '';
   selectedProvider: string = 'LOCAL';
-  selectedModelId: string = 'nemotron-3-super';
+  selectedModelId: string = 'gpt-oss-120b';
 
   readonly availableProviders = ['AWS', 'GCP', 'LOCAL'];
-  readonly availableModels = [
-    'devstral',
-    'gemma-4',
-    'gpt-oss-120b',
-    'nemotron-3-nano',
-    'nemotron-3-super',
-    'nemotron-3-ultra',
-  ];
+  readonly availableModels = ['gpt-oss-120b'];
 
   private sseSubscription!: Subscription;
   private shouldScrollToBottom = false;
@@ -128,6 +128,12 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
     }
   }
 
+  async ngOnChanges(changes: SimpleChanges): Promise<void> {
+    const sessionChange = changes['resumeSessionId'];
+    if (!sessionChange || sessionChange.firstChange || !this.resumeSessionId || !this.hasActiveSession) return;
+    await this.openExistingSession(this.resumeSessionId);
+  }
+
   ngAfterViewChecked(): void {
     if (this.shouldScrollToBottom) {
       this.scrollToBottom();
@@ -143,15 +149,35 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
   async newSession(): Promise<void> {
     if (this.isSwitching) return;
     this.isSwitching = true;
-    this.sseSubscription?.unsubscribe();
-    this.activeService.closeStream();
-    this.messages = [];
-    this.pendingToolCalls = [];
-    this.isWaiting = false;
-    this.hasActiveSession = false;
-    this.resetActiveToolData();
-    await this.initConnection();
-    this.isSwitching = false;
+    try {
+      this.sseSubscription?.unsubscribe();
+      this.activeService.closeStream();
+      this.messages = [];
+      this.pendingToolCalls = [];
+      this.isWaiting = false;
+      this.hasActiveSession = false;
+      this.resetActiveToolData();
+      await this.initConnection();
+    } finally {
+      this.isSwitching = false;
+    }
+  }
+
+  private async openExistingSession(sessionId: string): Promise<void> {
+    if (this.isSwitching) return;
+    this.isSwitching = true;
+    try {
+      this.sseSubscription?.unsubscribe();
+      this.activeService.closeStream();
+      this.messages = [];
+      this.pendingToolCalls = [];
+      this.isWaiting = false;
+      this.hasActiveSession = false;
+      this.resetActiveToolData();
+      await this.loadExistingSession(sessionId);
+    } finally {
+      this.isSwitching = false;
+    }
   }
 
   async onProviderChange(): Promise<void> {
@@ -163,6 +189,29 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
     await this.newSession();
   }
 
+  async onPersonaChange(personaId: string): Promise<void> {
+    if (this.isSwitching || this.isWaiting) return;
+    this.selectedPersonaIds = personaId ? [personaId] : [];
+    if (this.hasActiveSession) {
+      this.activeService.updateSessionContext({
+        persona_id: personaId || null,
+        persona_ids: this.selectedPersonaIds,
+      });
+    }
+  }
+
+  onQueryKeydown(event: KeyboardEvent): void {
+    if (event.key !== 'Enter' || event.shiftKey) return;
+    event.preventDefault();
+    void this.sendMessage();
+  }
+
+  selectPromptTemplate(template: string): void {
+    if (!template) return;
+    this.userInput = template;
+    this.selectedPromptTemplate = '';
+  }
+
   async onSystemPromptSelect(promptId: string): Promise<void> {
     if (this.isSwitching || this.isWaiting) return;
     this.selectedSystemPromptId = promptId === this.selectedSystemPromptId ? null : promptId;
@@ -172,16 +221,19 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
   async switchMode(newMode: ConnectionMode): Promise<void> {
     if (newMode === this.mode || this.isSwitching) return;
     this.isSwitching = true;
-    this.sseSubscription?.unsubscribe();
-    this.activeService.closeStream();
-    this.messages = [];
-    this.pendingToolCalls = [];
-    this.isWaiting = false;
-    this.hasActiveSession = false;
-    this.resetActiveToolData();
-    this.mode = newMode;
-    await this.initConnection();
-    this.isSwitching = false;
+    try {
+      this.sseSubscription?.unsubscribe();
+      this.activeService.closeStream();
+      this.messages = [];
+      this.pendingToolCalls = [];
+      this.isWaiting = false;
+      this.hasActiveSession = false;
+      this.resetActiveToolData();
+      this.mode = newMode;
+      await this.initConnection();
+    } finally {
+      this.isSwitching = false;
+    }
   }
 
   async sendMessage(): Promise<void> {
@@ -203,7 +255,8 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
     }
   }
 
-  async handleApproval(tool_use_id: string, approved: boolean): Promise<void> {
+  async handleApproval(tool_use_id: string, decision: ApprovalDecision): Promise<void> {
+    const { approved, tool_input } = decision;
     this.pendingToolCalls = this.pendingToolCalls.filter(tc => tc.tool_use_id !== tool_use_id);
     this.markToolApproval(tool_use_id, approved);
     if (this.pendingToolCalls.length === 0) {
@@ -211,7 +264,7 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
     }
     this.attachActiveToolDataToLatestAssistant();
     this.cdr.detectChanges();
-    await this.activeService.approveTool(tool_use_id, approved);
+    await this.activeService.approveTool(tool_use_id, approved, tool_input);
   }
 
   private async loadExistingSession(sessionId: string): Promise<void> {
@@ -251,6 +304,7 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
     );
     this.hasActiveSession = true;
     this.subscribeToEvents(this.activeService);
+    this.sessionChanged.emit();
   }
 
   selectedPersonaSkillSummary(): string {
@@ -293,7 +347,7 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
     ) {
       return this.selectedSystemPromptId;
     }
-    return null;
+    return prompts.find(prompt => prompt.is_active)?.id ?? prompts[0]?.id ?? null;
   }
 
   private subscribeToEvents(service: ChatService | WebsocketChatService): void {
@@ -324,10 +378,6 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
             const title = this.pendingReportTitles.get(event.tool_use_id!) ?? 'Report';
             this.pendingReportTitles.delete(event.tool_use_id!);
             this.addReportMessage(title, event.result);
-          } else if (this.shouldShowToolResult(event)) {
-            this.addSystemMessage(
-              `Tool "${event.tool_name}" returned: ${event.result}`
-            );
           }
           break;
         case 'tool_rejected':
@@ -437,17 +487,13 @@ export class Chat implements OnInit, OnDestroy, AfterViewChecked {
     toolInput: Record<string, unknown> | undefined,
   ): string | null {
     if (toolName === 'kubectl') {
-      const args = String(toolInput?.['args'] ?? '').trim();
+      const args = String(toolInput?.['command'] ?? toolInput?.['args'] ?? '').trim();
       return args ? `kubectl ${args}` : 'kubectl';
     }
     if (Object.keys(toolInput ?? {}).length === 0) {
       return toolName;
     }
     return `${toolName}(${JSON.stringify(toolInput)})`;
-  }
-
-  private shouldShowToolResult(event: SseEvent): boolean {
-    return event.tool_name !== 'get_skill_instructions';
   }
 
   private attachActiveToolDataToLatestAssistant(): void {

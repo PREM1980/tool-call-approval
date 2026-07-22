@@ -209,6 +209,7 @@ describe('ChatService', () => {
       approval: {
         tool_use_id: 'tool-1',
         approved: true,
+        tool_input: null,
       },
     });
     req.flush({ status: 'ok' });

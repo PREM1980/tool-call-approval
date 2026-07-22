@@ -99,6 +99,7 @@ export function normalizeApproval(
   return {
     approved: approval.approved,
     tool_use_id: approval.tool_use_id ?? null,
+    tool_input: approval.tool_input ?? null,
   };
 }
 

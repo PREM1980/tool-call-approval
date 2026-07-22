@@ -3,7 +3,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1.05fr) minmax(360px, 0.95fr);
   align-items: stretch;
-  background: #eef4f8;
+  background: #f3f4f6;
 }
 
 .login-hero {
@@ -13,7 +13,7 @@
   padding: clamp(36px, 7vw, 84px);
   color: #fff;
   background:
-    linear-gradient(135deg, rgba(8, 19, 35, 0.96), rgba(24, 72, 94, 0.94)),
+    linear-gradient(135deg, #0d6efd, #0b5ed7),
     url('/favicon.ico');
 }
 

@@ -1,0 +1,161 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: tool-call-approval
+  labels:
+    app: postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:17
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              value: postgres
+            - name: POSTGRES_DB
+              value: postgres
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: tool-call-approval-secrets
+                  key: POSTGRES_PASSWORD
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: postgres-data
+          emptyDir: {}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tool-call-agent
+  namespace: tool-call-approval
+  labels:
+    app: tool-call-agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tool-call-agent
+  template:
+    metadata:
+      labels:
+        app: tool-call-agent
+    spec:
+      imagePullSecrets:
+        - name: artifactory-registry
+      containers:
+        - name: tool-call-agent
+          image: 10.49.19.241/docker-local/tool-call-agent:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: tool-call-approval-config
+            - secretRef:
+                name: tool-call-approval-secrets
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 10
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tool-call-k8s
+  namespace: tool-call-approval
+  labels:
+    app: tool-call-k8s
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tool-call-k8s
+  template:
+    metadata:
+      labels:
+        app: tool-call-k8s
+    spec:
+      imagePullSecrets:
+        - name: artifactory-registry
+      containers:
+        - name: tool-call-k8s
+          image: 10.49.19.241/docker-local/tool-call-k8s:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8001
+          readinessProbe:
+            tcpSocket:
+              port: 8001
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: 8001
+            initialDelaySeconds: 15
+            periodSeconds: 10
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tool-call-api
+  namespace: tool-call-approval
+  labels:
+    app: tool-call-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tool-call-api
+  template:
+    metadata:
+      labels:
+        app: tool-call-api
+    spec:
+      imagePullSecrets:
+        - name: artifactory-registry
+      containers:
+        - name: tool-call-api
+          image: 10.49.19.241/docker-local/tool-call-api:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: tool-call-approval-config
+          readinessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 10
