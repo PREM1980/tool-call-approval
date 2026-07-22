@@ -101,13 +101,13 @@ update-k8s-images:
       set -eu
       : "${GITLAB_PUSH_TOKEN:?Set GITLAB_PUSH_TOKEN with write_repository scope}"
       IMAGE_PREFIX="${ARTIFACTORY_DOCKER_REGISTRY}/${ARTIFACTORY_DOCKER_REPO}"
-      sed -i "s#${IMAGE_PREFIX}/tool-call-agent:.*#${IMAGE_PREFIX}/tool-call-agent:${CI_COMMIT_SHORT_SHA}#" k8s-deploy/deployment.yaml
-      sed -i "s#${IMAGE_PREFIX}/tool-call-api:.*#${IMAGE_PREFIX}/tool-call-api:${CI_COMMIT_SHORT_SHA}#" k8s-deploy/deployment.yaml
-      sed -i "s#${IMAGE_PREFIX}/tool-call-k8s:.*#${IMAGE_PREFIX}/tool-call-k8s:${CI_COMMIT_SHORT_SHA}#" k8s-deploy/deployment.yaml
+      sed -i "s#${IMAGE_PREFIX}/tool-call-agent:.*#${IMAGE_PREFIX}/tool-call-agent:${CI_COMMIT_SHORT_SHA}#" k8s-deploy/base/deployment.yaml
+      sed -i "s#${IMAGE_PREFIX}/tool-call-api:.*#${IMAGE_PREFIX}/tool-call-api:${CI_COMMIT_SHORT_SHA}#" k8s-deploy/base/deployment.yaml
+      sed -i "s#${IMAGE_PREFIX}/tool-call-k8s:.*#${IMAGE_PREFIX}/tool-call-k8s:${CI_COMMIT_SHORT_SHA}#" k8s-deploy/base/deployment.yaml
       git config user.email "ci@gitlab.local"
       git config user.name "GitLab CI"
       git remote set-url origin "https://gitlab-ci-token:${GITLAB_PUSH_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
-      git add k8s-deploy/deployment.yaml
+      git add k8s-deploy/base/deployment.yaml
       git diff --cached --quiet && exit 0
       git commit -m "Deploy application images:${CI_COMMIT_SHORT_SHA} [skip ci]"
       git push origin HEAD:"${CI_COMMIT_BRANCH}"
