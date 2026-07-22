@@ -21,6 +21,8 @@ variables:
   # changed to a Docker executor later.
   image: python:${PYTHON_VERSION}-slim
   before_script:
+    # The shell runner inherits a Linux CA path that does not exist on its host.
+    - unset SSL_CERT_FILE REQUESTS_CA_BUNDLE CURL_CA_BUNDLE
     - python3 --version
     - python3 -m venv "${CI_PROJECT_DIR}/.ci-venv"
     - ${CI_PROJECT_DIR}/.ci-venv/bin/python -m pip install --no-cache-dir --upgrade pip
