@@ -7,10 +7,16 @@ from pydantic import BaseModel
 
 
 class CredentialsRequest(BaseModel):
+    aws_access_key_id: str | None = None
+    aws_secret_access_key: str | None = None
+    aws_region: str | None = None
     kubeconfig: str | None = None
 
 
 class CredentialsResponse(BaseModel):
+    aws_access_key_id: str | None = None
+    aws_secret_access_key: str | None = None
+    aws_region: str | None = None
     kubeconfig: str | None
 
 

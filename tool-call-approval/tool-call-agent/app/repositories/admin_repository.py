@@ -135,18 +135,26 @@ class AdminRepository:
 
     def upsert_credentials(
         self,
-        kubeconfig: str | None,
+        aws_access_key_id: str | None = None,
+        aws_secret_access_key: str | None = None,
+        aws_region: str | None = None,
+        kubeconfig: str | None = None,
     ) -> None:
         conn = self._connect()
         try:
             with conn.cursor() as cur:
                 cur.execute("""
-                    INSERT INTO admin_credentials (id, kubeconfig, updated_at)
-                    VALUES (1, %s, NOW())
+                    INSERT INTO admin_credentials (
+                        id, aws_access_key_id, aws_secret_access_key, aws_region, kubeconfig, updated_at
+                    )
+                    VALUES (1, %s, %s, COALESCE(%s, 'us-east-1'), %s, NOW())
                     ON CONFLICT (id) DO UPDATE SET
+                        aws_access_key_id     = EXCLUDED.aws_access_key_id,
+                        aws_secret_access_key = EXCLUDED.aws_secret_access_key,
+                        aws_region            = EXCLUDED.aws_region,
                         kubeconfig            = EXCLUDED.kubeconfig,
                         updated_at            = NOW()
-                """, (kubeconfig,))
+                """, (aws_access_key_id, aws_secret_access_key, aws_region, kubeconfig))
             conn.commit()
         except Exception:
             conn.rollback()
