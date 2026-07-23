@@ -580,6 +580,7 @@ export class Chat implements OnInit, OnChanges, OnDestroy, AfterViewChecked {
       duplo_base_url: null,
       duplo_token: null,
       tenant_name: null,
+      aws_credentials: null,
       kubeconfig: null,
     };
   }
