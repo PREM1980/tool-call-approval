@@ -10,6 +10,7 @@ export interface Message {
   ambient_context?: AmbientContext | null;
   reportUrl?: string;
   reportTitle?: string;
+  trace_run_id?: string | null;
 }
 
 export interface ToolCall {
@@ -41,6 +42,16 @@ export interface ChatMessage {
 
 export interface SseEvent {
   type:
+    | 'run_started'
+    | 'run_completed'
+    | 'run_failed'
+    | 'model_request'
+    | 'model_response'
+    | 'message_delta'
+    | 'tool_started'
+    | 'tool_failed'
+    | 'approval_received'
+    | 'approval_timed_out'
     | 'thinking'
     | 'tool_call_pending'
     | 'tool_result'
@@ -57,6 +68,17 @@ export interface SseEvent {
   input_tokens?: number;
   output_tokens?: number;
   total_tokens?: number;
+  sequence?: number;
+  run_id?: string | null;
+  occurred_at?: string;
+}
+
+export interface DebugEvent {
+  sequence?: number;
+  run_id?: string | null;
+  event_type: string;
+  payload: Record<string, unknown>;
+  occurred_at: string;
 }
 
 export interface FileObject {

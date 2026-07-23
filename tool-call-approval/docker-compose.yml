@@ -171,7 +171,8 @@ services:
 
   tool-call-api:
     build:
-      context: ./tool-call-api
+      context: .
+      dockerfile: ./tool-call-api/Dockerfile
     image: tool-call-api:latest
     ports:
       - "8080:8080"

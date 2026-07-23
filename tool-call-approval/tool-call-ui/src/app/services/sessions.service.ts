@@ -1,7 +1,7 @@
 import { inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
-import { ChatMessage, SessionSummary } from '../models/types';
+import { ChatMessage, DebugEvent, SessionSummary } from '../models/types';
 
 const API_URL = '/api';
 
@@ -18,6 +18,14 @@ export class SessionsService {
   getHistory(sessionId: string): Promise<ChatMessage[]> {
     return firstValueFrom(
       this.http.get<ChatMessage[]>(`${API_URL}/sessions/${sessionId}/history`)
+    );
+  }
+
+  getEvents(sessionId: string, afterSequence = 0): Promise<DebugEvent[]> {
+    return firstValueFrom(
+      this.http.get<DebugEvent[]>(`${API_URL}/sessions/${sessionId}/events`, {
+        params: { after_sequence: afterSequence },
+      })
     );
   }
 

@@ -36,3 +36,4 @@ class Session:
         "user_file_uploads": [],
     })
     active_tool_commands: dict[str, dict[str, Any]] = field(default_factory=dict)
+    current_run_id: str | None = None

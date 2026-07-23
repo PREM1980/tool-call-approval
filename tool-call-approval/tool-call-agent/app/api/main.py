@@ -244,6 +244,7 @@ async def chat(
         message_content,
         user_message.model_dump(mode="json") if user_message else None,
     )
+    service.record_event(session, "user_message", content=message_content)
     asyncio.create_task(service.run(session, message_content))
     return {"status": "processing"}
 
@@ -279,6 +280,17 @@ async def get_history(
 ) -> list[dict]:
     _require_session_owner(current_user, session_id)
     return service.get_history(session_id)
+
+
+@app.get("/sessions/{session_id}/events")
+async def get_events(
+    session_id: str,
+    after_sequence: int = Query(default=0, ge=0),
+    current_user: User = Depends(_current_user),
+) -> list[dict]:
+    """Return the durable execution timeline.  This is safe to replay after reconnecting."""
+    _require_session_owner(current_user, session_id)
+    return service.get_events(session_id, after_sequence)
 
 
 @app.delete("/sessions/{session_id}")

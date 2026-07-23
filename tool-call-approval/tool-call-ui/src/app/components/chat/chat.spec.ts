@@ -838,6 +838,15 @@ describe('Chat', () => {
     expect(component.pendingToolCalls[0].tool_name).toBe('calculate');
   });
 
+  it('streams assistant deltas into one message without duplicating the final response', () => {
+    sseSubject.next({ type: 'message_delta', content: 'Hello ' });
+    sseSubject.next({ type: 'message_delta', content: 'world!' });
+    sseSubject.next({ type: 'message', content: 'Hello world!' });
+
+    expect(component.messages.filter(message => message.role === 'assistant').length).toBe(1);
+    expect(component.messages.at(-1)?.content).toBe('Hello world!');
+  });
+
   it('should remove tool call from pendingToolCalls after approval', async () => {
     component.pendingToolCalls = [{
       tool_use_id: 'abc',

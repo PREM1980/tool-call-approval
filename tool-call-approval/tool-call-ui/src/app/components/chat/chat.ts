@@ -19,7 +19,7 @@ import { AdminService, PersonaData, Skill, SystemPromptData } from '../../servic
 import { ChatService } from '../../services/chat.service';
 import { SessionsService } from '../../services/sessions.service';
 import { ToolApproval } from '../tool-approval/tool-approval';
-import { AmbientContext, ApiMessage, ApprovalDecision, Command, ExecutedCommand, Message, MessageData, PlatformContext, SseEvent, ToolCall } from '../../models/types';
+import { AmbientContext, ApiMessage, ApprovalDecision, Command, DebugEvent, ExecutedCommand, Message, MessageData, PlatformContext, SseEvent, ToolCall } from '../../models/types';
 import { formatMarkdownBlocks, MarkdownBlock } from '../../shared/markdown-blocks';
 
 const KUBERNETES_SUGGESTIONS = [
@@ -51,6 +51,7 @@ export class Chat implements OnInit, OnChanges, OnDestroy, AfterViewChecked {
   messages: Message[] = [];
   userInput = '';
   pendingToolCalls: ToolCall[] = [];
+  executionEvents: DebugEvent[] = [];
   isWaiting = false;
   isSwitching = false;
   personas: PersonaData[] = [];
@@ -78,6 +79,7 @@ export class Chat implements OnInit, OnChanges, OnDestroy, AfterViewChecked {
   private pendingReportTitles = new Map<string, string>();
   private activeToolData: MessageData = this.emptyMessageData();
   private activeToolCommands = new Map<string, Command>();
+  private streamingAssistantMessage: Message | null = null;
 
   constructor(
     private chatService: ChatService,
@@ -152,9 +154,11 @@ export class Chat implements OnInit, OnChanges, OnDestroy, AfterViewChecked {
       this.chatService.closeStream();
       this.messages = [];
       this.pendingToolCalls = [];
+      this.executionEvents = [];
       this.isWaiting = false;
       this.hasActiveSession = false;
       this.resetActiveToolData();
+      this.streamingAssistantMessage = null;
       await this.initConnection();
     } finally {
       this.isSwitching = false;
@@ -169,9 +173,11 @@ export class Chat implements OnInit, OnChanges, OnDestroy, AfterViewChecked {
       this.chatService.closeStream();
       this.messages = [];
       this.pendingToolCalls = [];
+      this.executionEvents = [];
       this.isWaiting = false;
       this.hasActiveSession = false;
       this.resetActiveToolData();
+      this.streamingAssistantMessage = null;
       await this.loadExistingSession(sessionId);
     } finally {
       this.isSwitching = false;
@@ -245,7 +251,10 @@ export class Chat implements OnInit, OnChanges, OnDestroy, AfterViewChecked {
   private async loadExistingSession(sessionId: string): Promise<void> {
     this.chatService.setSession(sessionId);
     this.hasActiveSession = true;
-    const history = await this.sessionsService.getHistory(sessionId).catch(() => []);
+    const [history, events] = await Promise.all([
+      this.sessionsService.getHistory(sessionId).catch(() => []),
+      this.sessionsService.getEvents(sessionId).catch(() => []),
+    ]);
     this.messages = history.map(m => ({
       id: crypto.randomUUID(),
       role: m.role,
@@ -261,6 +270,7 @@ export class Chat implements OnInit, OnChanges, OnDestroy, AfterViewChecked {
         ? this.normalizeAmbientContext(m.ambient_context)
         : undefined,
     }));
+    this.executionEvents = events;
     this.shouldScrollToBottom = true;
     this.subscribeToEvents(this.chatService);
   }
@@ -327,12 +337,15 @@ export class Chat implements OnInit, OnChanges, OnDestroy, AfterViewChecked {
   private subscribeToEvents(service: ChatService): void {
     service.connectStream();
     this.sseSubscription = service.sseEvents$.subscribe((event) => {
+      if (event.type !== 'stream_error') this.addLiveExecutionEvent(event);
       switch (event.type) {
         case 'thinking':
           this.isWaiting = true;
           break;
         case 'tool_call_pending':
           this.isWaiting = false;
+          // A following model pass starts a separate assistant message after the tool result.
+          this.streamingAssistantMessage = null;
           this.trackToolCommand(event);
           if (event.tool_name === 'save_report') {
             this.pendingReportTitles.set(
@@ -345,6 +358,10 @@ export class Chat implements OnInit, OnChanges, OnDestroy, AfterViewChecked {
             tool_name: event.tool_name!,
             tool_input: event.tool_input ?? {},
           });
+          break;
+        case 'message_delta':
+          this.isWaiting = false;
+          this.appendAssistantDelta(event.content ?? '', event.run_id);
           break;
         case 'tool_result':
           this.trackToolResult(event);
@@ -362,9 +379,13 @@ export class Chat implements OnInit, OnChanges, OnDestroy, AfterViewChecked {
           break;
         case 'message':
           this.isWaiting = false;
-          this.attachActiveToolDataToMessage(
-            this.appendAssistantMessage(event.content ?? ''),
-          );
+          const streamed = this.streamingAssistantMessage;
+          const assistantMessage = streamed?.content === (event.content ?? '')
+            ? streamed
+            : this.appendAssistantMessage(event.content ?? '');
+          this.attachActiveToolDataToMessage(assistantMessage);
+          if (assistantMessage) assistantMessage.trace_run_id = event.run_id ?? assistantMessage.trace_run_id;
+          this.streamingAssistantMessage = null;
           break;
         case 'done':
           this.isWaiting = false;
@@ -419,6 +440,41 @@ export class Chat implements OnInit, OnChanges, OnDestroy, AfterViewChecked {
     } else {
       return this.addMessage('assistant', content);
     }
+  }
+
+  traceEventsFor(message: Message): DebugEvent[] {
+    const runId = message.trace_run_id
+      ?? (typeof message.agent === 'object' && message.agent ? message.agent['run_id'] : null);
+    return runId ? this.executionEvents.filter(event => event.run_id === runId) : [];
+  }
+
+  private appendAssistantDelta(content: string, runId?: string | null): void {
+    if (!content) return;
+    if (!this.streamingAssistantMessage) {
+      this.streamingAssistantMessage = this.addMessage('assistant', '');
+    }
+    this.streamingAssistantMessage.content += content;
+    this.streamingAssistantMessage.trace_run_id = runId ?? this.streamingAssistantMessage.trace_run_id;
+  }
+
+  eventSummary(event: DebugEvent): string {
+    const payload = event.payload;
+    const tool = typeof payload['tool_name'] === 'string' ? `: ${payload['tool_name']}` : '';
+    const content = typeof payload['content'] === 'string' ? ` — ${payload['content']}` : '';
+    const result = typeof payload['result'] === 'string' ? ` — ${payload['result']}` : '';
+    return `${event.event_type.replaceAll('_', ' ')}${tool}${content || result}`;
+  }
+
+  private addLiveExecutionEvent(event: SseEvent): void {
+    if (event.sequence && this.executionEvents.some(item => item.sequence === event.sequence)) return;
+    const { type, sequence, run_id, occurred_at, ...payload } = event;
+    this.executionEvents.push({
+      sequence,
+      run_id,
+      event_type: type,
+      payload,
+      occurred_at: occurred_at ?? new Date().toISOString(),
+    });
   }
 
   private trackToolCommand(event: SseEvent): void {
