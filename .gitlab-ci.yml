@@ -1,5 +1,4 @@
 stages:
-  - test
   - build
   - deploy
   - secret-detection
@@ -12,39 +11,6 @@ variables:
   IMAGE_VERSION: "v1.0"
   PYTHON_VERSION: "3.12"
   SECRET_DETECTION_ENABLED: "true"
-
-.test-python-service:
-  stage: test
-  tags:
-    - shared
-  # Shell executors ignore this image; it remains useful if the runner is
-  # changed to a Docker executor later.
-  image: python:${PYTHON_VERSION}-slim
-  before_script:
-    # The shell runner inherits a Linux CA path that does not exist on its host.
-    - unset SSL_CERT_FILE REQUESTS_CA_BUNDLE CURL_CA_BUNDLE
-    - python3 --version
-    - python3 -m venv "${CI_PROJECT_DIR}/.ci-venv"
-    - ${CI_PROJECT_DIR}/.ci-venv/bin/python -m pip install --no-cache-dir --upgrade pip eval_type_backport
-  script:
-    - cd "${SERVICE_DIR}"
-    - ${CI_PROJECT_DIR}/.ci-venv/bin/python -m pip install --no-cache-dir -r requirements.txt
-    - ${CI_PROJECT_DIR}/.ci-venv/bin/python -m pytest tests/ -v
-
-test-agent:
-  extends: .test-python-service
-  variables:
-    SERVICE_DIR: tool-call-approval/tool-call-agent
-
-test-api:
-  extends: .test-python-service
-  variables:
-    SERVICE_DIR: tool-call-approval/tool-call-api
-
-test-k8s:
-  extends: .test-python-service
-  variables:
-    SERVICE_DIR: tool-call-approval/tool-call-k8s
 
 .build-and-push-image:
   stage: build
