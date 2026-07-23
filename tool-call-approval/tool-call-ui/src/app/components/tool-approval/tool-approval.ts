@@ -27,6 +27,12 @@ export class ToolApproval implements OnChanges {
   }
 
   get formattedCommand(): string {
+    if (this.toolCall.tool_name === 'set_namespace') {
+      const namespace = this.toolCall.tool_input['namespace'];
+      return namespace === '__all__'
+        ? 'Set active namespace to all namespaces'
+        : `Set active namespace to ${namespace ?? ''}`.trim();
+    }
     if (this.toolCall.tool_name === 'kubectl') {
       return `kubectl ${this.toolCall.tool_input['command'] ?? this.toolCall.tool_input['args'] ?? ''}`.trim();
     }

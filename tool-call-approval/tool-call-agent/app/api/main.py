@@ -281,6 +281,17 @@ async def get_history(
     return service.get_history(session_id)
 
 
+@app.delete("/sessions/{session_id}")
+async def delete_session(
+    session_id: str,
+    current_user: User = Depends(_current_user),
+) -> dict:
+    _require_session_owner(current_user, session_id)
+    service.delete_session(session_id)
+    _session_ownership_service.delete_owner(current_user, session_id)
+    return {"status": "deleted"}
+
+
 @app.get("/sessions/{session_id}/reports/{report_id}")
 async def get_report(
     session_id: str,

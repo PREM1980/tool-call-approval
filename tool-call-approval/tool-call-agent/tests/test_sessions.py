@@ -180,3 +180,21 @@ def test_get_history_reads_session_records_messages():
     ]
     assert "platform_context" in data[0]
     assert "ambient_context" in data[0]
+
+
+def test_delete_session_removes_saved_history_and_ownership():
+    conn = psycopg2.connect(TEST_URL)
+    with conn.cursor() as cur:
+        cur.execute(
+            "INSERT INTO ai.session_records (session_id, messages) VALUES ('delete-me', '[{\"role\": \"user\", \"content\": \"hello\"}]')"
+        )
+    conn.commit()
+    conn.close()
+
+    with _allow_auth(), _allow_owner(), patch.object(main_app._session_ownership_service, "delete_owner") as delete_owner:
+        response = http.delete("/sessions/delete-me", headers=_auth_headers())
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "deleted"}
+    assert main_app._repository.get_session_history("delete-me") == []
+    delete_owner.assert_called_once_with(AUTH_USER, "delete-me")

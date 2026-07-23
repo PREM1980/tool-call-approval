@@ -18,7 +18,6 @@ const EMPTY_PLATFORM_CONTEXT = {
   duplo_base_url: null,
   duplo_token: null,
   tenant_name: null,
-  aws_credentials: null,
   kubeconfig: null,
 };
 const EMPTY_AMBIENT_CONTEXT = { user_terminal_cmds: [] };
@@ -117,37 +116,6 @@ describe('Chat', () => {
     expect(chatService.createSession).not.toHaveBeenCalled();
   });
 
-  it('should keep no prompt selected when switching to GCP', async () => {
-    const prompts: SystemPromptData[] = [
-      {
-        id: 'prompt-1',
-        name: 'default_agent',
-        instructions: 'default instructions',
-        is_active: false,
-        created_at: '',
-        updated_at: '',
-      },
-      {
-        id: 'prompt-2',
-        name: 'kubernetes_agent',
-        instructions: 'kubernetes instructions',
-        is_active: true,
-        created_at: '',
-        updated_at: '',
-      },
-    ];
-    adminService.listSystemPrompts.and.returnValue(Promise.resolve(prompts));
-    await component.ngOnInit();
-    chatService.createSession.calls.reset();
-
-    component.selectedSystemPromptId = 'prompt-2';
-    component.selectedProvider = 'GCP';
-    await component.onProviderChange();
-
-    expect(component.selectedSystemPromptId).toBeNull();
-    expect(chatService.createSession).not.toHaveBeenCalled();
-  });
-
   it('should create a session when the user selects a system prompt', async () => {
     component.systemPrompts = [
       {
@@ -167,7 +135,6 @@ describe('Chat', () => {
         updated_at: '',
       },
     ];
-    component.selectedProvider = 'GCP';
     component.selectedSystemPromptId = null;
     chatService.createSession.calls.reset();
 
@@ -179,8 +146,8 @@ describe('Chat', () => {
       null,
       undefined,
       'prompt-1',
-      undefined,
-      'GCP',
+      'gpt-oss-120b',
+      'LOCAL',
       [],
     ]);
   });
@@ -204,7 +171,6 @@ describe('Chat', () => {
         updated_at: '',
       },
     ];
-    component.selectedProvider = 'GCP';
     component.selectedSystemPromptId = null;
     chatService.createSession.calls.reset();
 
@@ -291,7 +257,7 @@ describe('Chat', () => {
     expect(fixture.nativeElement.querySelector('.chat-topbar .chat-btn-new')).toBeTruthy();
   });
 
-  it('should order provider and model before system prompt and personas in the sidebar', () => {
+  it('should show local model, system prompt, and persona controls in the composer', () => {
     component.systemPrompts = [
       {
         id: 'prompt-1',
@@ -311,14 +277,12 @@ describe('Chat', () => {
         updated_at: '',
       },
     ];
-    component.selectedProvider = 'LOCAL';
     fixture.detectChanges();
 
-    const labels = Array.from(
-      fixture.nativeElement.querySelectorAll('.chat-sidebar .context-label')
-    ).map(label => (label as HTMLElement).textContent?.trim());
+    const labels = Array.from(fixture.nativeElement.querySelectorAll('.composer-field span'))
+      .map(label => (label as HTMLElement).textContent?.trim());
 
-    expect(labels).toEqual(['Provider', 'Model', 'System prompt', 'Personas']);
+    expect(labels).toEqual(['Local model', 'Persona', 'System prompt', 'Prompt template']);
   });
 
   it('should use generous vertical spacing between sidebar context groups', () => {
@@ -429,7 +393,7 @@ describe('Chat', () => {
       fixture.nativeElement.querySelectorAll('.suggestion-chip')
     ).map(el => (el as HTMLElement).textContent?.trim());
 
-    expect(suggestions).toContain('"List all pods in the default namespace"');
+    expect(suggestions).toContain('"List all pods"');
   });
 
   it('should populate personas and select first on init', async () => {

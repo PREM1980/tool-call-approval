@@ -1,14 +1,14 @@
 <div class="d-flex flex-column vh-100">
   <nav class="topbar flex-shrink-0">
     <a class="topbar-brand" routerLink="/ai-engg">
-      Devops Agent
-      <span class="hitl-badge">Human in the loop</span>
+      Operations Workspace
+      <span class="hitl-badge">Approval required</span>
     </a>
     <div class="topbar-nav">
       @if (auth.isAdmin()) {
         <a class="topbar-link" routerLink="/users" routerLinkActive="active">Users</a>
       }
-      <a class="topbar-link" routerLink="/admin" routerLinkActive="active">Config</a>
+      <a class="topbar-link" routerLink="/admin" routerLinkActive="active">Administration</a>
       @if (auth.currentUser(); as user) {
         <span class="topbar-user">{{ user.username }}</span>
       }

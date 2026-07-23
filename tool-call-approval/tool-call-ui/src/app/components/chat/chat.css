@@ -15,19 +15,18 @@
   flex-direction: column;
   height: 100%;
   min-height: 0;
-  gap: 16px;
+  gap: 0;
   background: #f3f4f6;
   color: #111827;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
-.chat-topbar,
 .chat-sidebar,
 .chat-main {
-  border: 1px solid #d8e1e8;
-  border-radius: 8px;
+  border: 1px solid rgba(17, 24, 39, .11);
+  border-radius: 0;
   background: #fff;
-  box-shadow: 0 18px 50px rgba(15, 23, 42, 0.08);
+  box-shadow: none;
 }
 
 .chat-topbar {
@@ -65,9 +64,9 @@
 .chat-btn-new {
   min-height: 34px;
   padding: 6px 14px;
-  border: 1px solid #0d6efd;
+  border: 1px solid #b45309;
   border-radius: 7px;
-  background: #0d6efd;
+  background: #b45309;
   color: #fff;
   cursor: pointer;
   font-size: 0.8rem;
@@ -76,51 +75,17 @@
 }
 
 .chat-btn-new:hover:not(:disabled) {
-  border-color: #0b5ed7;
-  background: #0b5ed7;
-  box-shadow: 0 10px 24px rgba(13, 110, 253, 0.2);
+  border-color: #92400e;
+  background: #92400e;
+  box-shadow: 0 10px 24px rgba(180, 83, 9, 0.2);
 }
 
 .chat-btn-new:disabled,
-.mode-btn:disabled,
 .prompt-item:disabled,
 .chat-input:disabled,
 .chat-send:disabled {
   cursor: default;
   opacity: 0.5;
-}
-
-.mode-toggle {
-  display: flex;
-  gap: 3px;
-  padding: 3px;
-  border: 1px solid #d8e1e8;
-  border-radius: 7px;
-  background: #edf4f8;
-}
-
-.mode-btn {
-  min-height: 28px;
-  padding: 4px 11px;
-  border: 0;
-  border-radius: 5px;
-  background: transparent;
-  color: #667085;
-  cursor: pointer;
-  font-size: 0.72rem;
-  font-weight: 900;
-  transition: background 0.12s, color 0.12s, box-shadow 0.12s;
-}
-
-.mode-btn.active {
-  background: #0d6efd;
-  color: #fff;
-  box-shadow: 0 8px 18px rgba(13, 110, 253, 0.16);
-}
-
-.mode-btn:hover:not(.active):not(:disabled) {
-  background: #f8fafc;
-  color: #132033;
 }
 
 .chat-layout {
@@ -143,6 +108,7 @@
   min-height: 0;
   flex-direction: column;
   overflow: hidden;
+  border-width: 0;
 }
 
 .chat-sidebar {
@@ -198,14 +164,6 @@
   font-size: 0.72rem;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.provider-picker .mode-toggle {
-  width: 100%;
-}
-
-.provider-picker .mode-btn {
-  flex: 1;
 }
 
 .prompt-list,
@@ -326,9 +284,9 @@
   flex-direction: column;
   gap: 12px;
   min-height: 0;
-  padding: 22px;
+  padding: 28px clamp(20px, 4vw, 56px);
   overflow-y: auto;
-  background: #fbfdff;
+  background: #f3f4f6;
 }
 
 .chat-empty {
@@ -405,8 +363,8 @@
 }
 
 .msg-user .msg-bubble {
-  border-color: #0d6efd;
-  background: #0d6efd;
+  border-color: #374151;
+  background: #374151;
   color: #fff;
 }
 
@@ -523,7 +481,7 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #0d6efd;
+  background: #b45309;
   animation: pulse 1.2s infinite;
 }
 
@@ -556,7 +514,7 @@
   width: min(100%, 390px);
   padding: 12px 14px;
   border: 1px solid #d8e1e8;
-  border-left: 4px solid #0d6efd;
+  border-left: 4px solid #b45309;
   border-radius: 8px;
   background: #fff;
   box-shadow: 0 14px 30px rgba(15, 23, 42, 0.08);
@@ -566,7 +524,7 @@
   display: flex;
   flex-shrink: 0;
   align-items: center;
-  color: #0d6efd;
+  color: #b45309;
 }
 
 .report-card-body {
@@ -578,7 +536,7 @@
 }
 
 .report-card-label {
-  color: #0d6efd;
+  color: #92400e;
   font-size: 0.68rem;
   font-weight: 900;
   letter-spacing: 0.04em;
@@ -598,7 +556,7 @@
   flex-shrink: 0;
   padding: 5px 12px;
   border-radius: 7px;
-  background: #0d6efd;
+  background: #b45309;
   color: #fff;
   font-size: 0.78rem;
   font-weight: 900;
@@ -607,7 +565,7 @@
 }
 
 .report-card-download:hover {
-  background: #0b5ed7;
+  background: #92400e;
 }
 
 .chat-input-bar {
@@ -707,11 +665,6 @@
   box-shadow: 0 0 0 3px rgba(17, 24, 39, 0.12);
 }
 
-.composer-mode-toggle {
-  align-self: end;
-  flex-shrink: 0;
-}
-
 .composer-hint {
   flex: 1;
   min-width: 0;
@@ -782,18 +735,12 @@
     display: none;
   }
 
-  .chat-actions,
-  .mode-toggle {
+  .chat-actions {
     width: 100%;
   }
 
   .chat-actions {
     justify-content: stretch;
-  }
-
-  .mode-btn,
-  .provider-picker .mode-btn {
-    flex: 1;
   }
 
   .chat-messages {
@@ -813,10 +760,6 @@
 
   .composer-field {
     flex: 1 1 140px;
-  }
-
-  .composer-mode-toggle {
-    flex: 1 1 180px;
   }
 
   .composer-hint {

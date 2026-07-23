@@ -25,6 +25,8 @@ class IAgentStorage(ABC):
     def get_session_history(self, session_id: str) -> list[dict]: ...
     @abstractmethod
     def save_report(self, report_id: str, session_id: str, s3_bucket: str, s3_key: str, title: str) -> None: ...
+    @abstractmethod
+    def delete_session(self, session_id: str) -> None: ...
 
 
 class PostgresRepository(IAgentStorage):
@@ -77,6 +79,20 @@ class PostgresRepository(IAgentStorage):
                     )
         except Exception as exc:
             logger.warning("save_report failed: %s", exc)
+    def delete_session(self, session_id: str) -> None:
+        if not self._is_reachable():
+            raise RuntimeError("Session storage is unavailable")
+        try:
+            with psycopg2.connect(self._psycopg_url()) as conn:
+                self._ensure_session_records_table(conn)
+                with conn.cursor() as cur:
+                    cur.execute("DELETE FROM ai.session_records WHERE session_id=%s", (session_id,))
+                    cur.execute("SELECT to_regclass('ai.reports')")
+                    if cur.fetchone()[0] is not None:
+                        cur.execute("DELETE FROM ai.reports WHERE session_id=%s", (session_id,))
+        except Exception as exc:
+            logger.warning("delete_session failed: %s", exc)
+            raise
     def _ensure_session_records_table(self, conn: Any) -> None:
         with conn.cursor() as cur:
             cur.execute("CREATE SCHEMA IF NOT EXISTS ai"); cur.execute("""CREATE TABLE IF NOT EXISTS ai.session_records (session_id TEXT PRIMARY KEY, instance_id TEXT, system_prompt_id TEXT, system_prompt_name TEXT, system_prompt_instructions_snapshot TEXT, messages JSONB NOT NULL DEFAULT '[]', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())""")

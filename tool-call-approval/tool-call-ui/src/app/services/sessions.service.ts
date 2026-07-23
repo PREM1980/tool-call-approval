@@ -20,4 +20,10 @@ export class SessionsService {
       this.http.get<ChatMessage[]>(`${API_URL}/sessions/${sessionId}/history`)
     );
   }
+
+  delete(sessionId: string): Promise<{ status: string }> {
+    return firstValueFrom(
+      this.http.delete<{ status: string }>(`${API_URL}/sessions/${sessionId}`)
+    );
+  }
 }

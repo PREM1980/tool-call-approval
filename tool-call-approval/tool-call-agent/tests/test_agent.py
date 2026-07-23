@@ -7,7 +7,7 @@ from langchain_core.messages import AIMessage
 from app.core.system_prompts import DEFAULT_INSTRUCTIONS
 from app.domain.session import Session
 from app.repositories.agent_repository import IAgentStorage, PostgresRepository
-from app.services.agent_service import AgentService
+from app.services.agent_service import AgentService, _normalize_tool_args
 
 
 class MockStorage(IAgentStorage):
@@ -22,6 +22,7 @@ class MockStorage(IAgentStorage):
         self.messages.append({"session_id": session_id, "role": role, "content": content, "message": message})
     def get_session_history(self, session_id): return []
     def save_report(self, *args): pass
+    def delete_session(self, session_id): pass
 
 
 class MockAdminRepo:
@@ -56,6 +57,43 @@ def test_session_defaults():
     session = Session(id="abc-123")
     assert session.pending_approvals == {}
     assert session.queue.empty()
+    assert session.k8s_namespace is None
+    assert session.pending_namespace_command is None
+
+
+def test_kubectl_uses_active_namespace_when_command_has_none():
+    assert _normalize_tool_args("kubectl", {"command": "get pods"}, "demo") == {
+        "command": "get pods -n demo"
+    }
+
+
+def test_explicit_kubectl_namespace_overrides_active_namespace():
+    assert _normalize_tool_args("kubectl", {"command": "get pods -n kube-system"}, "demo") == {
+        "command": "get pods -n kube-system"
+    }
+
+
+def test_kubectl_uses_all_namespaces_scope_when_selected():
+    assert _normalize_tool_args("kubectl", {"command": "get pods"}, "__all__") == {
+        "command": "get pods --all-namespaces"
+    }
+
+
+def test_explicit_all_namespaces_scope_overrides_active_namespace():
+    assert _normalize_tool_args("kubectl", {"command": "get pods -A"}, "demo") == {
+        "command": "get pods -A"
+    }
+
+
+def test_namespace_list_is_formatted_as_markdown_table():
+    output = "NAME STATUS AGE\ndefault Active 41d\nkube-system Active 41d"
+
+    assert AgentService._format_namespace_list(output) == (
+        "| Namespace | Status | Age |\n"
+        "| --- | --- | --- |\n"
+        "| default | Active | 41d |\n"
+        "| kube-system | Active | 41d |"
+    )
 
 
 def test_create_session_builds_a_langgraph_runtime(service):

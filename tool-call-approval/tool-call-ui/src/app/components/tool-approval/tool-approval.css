@@ -1,7 +1,7 @@
 .approval-card {
   background: #fff;
   border: 1px solid #d8e1e8;
-  border-left: 3px solid #0d6efd;
+  border-left: 3px solid #b45309;
   border-radius: 8px;
 }
 
@@ -17,7 +17,7 @@
 .approval-command {
   font-size: 0.82rem;
   font-family: ui-monospace, monospace;
-  color: #0d6efd;
+  color: #92400e;
   word-break: break-all;
 }
 

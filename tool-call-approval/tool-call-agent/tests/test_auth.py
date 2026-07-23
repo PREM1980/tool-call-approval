@@ -48,6 +48,9 @@ class FakeRegistrationRepository:
     def get_session_ids_for_user(self, user_id: str) -> list[str]:
         return self.owned_sessions.get(user_id, [])
 
+    def delete_session_owner(self, user_id: str, session_id: str) -> None:
+        self.owned_sessions[user_id] = [item for item in self.owned_sessions.get(user_id, []) if item != session_id]
+
 
 def test_password_hasher_verifies_matching_password_and_rejects_wrong_password():
     hasher = PasswordHasher()
@@ -144,3 +147,7 @@ def test_session_ownership_service_records_and_checks_owned_sessions():
     assert service.user_owns_session(user, "session-123") is True
     assert service.user_owns_session(user, "other-session") is False
     assert service.get_session_ids_for_user(user) == ["session-123"]
+
+    service.delete_owner(user, "session-123")
+
+    assert service.get_session_ids_for_user(user) == []

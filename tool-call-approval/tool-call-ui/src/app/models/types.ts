@@ -87,7 +87,6 @@ export interface PlatformContext {
   duplo_base_url?: string | null;
   duplo_token?: string | null;
   tenant_name?: string | null;
-  aws_credentials?: Record<string, unknown> | null;
   kubeconfig?: string | null;
 }
 

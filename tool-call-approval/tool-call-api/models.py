@@ -38,7 +38,6 @@ class PlatformContext(StrictBaseModel):
     duplo_base_url: str | None
     duplo_token: str | None
     tenant_name: str | None
-    aws_credentials: dict[str, Any] | None
     kubeconfig: str | None
 
 

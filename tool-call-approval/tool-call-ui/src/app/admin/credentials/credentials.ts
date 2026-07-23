@@ -12,9 +12,6 @@ import { AdminService } from '../../services/admin.service';
 })
 export class Credentials implements OnInit {
   form = {
-    aws_access_key_id: '',
-    aws_secret_access_key: '',
-    aws_region: 'us-east-1',
     kubeconfig: '',
   };
   saving = false;
@@ -26,9 +23,6 @@ export class Credentials implements OnInit {
   async ngOnInit() {
     const creds = await this.adminService.getCredentials();
     if (creds) {
-      this.form.aws_access_key_id = creds.aws_access_key_id ?? '';
-      this.form.aws_secret_access_key = creds.aws_secret_access_key ?? '';
-      this.form.aws_region = creds.aws_region ?? 'us-east-1';
       this.form.kubeconfig = creds.kubeconfig ?? '';
     }
   }
@@ -44,9 +38,6 @@ export class Credentials implements OnInit {
     this.error = '';
     try {
       await this.adminService.saveCredentials({
-        aws_access_key_id: this.form.aws_access_key_id,
-        aws_secret_access_key: this.form.aws_secret_access_key,
-        aws_region: this.form.aws_region,
         kubeconfig: this.form.kubeconfig || null,
       });
       this.saved = true;

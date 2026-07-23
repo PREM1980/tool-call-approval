@@ -18,6 +18,7 @@ export class AiEngg implements OnInit {
   sessions: SessionSummary[] = [];
   loadingSessions = false;
   sessionsError = '';
+  deletingSessionId: string | null = null;
 
   constructor(private sessionsService: SessionsService) {}
 
@@ -32,6 +33,28 @@ export class AiEngg implements OnInit {
 
   openSessionInChat(sessionId: string): void {
     this.resumeSessionId = sessionId;
+  }
+
+  async deleteSession(session: SessionSummary, event: MouseEvent): Promise<void> {
+    event.stopPropagation();
+    const title = this.sessionTitle(session);
+    if (!window.confirm(`Delete the conversation “${title}”? This cannot be undone.`)) {
+      return;
+    }
+
+    this.deletingSessionId = session.session_id;
+    this.sessionsError = '';
+    try {
+      if (this.resumeSessionId === session.session_id) {
+        await this.startNewChat();
+      }
+      await this.sessionsService.delete(session.session_id);
+      this.sessions = this.sessions.filter(({ session_id }) => session_id !== session.session_id);
+    } catch {
+      this.sessionsError = 'Unable to delete this conversation.';
+    } finally {
+      this.deletingSessionId = null;
+    }
   }
 
   async refreshSessions(): Promise<void> {
