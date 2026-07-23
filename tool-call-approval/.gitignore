@@ -8,3 +8,8 @@
 
 # K8s secrets — never commit real values
 k8s/**/secret.yaml
+k8s-deploy/secret.yaml
+
+# Python interpreter artifacts
+__pycache__/
+*.py[cod]
