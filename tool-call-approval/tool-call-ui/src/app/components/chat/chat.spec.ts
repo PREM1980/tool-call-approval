@@ -847,6 +847,16 @@ describe('Chat', () => {
     expect(component.messages.at(-1)?.content).toBe('Hello world!');
   });
 
+  it('shows a working status while a tool is executing', () => {
+    sseSubject.next({ type: 'tool_started', tool_use_id: 'tool-1', tool_name: 'kubectl' });
+
+    expect(component.isWaiting).toBeTrue();
+    expect(component.activityStatus).toBe('Working: kubectl…');
+
+    sseSubject.next({ type: 'tool_result', tool_use_id: 'tool-1', tool_name: 'kubectl', result: 'done' });
+    expect(component.activityStatus).toBe('Thinking…');
+  });
+
   it('should remove tool call from pendingToolCalls after approval', async () => {
     component.pendingToolCalls = [{
       tool_use_id: 'abc',

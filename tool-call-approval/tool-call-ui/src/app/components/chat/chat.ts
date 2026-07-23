@@ -53,6 +53,7 @@ export class Chat implements OnInit, OnChanges, OnDestroy, AfterViewChecked {
   pendingToolCalls: ToolCall[] = [];
   executionEvents: DebugEvent[] = [];
   isWaiting = false;
+  activityStatus = '';
   isSwitching = false;
   personas: PersonaData[] = [];
   skills: Skill[] = [];
@@ -156,6 +157,7 @@ export class Chat implements OnInit, OnChanges, OnDestroy, AfterViewChecked {
       this.pendingToolCalls = [];
       this.executionEvents = [];
       this.isWaiting = false;
+      this.activityStatus = '';
       this.hasActiveSession = false;
       this.resetActiveToolData();
       this.streamingAssistantMessage = null;
@@ -175,6 +177,7 @@ export class Chat implements OnInit, OnChanges, OnDestroy, AfterViewChecked {
       this.pendingToolCalls = [];
       this.executionEvents = [];
       this.isWaiting = false;
+      this.activityStatus = '';
       this.hasActiveSession = false;
       this.resetActiveToolData();
       this.streamingAssistantMessage = null;
@@ -223,6 +226,7 @@ export class Chat implements OnInit, OnChanges, OnDestroy, AfterViewChecked {
     this.userInput = '';
     const userMessage = this.addMessage('user', text);
     this.isWaiting = true;
+    this.activityStatus = 'Thinking…';
     const platformContext = this.kubeconfig ? { kubeconfig: this.kubeconfig } : undefined;
     try {
       await this.chatService.sendMessage(
@@ -230,6 +234,7 @@ export class Chat implements OnInit, OnChanges, OnDestroy, AfterViewChecked {
       );
     } catch (error) {
       this.isWaiting = false;
+      this.activityStatus = '';
       this.addSystemMessage(`Error: ${this.describeRequestError(error)}`);
       this.shouldScrollToBottom = true;
       this.cdr.detectChanges();
@@ -242,6 +247,7 @@ export class Chat implements OnInit, OnChanges, OnDestroy, AfterViewChecked {
     this.markToolApproval(tool_use_id, approved);
     if (this.pendingToolCalls.length === 0) {
       this.isWaiting = true;
+      this.activityStatus = 'Working…';
     }
     this.attachActiveToolDataToLatestAssistant();
     this.cdr.detectChanges();
@@ -341,9 +347,15 @@ export class Chat implements OnInit, OnChanges, OnDestroy, AfterViewChecked {
       switch (event.type) {
         case 'thinking':
           this.isWaiting = true;
+          this.activityStatus = 'Thinking…';
+          break;
+        case 'model_request':
+          this.isWaiting = true;
+          this.activityStatus = 'Thinking…';
           break;
         case 'tool_call_pending':
           this.isWaiting = false;
+          this.activityStatus = '';
           // A following model pass starts a separate assistant message after the tool result.
           this.streamingAssistantMessage = null;
           this.trackToolCommand(event);
@@ -361,9 +373,16 @@ export class Chat implements OnInit, OnChanges, OnDestroy, AfterViewChecked {
           break;
         case 'message_delta':
           this.isWaiting = false;
+          this.activityStatus = '';
           this.appendAssistantDelta(event.content ?? '', event.run_id);
           break;
+        case 'tool_started':
+          this.isWaiting = true;
+          this.activityStatus = event.tool_name ? `Working: ${event.tool_name}…` : 'Working…';
+          break;
         case 'tool_result':
+          this.isWaiting = true;
+          this.activityStatus = 'Thinking…';
           this.trackToolResult(event);
           if (event.tool_name === 'save_report' && event.result) {
             const title = this.pendingReportTitles.get(event.tool_use_id!) ?? 'Report';
@@ -379,6 +398,7 @@ export class Chat implements OnInit, OnChanges, OnDestroy, AfterViewChecked {
           break;
         case 'message':
           this.isWaiting = false;
+          this.activityStatus = '';
           const streamed = this.streamingAssistantMessage;
           const assistantMessage = streamed?.content === (event.content ?? '')
             ? streamed
@@ -389,6 +409,7 @@ export class Chat implements OnInit, OnChanges, OnDestroy, AfterViewChecked {
           break;
         case 'done':
           this.isWaiting = false;
+          this.activityStatus = '';
           this.attachActiveToolDataToLatestAssistant();
           this.resetActiveToolData();
           if (event.total_tokens) {
@@ -400,11 +421,13 @@ export class Chat implements OnInit, OnChanges, OnDestroy, AfterViewChecked {
           break;
         case 'error':
           this.isWaiting = false;
+          this.activityStatus = '';
           this.addSystemMessage(`Error: ${event.content}`);
           break;
         case 'stream_error':
           if (this.isWaiting || this.pendingToolCalls.length > 0) {
             this.isWaiting = false;
+            this.activityStatus = '';
             this.addSystemMessage(`Error: ${event.content ?? 'Stream connection lost.'}`);
           }
           break;
