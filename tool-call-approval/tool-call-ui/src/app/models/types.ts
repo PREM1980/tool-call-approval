@@ -52,6 +52,7 @@ export interface SseEvent {
     | 'tool_failed'
     | 'approval_received'
     | 'approval_timed_out'
+    | 'continuing_namespace_command'
     | 'thinking'
     | 'tool_call_pending'
     | 'tool_result'

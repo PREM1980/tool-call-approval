@@ -44,6 +44,12 @@ _SKILL_NAME_RE = re.compile(r"^\s*name\s*:\s*(?P<name>.+?)\s*$", re.MULTILINE)
 _MAX_TOOL_CALLS = 12
 _NAMESPACE_NAME_RE = re.compile(r"^[a-z0-9](?:[-a-z0-9]*[a-z0-9])?$")
 _ALL_NAMESPACES_SCOPE = "__all__"
+_NAMESPACE_SELECTION_RE = re.compile(
+    r"^\s*(?:use|switch\s+to|set)\s+(?:the\s+)?(?:namespace\s+)?"
+    r"(?P<namespace>[a-z0-9](?:[-a-z0-9]*[a-z0-9])?|all\s+namespaces?)"
+    r"(?:\s+namespace)?\s*$",
+    re.IGNORECASE,
+)
 _SENSITIVE_EVENT_KEYS = {"authorization", "credential", "credentials", "kubeconfig", "password", "secret", "token", "api_key"}
 _CLUSTER_SCOPED_COMMAND_RE = re.compile(
     r"^(?:get|describe)\s+(?:ns|namespace|namespaces|node|nodes|"
@@ -391,6 +397,11 @@ class AgentService:
             await self._emit(session, "run_started", content=message)
             await self._emit(session, "thinking", content="Thinking...")
             requested_namespace = await self._detect_requested_namespace(session, message)
+            # Namespace selection is a short, structured follow-up to a command that is
+            # already waiting.  Parse it locally so a model classification miss cannot
+            # strand the original command after the user selects a namespace.
+            if session.pending_namespace_command:
+                requested_namespace = self._selected_namespace(message) or requested_namespace
             command_to_execute = message
             if requested_namespace:
                 approved, updated_args = await self._await_approval(
@@ -409,6 +420,7 @@ class AgentService:
                     if session.pending_namespace_command:
                         command_to_execute = session.pending_namespace_command
                         session.pending_namespace_command = None
+                        await self._emit(session, "continuing_namespace_command", content=command_to_execute)
                 elif approved:
                     await self._emit(session, "message", content="The selected namespace is not valid.")
                     await self._emit(session, "done")
@@ -525,6 +537,16 @@ class AgentService:
     @classmethod
     def _is_valid_namespace_scope(cls, namespace: str) -> bool:
         return namespace == _ALL_NAMESPACES_SCOPE or cls._is_valid_namespace(namespace)
+
+    @classmethod
+    def _selected_namespace(cls, message: str) -> str | None:
+        """Parse the constrained namespace-selection reply shown in the chat UI."""
+        match = _NAMESPACE_SELECTION_RE.fullmatch(message)
+        if not match:
+            return None
+        selected = match.group("namespace").lower()
+        namespace = _ALL_NAMESPACES_SCOPE if selected.startswith("all namespace") else selected
+        return namespace if cls._is_valid_namespace_scope(namespace) else None
 
     # ── Persona, skill, and persistence helpers ──────────────────────────
     def _load_skills(self, instance_id: str | None, persona_ids: list[str]) -> tuple[str, str, list[dict[str, Any]]]:

@@ -1,5 +1,5 @@
 import asyncio
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from langchain_core.messages import AIMessage, AIMessageChunk
@@ -124,6 +124,23 @@ async def test_run_uses_graph_and_persists_final_response(service):
         "message", "run_completed", "done",
     ]
     assert service._repository.messages[-1]["content"] == "Hello from LangGraph."
+
+
+async def test_namespace_selection_continues_pending_command(service):
+    with patch("app.services.agent_service._build_model", return_value=TextModel()):
+        session = service.create_session()
+    session.pending_namespace_command = "check all broken pods"
+    graph = service._sessions[session.id][1].graph
+    graph.ainvoke = AsyncMock(return_value={"messages": [], "final_output": "Done."})
+
+    with patch.object(service, "_detect_requested_namespace", return_value=None), \
+         patch.object(service, "_await_approval", return_value=(True, {"namespace": "demo"})):
+        await service.run(session, "use demo")
+
+    assert session.k8s_namespace == "demo"
+    assert session.pending_namespace_command is None
+    invoked_messages = graph.ainvoke.await_args.args[0]["messages"]
+    assert invoked_messages[-1].content == "check all broken pods"
 
 
 def test_approve_validates_edited_tool_parameters(service):
