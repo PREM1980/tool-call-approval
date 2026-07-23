@@ -10,3 +10,7 @@
 k8s/**/secret.yaml
 k8s-deploy/secret.yaml
 k8s-deploy/overlays/*/secret.yaml
+
+# Python interpreter artifacts
+__pycache__/
+*.py[cod]

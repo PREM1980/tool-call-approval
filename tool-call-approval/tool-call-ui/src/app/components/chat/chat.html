@@ -80,6 +80,23 @@
                         }
                       }
                     }
+                    @let traceEvents = traceEventsFor(message);
+                    @if (traceEvents.length > 0) {
+                      <details class="debug-trace">
+                        <summary>
+                          <span class="debug-trace-title">Trace</span>
+                          <span class="debug-trace-count">{{ traceEvents.length }} events</span>
+                        </summary>
+                        <ol>
+                          @for (event of traceEvents; track event.sequence ?? $index) {
+                            <li>
+                              <time>{{ event.occurred_at | date: 'HH:mm:ss' }}</time>
+                              <span>{{ eventSummary(event) }}</span>
+                            </li>
+                          }
+                        </ol>
+                      </details>
+                    }
                   </div>
                 } @else {
                   <div class="msg-bubble">{{ message.content }}</div>
@@ -105,6 +122,7 @@
             <span class="thinking-dot"></span>
           </div>
         }
+
       </div>
 
       <form class="chat-input-bar" (ngSubmit)="sendMessage()">
@@ -119,26 +137,15 @@
         ></textarea>
         <div class="composer-toolbar">
           <div class="composer-selectors">
-            <label class="composer-field" for="providerSelect">
-              <span>Provider</span>
-              <select id="providerSelect" [(ngModel)]="selectedProvider" (ngModelChange)="onProviderChange()"
-                name="providerSelect" [disabled]="isSwitching || isWaiting" title="Provider">
-                @for (provider of availableProviders; track provider) {
-                  <option [value]="provider">{{ provider }}</option>
+            <label class="composer-field" for="modelSelect">
+              <span>Local model</span>
+              <select id="modelSelect" [(ngModel)]="selectedModelId" (ngModelChange)="onModelChange()"
+                name="modelSelect" [disabled]="isSwitching || isWaiting" title="Local model">
+                @for (model of availableModels; track model) {
+                  <option [value]="model">{{ model }}</option>
                 }
               </select>
             </label>
-            @if (selectedProvider === 'LOCAL') {
-              <label class="composer-field" for="modelSelect">
-                <span>Model</span>
-                <select id="modelSelect" [(ngModel)]="selectedModelId" (ngModelChange)="onModelChange()"
-                  name="modelSelect" [disabled]="isSwitching || isWaiting" title="Model">
-                  @for (model of availableModels; track model) {
-                    <option [value]="model">{{ model }}</option>
-                  }
-                </select>
-              </label>
-            }
             <label class="composer-field" for="personaSelect">
               <span>Persona</span>
               <select id="personaSelect" [ngModel]="selectedPersonaIds[0] ?? ''"
@@ -174,14 +181,6 @@
                 }
               </select>
             </label>
-            <div class="composer-mode-toggle mode-toggle" aria-label="Connection mode">
-              <button type="button" class="mode-btn"
-                [class.active]="mode === 'sse'"
-                (click)="switchMode('sse')">SSE</button>
-              <button type="button" class="mode-btn"
-                [class.active]="mode === 'websocket'"
-                (click)="switchMode('websocket')">WebSocket</button>
-            </div>
           </div>
           <button class="chat-send" type="submit" aria-label="Send message" title="Send message"
             [disabled]="!canSendMessage || isWaiting || pendingToolCalls.length > 0 || !userInput.trim()">

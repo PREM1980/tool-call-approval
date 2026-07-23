@@ -18,15 +18,13 @@ import { Subscription } from 'rxjs';
 import { AdminService, PersonaData, Skill, SystemPromptData } from '../../services/admin.service';
 import { ChatService } from '../../services/chat.service';
 import { SessionsService } from '../../services/sessions.service';
-import { WebsocketChatService } from '../../services/websocket-chat.service';
 import { ToolApproval } from '../tool-approval/tool-approval';
-import { AmbientContext, ApiMessage, ApprovalDecision, Command, ExecutedCommand, Message, MessageData, PlatformContext, SseEvent, ToolCall } from '../../models/types';
+import { AmbientContext, ApiMessage, ApprovalDecision, Command, DebugEvent, ExecutedCommand, Message, MessageData, PlatformContext, SseEvent, ToolCall } from '../../models/types';
 import { formatMarkdownBlocks, MarkdownBlock } from '../../shared/markdown-blocks';
 
-export type ConnectionMode = 'sse' | 'websocket';
-
 const KUBERNETES_SUGGESTIONS = [
-  'List all pods in the default namespace',
+  'List all pods',
+  'List all namespaces',
   'list all applications in argo cd',
   'Scale the frontend deployment to 3 replicas',
   'Show me recent events in the kube-system namespace',
@@ -53,8 +51,8 @@ export class Chat implements OnInit, OnChanges, OnDestroy, AfterViewChecked {
   messages: Message[] = [];
   userInput = '';
   pendingToolCalls: ToolCall[] = [];
+  executionEvents: DebugEvent[] = [];
   isWaiting = false;
-  mode: ConnectionMode = 'sse';
   isSwitching = false;
   personas: PersonaData[] = [];
   skills: Skill[] = [];
@@ -62,11 +60,17 @@ export class Chat implements OnInit, OnChanges, OnDestroy, AfterViewChecked {
   systemPrompts: SystemPromptData[] = [];
   selectedSystemPromptId: string | null = null;
   selectedPromptTemplate = '';
-  selectedProvider: string = 'LOCAL';
-  selectedModelId: string = 'gpt-oss-120b';
+  selectedModelId: string = 'gemma-4';
 
-  readonly availableProviders = ['AWS', 'GCP', 'LOCAL'];
-  readonly availableModels = ['gpt-oss-120b'];
+  readonly availableModels = [
+    'gpt-oss-120b',
+    'devstral',
+    'gemma-4',
+    'nemotron-3-nano',
+    'nemotron-3-super',
+    'nemotron-3-ultra',
+    'nemotron-3-ultra-codex',
+  ];
 
   private sseSubscription!: Subscription;
   private shouldScrollToBottom = false;
@@ -75,10 +79,10 @@ export class Chat implements OnInit, OnChanges, OnDestroy, AfterViewChecked {
   private pendingReportTitles = new Map<string, string>();
   private activeToolData: MessageData = this.emptyMessageData();
   private activeToolCommands = new Map<string, Command>();
+  private streamingAssistantMessage: Message | null = null;
 
   constructor(
     private chatService: ChatService,
-    private wsChatService: WebsocketChatService,
     private sessionsService: SessionsService,
     private adminService: AdminService,
     private cdr: ChangeDetectorRef,
@@ -86,10 +90,6 @@ export class Chat implements OnInit, OnChanges, OnDestroy, AfterViewChecked {
 
   formatMessageContent(content: string): MarkdownBlock[] {
     return formatMarkdownBlocks(content);
-  }
-
-  private get activeService(): ChatService | WebsocketChatService {
-    return this.mode === 'sse' ? this.chatService : this.wsChatService;
   }
 
   get emptyStateSuggestions(): string[] {
@@ -143,7 +143,7 @@ export class Chat implements OnInit, OnChanges, OnDestroy, AfterViewChecked {
 
   ngOnDestroy(): void {
     this.sseSubscription?.unsubscribe();
-    this.activeService.closeStream();
+    this.chatService.closeStream();
   }
 
   async newSession(): Promise<void> {
@@ -151,12 +151,14 @@ export class Chat implements OnInit, OnChanges, OnDestroy, AfterViewChecked {
     this.isSwitching = true;
     try {
       this.sseSubscription?.unsubscribe();
-      this.activeService.closeStream();
+      this.chatService.closeStream();
       this.messages = [];
       this.pendingToolCalls = [];
+      this.executionEvents = [];
       this.isWaiting = false;
       this.hasActiveSession = false;
       this.resetActiveToolData();
+      this.streamingAssistantMessage = null;
       await this.initConnection();
     } finally {
       this.isSwitching = false;
@@ -168,21 +170,18 @@ export class Chat implements OnInit, OnChanges, OnDestroy, AfterViewChecked {
     this.isSwitching = true;
     try {
       this.sseSubscription?.unsubscribe();
-      this.activeService.closeStream();
+      this.chatService.closeStream();
       this.messages = [];
       this.pendingToolCalls = [];
+      this.executionEvents = [];
       this.isWaiting = false;
       this.hasActiveSession = false;
       this.resetActiveToolData();
+      this.streamingAssistantMessage = null;
       await this.loadExistingSession(sessionId);
     } finally {
       this.isSwitching = false;
     }
-  }
-
-  async onProviderChange(): Promise<void> {
-    this.selectedSystemPromptId = null;
-    await this.newSession();
   }
 
   async onModelChange(): Promise<void> {
@@ -193,7 +192,7 @@ export class Chat implements OnInit, OnChanges, OnDestroy, AfterViewChecked {
     if (this.isSwitching || this.isWaiting) return;
     this.selectedPersonaIds = personaId ? [personaId] : [];
     if (this.hasActiveSession) {
-      this.activeService.updateSessionContext({
+      this.chatService.updateSessionContext({
         persona_id: personaId || null,
         persona_ids: this.selectedPersonaIds,
       });
@@ -218,24 +217,6 @@ export class Chat implements OnInit, OnChanges, OnDestroy, AfterViewChecked {
     await this.newSession();
   }
 
-  async switchMode(newMode: ConnectionMode): Promise<void> {
-    if (newMode === this.mode || this.isSwitching) return;
-    this.isSwitching = true;
-    try {
-      this.sseSubscription?.unsubscribe();
-      this.activeService.closeStream();
-      this.messages = [];
-      this.pendingToolCalls = [];
-      this.isWaiting = false;
-      this.hasActiveSession = false;
-      this.resetActiveToolData();
-      this.mode = newMode;
-      await this.initConnection();
-    } finally {
-      this.isSwitching = false;
-    }
-  }
-
   async sendMessage(): Promise<void> {
     const text = this.userInput.trim();
     if (!text || !this.canSendMessage) return;
@@ -244,7 +225,7 @@ export class Chat implements OnInit, OnChanges, OnDestroy, AfterViewChecked {
     this.isWaiting = true;
     const platformContext = this.kubeconfig ? { kubeconfig: this.kubeconfig } : undefined;
     try {
-      await this.activeService.sendMessage(
+      await this.chatService.sendMessage(
         this.buildRequestMessages(userMessage.id, platformContext),
       );
     } catch (error) {
@@ -264,14 +245,16 @@ export class Chat implements OnInit, OnChanges, OnDestroy, AfterViewChecked {
     }
     this.attachActiveToolDataToLatestAssistant();
     this.cdr.detectChanges();
-    await this.activeService.approveTool(tool_use_id, approved, tool_input);
+    await this.chatService.approveTool(tool_use_id, approved, tool_input);
   }
 
   private async loadExistingSession(sessionId: string): Promise<void> {
-    this.mode = 'sse';
     this.chatService.setSession(sessionId);
     this.hasActiveSession = true;
-    const history = await this.sessionsService.getHistory(sessionId).catch(() => []);
+    const [history, events] = await Promise.all([
+      this.sessionsService.getHistory(sessionId).catch(() => []),
+      this.sessionsService.getEvents(sessionId).catch(() => []),
+    ]);
     this.messages = history.map(m => ({
       id: crypto.randomUUID(),
       role: m.role,
@@ -287,6 +270,7 @@ export class Chat implements OnInit, OnChanges, OnDestroy, AfterViewChecked {
         ? this.normalizeAmbientContext(m.ambient_context)
         : undefined,
     }));
+    this.executionEvents = events;
     this.shouldScrollToBottom = true;
     this.subscribeToEvents(this.chatService);
   }
@@ -294,16 +278,16 @@ export class Chat implements OnInit, OnChanges, OnDestroy, AfterViewChecked {
   private async initConnection(): Promise<void> {
     if (this.systemPrompts.length > 0 && !this.selectedSystemPromptId) return;
     const personaIds = [...this.selectedPersonaIds];
-    await this.activeService.createSession(
+    await this.chatService.createSession(
       null,
       personaIds[0] ?? undefined,
       this.selectedSystemPromptId ?? undefined,
-      this.selectedProvider === 'LOCAL' ? this.selectedModelId || undefined : undefined,
-      this.selectedProvider,
+      this.selectedModelId || undefined,
+      'LOCAL',
       personaIds,
     );
     this.hasActiveSession = true;
-    this.subscribeToEvents(this.activeService);
+    this.subscribeToEvents(this.chatService);
     this.sessionChanged.emit();
   }
 
@@ -334,7 +318,7 @@ export class Chat implements OnInit, OnChanges, OnDestroy, AfterViewChecked {
       .filter(id => current.has(id));
     if (next.join('|') === this.selectedPersonaIds.join('|')) return;
     this.selectedPersonaIds = next;
-    this.activeService.updateSessionContext({
+    this.chatService.updateSessionContext({
       persona_id: next[0] ?? null,
       persona_ids: next,
     });
@@ -350,15 +334,18 @@ export class Chat implements OnInit, OnChanges, OnDestroy, AfterViewChecked {
     return prompts.find(prompt => prompt.is_active)?.id ?? prompts[0]?.id ?? null;
   }
 
-  private subscribeToEvents(service: ChatService | WebsocketChatService): void {
+  private subscribeToEvents(service: ChatService): void {
     service.connectStream();
     this.sseSubscription = service.sseEvents$.subscribe((event) => {
+      if (event.type !== 'stream_error') this.addLiveExecutionEvent(event);
       switch (event.type) {
         case 'thinking':
           this.isWaiting = true;
           break;
         case 'tool_call_pending':
           this.isWaiting = false;
+          // A following model pass starts a separate assistant message after the tool result.
+          this.streamingAssistantMessage = null;
           this.trackToolCommand(event);
           if (event.tool_name === 'save_report') {
             this.pendingReportTitles.set(
@@ -371,6 +358,10 @@ export class Chat implements OnInit, OnChanges, OnDestroy, AfterViewChecked {
             tool_name: event.tool_name!,
             tool_input: event.tool_input ?? {},
           });
+          break;
+        case 'message_delta':
+          this.isWaiting = false;
+          this.appendAssistantDelta(event.content ?? '', event.run_id);
           break;
         case 'tool_result':
           this.trackToolResult(event);
@@ -388,9 +379,13 @@ export class Chat implements OnInit, OnChanges, OnDestroy, AfterViewChecked {
           break;
         case 'message':
           this.isWaiting = false;
-          this.attachActiveToolDataToMessage(
-            this.appendAssistantMessage(event.content ?? ''),
-          );
+          const streamed = this.streamingAssistantMessage;
+          const assistantMessage = streamed?.content === (event.content ?? '')
+            ? streamed
+            : this.appendAssistantMessage(event.content ?? '');
+          this.attachActiveToolDataToMessage(assistantMessage);
+          if (assistantMessage) assistantMessage.trace_run_id = event.run_id ?? assistantMessage.trace_run_id;
+          this.streamingAssistantMessage = null;
           break;
         case 'done':
           this.isWaiting = false;
@@ -401,9 +396,7 @@ export class Chat implements OnInit, OnChanges, OnDestroy, AfterViewChecked {
               `Tokens: ${event.total_tokens.toLocaleString()} total (${event.input_tokens?.toLocaleString()} in / ${event.output_tokens?.toLocaleString()} out)`
             );
           }
-          if (this.mode === 'sse') {
-            this.activeService.connectStream();
-          }
+          this.chatService.connectStream();
           break;
         case 'error':
           this.isWaiting = false;
@@ -424,11 +417,14 @@ export class Chat implements OnInit, OnChanges, OnDestroy, AfterViewChecked {
   private describeRequestError(error: unknown): string {
     if (error && typeof error === 'object') {
       const maybeHttpError = error as {
-        error?: { detail?: string; message?: string };
+        error?: { detail?: string | Array<{ msg?: string }>; message?: string };
         message?: string;
         status?: number;
       };
       const detail = maybeHttpError.error?.detail ?? maybeHttpError.error?.message ?? maybeHttpError.message;
+      if (Array.isArray(detail)) {
+        return detail.map(item => item.msg ?? 'Invalid request').join('; ');
+      }
       if (detail) return detail;
       if (maybeHttpError.status === 404) return 'Session not found. Start a new chat and try again.';
     }
@@ -444,6 +440,41 @@ export class Chat implements OnInit, OnChanges, OnDestroy, AfterViewChecked {
     } else {
       return this.addMessage('assistant', content);
     }
+  }
+
+  traceEventsFor(message: Message): DebugEvent[] {
+    const runId = message.trace_run_id
+      ?? (typeof message.agent === 'object' && message.agent ? message.agent['run_id'] : null);
+    return runId ? this.executionEvents.filter(event => event.run_id === runId) : [];
+  }
+
+  private appendAssistantDelta(content: string, runId?: string | null): void {
+    if (!content) return;
+    if (!this.streamingAssistantMessage) {
+      this.streamingAssistantMessage = this.addMessage('assistant', '');
+    }
+    this.streamingAssistantMessage.content += content;
+    this.streamingAssistantMessage.trace_run_id = runId ?? this.streamingAssistantMessage.trace_run_id;
+  }
+
+  eventSummary(event: DebugEvent): string {
+    const payload = event.payload;
+    const tool = typeof payload['tool_name'] === 'string' ? `: ${payload['tool_name']}` : '';
+    const content = typeof payload['content'] === 'string' ? ` — ${payload['content']}` : '';
+    const result = typeof payload['result'] === 'string' ? ` — ${payload['result']}` : '';
+    return `${event.event_type.replaceAll('_', ' ')}${tool}${content || result}`;
+  }
+
+  private addLiveExecutionEvent(event: SseEvent): void {
+    if (event.sequence && this.executionEvents.some(item => item.sequence === event.sequence)) return;
+    const { type, sequence, run_id, occurred_at, ...payload } = event;
+    this.executionEvents.push({
+      sequence,
+      run_id,
+      event_type: type,
+      payload,
+      occurred_at: occurred_at ?? new Date().toISOString(),
+    });
   }
 
   private trackToolCommand(event: SseEvent): void {
@@ -526,7 +557,6 @@ export class Chat implements OnInit, OnChanges, OnDestroy, AfterViewChecked {
       duplo_base_url: null,
       duplo_token: null,
       tenant_name: null,
-      aws_credentials: null,
       kubeconfig: null,
     };
   }

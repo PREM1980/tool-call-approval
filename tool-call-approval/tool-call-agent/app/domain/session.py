@@ -15,6 +15,8 @@ class Session:
     approval_inputs: dict[str, dict[str, Any]] = field(default_factory=dict)
     pending_tool_inputs: dict[str, dict[str, Any]] = field(default_factory=dict)
     kubeconfig: str | None = None
+    k8s_namespace: str | None = None
+    pending_namespace_command: str | None = None
     tmpdir: str | None = None
     instance_id: str | None = None
     persona_id: str | None = None
@@ -34,3 +36,4 @@ class Session:
         "user_file_uploads": [],
     })
     active_tool_commands: dict[str, dict[str, Any]] = field(default_factory=dict)
+    current_run_id: str | None = None

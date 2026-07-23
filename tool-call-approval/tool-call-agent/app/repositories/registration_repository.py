@@ -255,6 +255,24 @@ class RegistrationRepository:
         finally:
             conn.close()
 
+    def delete_session_owner(self, user_id: str, session_id: str) -> None:
+        conn = self._connect()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    DELETE FROM user_chat_sessions
+                    WHERE user_id = %s::uuid AND session_id = %s
+                    """,
+                    (user_id, session_id),
+                )
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
     def _user_from_row(self, row: dict) -> User:
         return User(
             id=str(row["id"]),

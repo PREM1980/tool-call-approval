@@ -43,16 +43,12 @@ async def get_credentials():
     creds = _get_repo().get_credentials()
     if not creds:
         return None
-    creds["aws_secret_access_key"] = "***"
-    return CredentialsResponse(**creds)
+    return CredentialsResponse(kubeconfig=creds.get("kubeconfig"))
 
 
 @router.post("/credentials")
 async def save_credentials(request: CredentialsRequest):
     _get_repo().upsert_credentials(
-        request.aws_access_key_id,
-        request.aws_secret_access_key,
-        request.aws_region,
         request.kubeconfig,
     )
     return {"status": "ok"}

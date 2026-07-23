@@ -2,10 +2,10 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 20px;
-  height: 48px;
-  background: #fff;
-  border-bottom: 1px solid #d8e1e8;
+  padding: 0 28px;
+  height: 52px;
+  background: linear-gradient(120deg, #111827 0%, #374151 58%, #4b5563 100%);
+  box-shadow: 0 12px 32px rgba(17, 24, 39, .18);
   flex-shrink: 0;
 }
 
@@ -15,7 +15,7 @@
   gap: 8px;
   font-size: 0.875rem;
   font-weight: 600;
-  color: #132033;
+  color: #fff;
   text-decoration: none;
 }
 
@@ -24,9 +24,10 @@
   font-weight: 500;
   letter-spacing: 0;
   text-transform: uppercase;
-  color: #0d6efd;
-  background: #e8f1ff;
-  border-radius: 4px;
+  color: #fef3c7;
+  background: rgba(245, 158, 11, .18);
+  border: 1px solid rgba(253, 230, 138, .24);
+  border-radius: 999px;
   padding: 2px 7px;
 }
 
@@ -39,36 +40,36 @@
 .topbar-link {
   font-size: 0.8rem;
   font-weight: 500;
-  color: #667085;
+  color: rgba(255, 255, 255, .78);
   text-decoration: none;
   padding: 5px 11px;
   border-radius: 6px;
   transition: color 0.12s, background 0.12s;
 }
-.topbar-link:hover { color: #132033; background: #f3f4f6; }
-.topbar-link.active { color: #0d6efd; background: #e8f1ff; }
+.topbar-link:hover { color: #fff; background: rgba(255, 255, 255, .1); }
+.topbar-link.active { color: #fff; background: rgba(255, 255, 255, .14); }
 
 .topbar-user {
   margin-left: 8px;
   padding: 4px 9px;
-  border: 1px solid #d8e1e8;
+  border: 1px solid rgba(255, 255, 255, .2);
   border-radius: 999px;
-  color: #5f6f83;
+  color: rgba(255, 255, 255, .86);
   font-size: 0.75rem;
   font-weight: 700;
 }
 
 .topbar-logout {
   padding: 5px 10px;
-  border: 1px solid #d8e1e8;
+  border: 1px solid rgba(255, 255, 255, .2);
   border-radius: 6px;
   background: transparent;
-  color: #5f6f83;
+  color: rgba(255, 255, 255, .86);
   font-size: 0.78rem;
   font-weight: 700;
 }
 
 .topbar-logout:hover {
-  background: #f3f4f6;
-  color: #132033;
+  background: rgba(255, 255, 255, .14);
+  color: #fff;
 }

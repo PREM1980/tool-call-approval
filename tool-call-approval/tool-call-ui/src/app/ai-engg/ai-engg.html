@@ -21,14 +21,22 @@
       } @else {
         <div class="conversation-list">
           @for (session of sessions; track session.session_id) {
-            <button
-              type="button"
-              class="conversation-item"
-              [class.active]="resumeSessionId === session.session_id"
-              [title]="sessionTitle(session)"
-              (click)="openSessionInChat(session.session_id)">
-              <span class="conversation-item-title">{{ sessionTitle(session) }}</span>
-            </button>
+            <div class="conversation-item-row" [class.active]="resumeSessionId === session.session_id">
+              <button
+                type="button"
+                class="conversation-item"
+                [title]="sessionTitle(session)"
+                (click)="openSessionInChat(session.session_id)">
+                <span class="conversation-item-title">{{ sessionTitle(session) }}</span>
+              </button>
+              <button
+                type="button"
+                class="conversation-delete-button"
+                [disabled]="deletingSessionId === session.session_id"
+                [attr.aria-label]="'Delete ' + sessionTitle(session)"
+                title="Delete conversation"
+                (click)="deleteSession(session, $event)">×</button>
+            </div>
           }
         </div>
       }

@@ -14,7 +14,6 @@ const EMPTY_PLATFORM_CONTEXT = {
   duplo_base_url: null,
   duplo_token: null,
   tenant_name: null,
-  aws_credentials: null,
   kubeconfig: null,
 };
 const EMPTY_AMBIENT_CONTEXT = { user_terminal_cmds: [] };

@@ -124,6 +124,16 @@ def test_list_sessions_returns_only_owned_sessions():
     list_sessions.assert_called_once_with(["owned-1"])
 
 
+def test_get_events_returns_owned_session_trace():
+    events = [{"sequence": 7, "event_type": "tool_result", "payload": {}, "occurred_at": "2026-01-01T00:00:00+00:00"}]
+    with _allow_auth(), _allow_owner(), patch.object(main_app.service, "get_events", return_value=events) as get_events:
+        response = client.get("/sessions/session-123/events?after_sequence=3", headers=_auth_headers())
+
+    assert response.status_code == 200
+    assert response.json() == events
+    get_events.assert_called_once_with("session-123", 3)
+
+
 def test_chat_unknown_session_returns_404():
     with _allow_auth(), _allow_owner():
         response = client.post(

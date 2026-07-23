@@ -161,6 +161,26 @@ async def history(session_id: str, request: Request) -> JSONResponse:
     )
 
 
+@app.get("/api/sessions/{session_id}/events")
+async def events(session_id: str, request: Request) -> JSONResponse:
+    return await _proxy(
+        _get_client().get(
+            f"{_BACKEND}/sessions/{session_id}/events",
+            **_with_auth(request, params=dict(request.query_params), timeout=30.0),
+        )
+    )
+
+
+@app.delete("/api/sessions/{session_id}")
+async def delete_session(session_id: str, request: Request) -> JSONResponse:
+    return await _proxy(
+        _get_client().delete(
+            f"{_BACKEND}/sessions/{session_id}",
+            **_with_auth(request, timeout=30.0),
+        )
+    )
+
+
 @app.post("/api/sessions/{session_id}/approve")
 async def approve(session_id: str, request: ApprovalRequest, raw_request: Request) -> JSONResponse:
     payload = _payload(request)

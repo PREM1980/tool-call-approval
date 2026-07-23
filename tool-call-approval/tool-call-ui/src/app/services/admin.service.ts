@@ -5,9 +5,6 @@ import { firstValueFrom } from 'rxjs';
 const API = '/api/admin';
 
 export interface CredentialsData {
-  aws_access_key_id: string;
-  aws_secret_access_key: string;
-  aws_region: string;
   kubeconfig: string | null;
 }
 

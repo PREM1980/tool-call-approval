@@ -50,6 +50,11 @@ def clean_sessions():
             )
         """)
         cur.execute("DELETE FROM ai.session_records")
+        cur.execute("""CREATE TABLE IF NOT EXISTS ai.session_events (
+            id BIGSERIAL PRIMARY KEY, session_id TEXT NOT NULL, run_id TEXT,
+            event_type TEXT NOT NULL, payload JSONB NOT NULL DEFAULT '{}',
+            occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW())""")
+        cur.execute("DELETE FROM ai.session_events")
     conn.commit()
     conn.close()
     yield
@@ -180,3 +185,33 @@ def test_get_history_reads_session_records_messages():
     ]
     assert "platform_context" in data[0]
     assert "ambient_context" in data[0]
+
+
+def test_get_events_replays_ordered_session_trace():
+    main_app._repository.append_session_event("events-id", "run-1", "tool_call_pending", {"tool_name": "kubectl"})
+    main_app._repository.append_session_event("events-id", "run-1", "tool_result", {"result": "ok"})
+
+    with _allow_auth(), _allow_owner():
+        response = http.get("/sessions/events-id/events?after_sequence=0", headers=_auth_headers())
+
+    assert response.status_code == 200
+    assert [event["event_type"] for event in response.json()] == ["tool_call_pending", "tool_result"]
+    assert response.json()[0]["sequence"] < response.json()[1]["sequence"]
+
+
+def test_delete_session_removes_saved_history_and_ownership():
+    conn = psycopg2.connect(TEST_URL)
+    with conn.cursor() as cur:
+        cur.execute(
+            "INSERT INTO ai.session_records (session_id, messages) VALUES ('delete-me', '[{\"role\": \"user\", \"content\": \"hello\"}]')"
+        )
+    conn.commit()
+    conn.close()
+
+    with _allow_auth(), _allow_owner(), patch.object(main_app._session_ownership_service, "delete_owner") as delete_owner:
+        response = http.delete("/sessions/delete-me", headers=_auth_headers())
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "deleted"}
+    assert main_app._repository.get_session_history("delete-me") == []
+    delete_owner.assert_called_once_with(AUTH_USER, "delete-me")

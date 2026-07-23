@@ -24,7 +24,14 @@ class IAgentStorage(ABC):
     @abstractmethod
     def get_session_history(self, session_id: str) -> list[dict]: ...
     @abstractmethod
+    def append_session_event(self, session_id: str, run_id: str | None, event_type: str,
+                             payload: dict[str, Any] | None = None) -> dict: ...
+    @abstractmethod
+    def get_session_events(self, session_id: str, after_sequence: int = 0) -> list[dict]: ...
+    @abstractmethod
     def save_report(self, report_id: str, session_id: str, s3_bucket: str, s3_key: str, title: str) -> None: ...
+    @abstractmethod
+    def delete_session(self, session_id: str) -> None: ...
 
 
 class PostgresRepository(IAgentStorage):
@@ -59,6 +66,42 @@ class PostgresRepository(IAgentStorage):
                     cur.execute("SELECT messages FROM ai.session_records WHERE session_id=%s", (session_id,)); row = cur.fetchone()
                     return [self._normalize_message(m.get("role", "user"), m.get("content") or "", m) for m in (row[0] if row else []) if isinstance(m, dict) and m.get("role") in {"user", "assistant"}]
         except Exception as exc: logger.warning("get_session_history failed: %s", exc); return []
+    def append_session_event(self, session_id: str, run_id: str | None, event_type: str,
+                             payload: dict[str, Any] | None = None) -> dict:
+        """Append a durable, ordered debugging event and return its public form."""
+        if not self._is_reachable():
+            return {}
+        try:
+            with psycopg2.connect(self._psycopg_url()) as conn:
+                self._ensure_session_events_table(conn)
+                with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                    cur.execute(
+                        """INSERT INTO ai.session_events (session_id, run_id, event_type, payload)
+                           VALUES (%s, %s, %s, %s::jsonb)
+                           RETURNING id AS sequence, run_id, event_type, payload, occurred_at""",
+                        (session_id, run_id, event_type, json.dumps(payload or {})),
+                    )
+                    return self._event_dict(cur.fetchone())
+        except Exception as exc:
+            logger.warning("event persistence failed: %s", exc)
+            return {}
+    def get_session_events(self, session_id: str, after_sequence: int = 0) -> list[dict]:
+        if not self._is_reachable():
+            return []
+        try:
+            with psycopg2.connect(self._psycopg_url()) as conn:
+                self._ensure_session_events_table(conn)
+                with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                    cur.execute(
+                        """SELECT id AS sequence, run_id, event_type, payload, occurred_at
+                           FROM ai.session_events
+                           WHERE session_id=%s AND id>%s ORDER BY id ASC""",
+                        (session_id, max(after_sequence, 0)),
+                    )
+                    return [self._event_dict(row) for row in cur.fetchall()]
+        except Exception as exc:
+            logger.warning("get_session_events failed: %s", exc)
+            return []
     def save_report(self, report_id: str, session_id: str, s3_bucket: str, s3_key: str, title: str) -> None:
         try:
             conn = psycopg2.connect(self._psycopg_url())
@@ -79,9 +122,41 @@ class PostgresRepository(IAgentStorage):
                 conn.close()
         except Exception as exc:
             logger.warning("save_report failed: %s", exc)
+    def delete_session(self, session_id: str) -> None:
+        if not self._is_reachable():
+            raise RuntimeError("Session storage is unavailable")
+        try:
+            with psycopg2.connect(self._psycopg_url()) as conn:
+                self._ensure_session_records_table(conn)
+                with conn.cursor() as cur:
+                    cur.execute("DELETE FROM ai.session_records WHERE session_id=%s", (session_id,))
+                    self._ensure_session_events_table(conn)
+                    cur.execute("DELETE FROM ai.session_events WHERE session_id=%s", (session_id,))
+                    cur.execute("SELECT to_regclass('ai.reports')")
+                    if cur.fetchone()[0] is not None:
+                        cur.execute("DELETE FROM ai.reports WHERE session_id=%s", (session_id,))
+        except Exception as exc:
+            logger.warning("delete_session failed: %s", exc)
+            raise
     def _ensure_session_records_table(self, conn: Any) -> None:
         with conn.cursor() as cur:
             cur.execute("CREATE SCHEMA IF NOT EXISTS ai"); cur.execute("""CREATE TABLE IF NOT EXISTS ai.session_records (session_id TEXT PRIMARY KEY, instance_id TEXT, system_prompt_id TEXT, system_prompt_name TEXT, system_prompt_instructions_snapshot TEXT, messages JSONB NOT NULL DEFAULT '[]', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())""")
+    def _ensure_session_events_table(self, conn: Any) -> None:
+        with conn.cursor() as cur:
+            cur.execute("CREATE SCHEMA IF NOT EXISTS ai")
+            cur.execute("""CREATE TABLE IF NOT EXISTS ai.session_events (
+                id BIGSERIAL PRIMARY KEY, session_id TEXT NOT NULL, run_id TEXT,
+                event_type TEXT NOT NULL, payload JSONB NOT NULL DEFAULT '{}',
+                occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW())""")
+            cur.execute("CREATE INDEX IF NOT EXISTS session_events_session_id_id_idx ON ai.session_events (session_id, id)")
+    def _event_dict(self, row: Any) -> dict:
+        if not row:
+            return {}
+        value = dict(row)
+        occurred_at = value.get("occurred_at")
+        if occurred_at:
+            value["occurred_at"] = occurred_at.isoformat()
+        return value
     def _normalize_message(self, role: str, content: str, message: dict[str, Any] | None = None) -> dict[str, Any]:
         source = message if isinstance(message, dict) else {}; normalized_role = source.get("role") if source.get("role") in {"user", "assistant"} else role
         result = {"role": normalized_role, "content": source.get("content", content), "data": self._data(source.get("data")), "timestamp": source.get("timestamp") or datetime.now(timezone.utc).isoformat(), "user": source.get("user") if "user" in source else None, "agent": source.get("agent") if "agent" in source else None}

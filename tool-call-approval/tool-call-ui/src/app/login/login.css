@@ -13,7 +13,7 @@
   padding: clamp(36px, 7vw, 84px);
   color: #fff;
   background:
-    linear-gradient(135deg, #0d6efd, #0b5ed7),
+    linear-gradient(135deg, #111827, #4b5563),
     url('/favicon.ico');
 }
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import re
 import shutil
 import tempfile
@@ -32,7 +33,7 @@ from app.tools.registry import execute_tool, reset_kubeconfig, set_kubeconfig
 
 _AWS_MODEL_ID = "us.anthropic.claude-sonnet-4-20250514-v1:0"
 _GCP_MODEL_ID = "claude-sonnet-4-6"
-_LOCAL_MODEL_ID = "gpt-oss-120b"
+_LOCAL_MODEL_ID = "gemma-4"
 _LOCAL_BASE_URL = "https://models.k8s.aip.mitre.org/v1"
 _THROTTLE_MAX_RETRIES = 3
 _THROTTLE_BASE_DELAY = 5
@@ -41,6 +42,22 @@ _APPROVAL_TIMEOUT = float(getenv("APPROVAL_TIMEOUT_SECONDS", "300"))
 _FRONTMATTER_RE = re.compile(r"\A---\s*\n(?P<body>.*?)\n---", re.DOTALL)
 _SKILL_NAME_RE = re.compile(r"^\s*name\s*:\s*(?P<name>.+?)\s*$", re.MULTILINE)
 _MAX_TOOL_CALLS = 12
+_NAMESPACE_NAME_RE = re.compile(r"^[a-z0-9](?:[-a-z0-9]*[a-z0-9])?$")
+_ALL_NAMESPACES_SCOPE = "__all__"
+_SENSITIVE_EVENT_KEYS = {"authorization", "credential", "credentials", "kubeconfig", "password", "secret", "token", "api_key"}
+_CLUSTER_SCOPED_COMMAND_RE = re.compile(
+    r"^(?:get|describe)\s+(?:ns|namespace|namespaces|node|nodes|"
+    r"persistentvolume|persistentvolumes|pv|pvs|clusterrole|clusterroles|"
+    r"clusterrolebinding|clusterrolebindings)\b|^(?:cluster-info|version|api-resources)\b",
+    re.IGNORECASE,
+)
+_NAMESPACE_INTENT_PROMPT = """You detect requested Kubernetes namespace changes.
+Return JSON only with exactly this shape: {\"namespace\": string|null}.
+Set namespace only when the user asks to change the active namespace for this
+conversation, including natural phrases such as 'switch to payments', 'work on the
+payments workloads', 'use the payments namespace', or a kubectl command with -n
+or --namespace. If the user asks to work across all namespaces, including -A or
+--all-namespaces, return the exact string "__all__". Return null otherwise."""
 
 
 def _requires_live_kubectl(message: str) -> bool:
@@ -53,7 +70,7 @@ def _requires_live_kubectl(message: str) -> bool:
     return bool(re.search(
         r"\b(list|show|get|check|inspect|describe|find|view|status|health|logs?|events?|"
         r"pods?|nodes?|namespaces?|deployments?|services?|ingresses?|configmaps?|pvcs?|"
-        r"secrets?|cluster|workloads?)\b",
+        r"secrets?|cluster|workloads?|apply|delete|scale|rollout|patch|create|exec|port-forward|kubectl)\b",
         text,
     ))
 
@@ -129,7 +146,9 @@ def _build_pdf(title: str, content: str) -> bytes:
     return bytes(pdf.output())
 
 
-def _normalize_tool_args(name: str, args: dict[str, Any]) -> dict[str, Any]:
+def _normalize_tool_args(
+    name: str, args: dict[str, Any], active_namespace: str | None = None,
+) -> dict[str, Any]:
     """Normalize OpenAI-compatible positional tool calls to this app's schema."""
     if name != "kubectl":
         return args
@@ -143,7 +162,15 @@ def _normalize_tool_args(name: str, args: dict[str, Any]) -> dict[str, Any]:
     if isinstance(value, list):
         value = " ".join(str(item) for item in value)
     if isinstance(value, str):
-        return {"command": value}
+        command = value.strip()
+        has_scope = bool(re.search(
+            r"(?:^|\s)(?:-A\b|--all-namespaces\b|-n\s+\S+|--namespace(?:=|\s+)\S+)",
+            command,
+        ))
+        if active_namespace and not has_scope and not _CLUSTER_SCOPED_COMMAND_RE.search(command):
+            flag = "--all-namespaces" if active_namespace == _ALL_NAMESPACES_SCOPE else f"-n {active_namespace}"
+            command = f"{command} {flag}"
+        return {"command": command}
     return args
 
 
@@ -200,6 +227,8 @@ class AgentService:
                 raise ValueError("Tool parameter types cannot be changed")
             session.approval_inputs[tool_use_id] = tool_input
         session.approval_results[tool_use_id] = approved
+        self._emit_nowait(session, "approval_received", tool_use_id=tool_use_id,
+                          approved=approved, tool_input=tool_input)
         session.pending_approvals[tool_use_id].set()
 
     def _build_graph(self, session: Session, instructions: str, model_id: str | None, provider: str | None) -> Any:
@@ -235,7 +264,23 @@ class AgentService:
                 if is_first_turn_after_user and _requires_live_kubectl(latest_user)
                 else model
             )
-            response = await active_model.ainvoke([SystemMessage(content=instructions), *history])
+            namespace_note = (
+                f"\n\nThe active Kubernetes namespace is `{session.k8s_namespace}`. "
+                "Use it unless the user explicitly specifies another namespace."
+                if session.k8s_namespace else ""
+            )
+            await self._emit(session, "model_request", model_id=session.model_id, provider=session.provider)
+            response: Any = None
+            async for chunk in active_model.astream([
+                SystemMessage(content=f"{instructions}{namespace_note}"), *history,
+            ]):
+                response = chunk if response is None else response + chunk
+                text = self._chunk_text(chunk)
+                if text:
+                    await self._emit(session, "message_delta", content=text)
+            if response is None:
+                raise RuntimeError("The model returned no response")
+            await self._emit(session, "model_response", has_tool_calls=bool(getattr(response, "tool_calls", None)))
             return {"messages": [response]}
 
         async def tools_node(state: AgentState) -> dict[str, Any]:
@@ -243,20 +288,24 @@ class AgentService:
             results: list[ToolMessage] = []
             for call in getattr(last, "tool_calls", []) or []:
                 name, args, call_id = call["name"], dict(call.get("args", {})), call["id"]
-                args = _normalize_tool_args(name, args)
+                args = _normalize_tool_args(name, args, session.k8s_namespace)
                 self._track_tool_command(session, call_id, name, args)
                 approved, args = await self._await_approval(session, call_id, name, args)
                 if not approved:
                     content = "Tool call rejected by user. Continue without executing it."
                 else:
                     try:
+                        await self._emit(session, "tool_started", tool_use_id=call_id,
+                                         tool_name=name, tool_input=args)
                         content = str(await tools_by_name[name].ainvoke(args))
                     except Exception as exc:
                         content = f"Tool error: {exc}"
+                        await self._emit(session, "tool_failed", tool_use_id=call_id,
+                                         tool_name=name, content=str(exc))
                     display = self._format_tool_result(name, args, content)
                     self._track_tool_result(session, call_id, display)
-                    await session.queue.put({"type": "tool_result", "tool_use_id": call_id,
-                                             "tool_name": name, "result": display})
+                    await self._emit(session, "tool_result", tool_use_id=call_id,
+                                     tool_name=name, result=display)
                 results.append(ToolMessage(content=content, name=name, tool_call_id=call_id))
             return {"messages": results}
 
@@ -270,7 +319,7 @@ class AgentService:
             content = str(getattr(last, "content", "") or "")
             if not content:
                 content = "I completed the requested tool calls, but did not receive a final text response."
-            await session.queue.put({"type": "message", "content": content})
+            await self._emit(session, "message", content=content)
             return {"final_output": content}
 
         graph = StateGraph(AgentState)
@@ -305,16 +354,19 @@ class AgentService:
                               args: dict[str, Any]) -> tuple[bool, dict[str, Any]]:
         if _AUTO_APPROVE:
             self._mark_tool_approval(session, tool_id, True)
+            await self._emit(session, "approval_received", tool_use_id=tool_id, approved=True,
+                             content="Automatically approved")
             return True, args
         event = asyncio.Event()
         session.pending_approvals[tool_id] = event
         session.pending_tool_inputs[tool_id] = args
-        await session.queue.put({"type": "tool_call_pending", "tool_use_id": tool_id,
-                                 "tool_name": name, "tool_input": args})
+        await self._emit(session, "tool_call_pending", tool_use_id=tool_id,
+                         tool_name=name, tool_input=args)
         try:
             await asyncio.wait_for(event.wait(), timeout=_APPROVAL_TIMEOUT)
         except asyncio.TimeoutError:
             session.approval_results[tool_id] = False
+            await self._emit(session, "approval_timed_out", tool_use_id=tool_id, tool_name=name)
         approved = session.approval_results.pop(tool_id, False)
         edited = session.approval_inputs.pop(tool_id, None)
         session.pending_approvals.pop(tool_id, None)
@@ -322,7 +374,7 @@ class AgentService:
         final_args = edited if approved and edited is not None else args
         self._mark_tool_approval(session, tool_id, approved)
         if not approved:
-            await session.queue.put({"type": "tool_rejected", "tool_use_id": tool_id, "tool_name": name})
+            await self._emit(session, "tool_rejected", tool_use_id=tool_id, tool_name=name)
         return approved, final_args
 
     # @observe(name="agent-run", capture_input=False, capture_output=False)
@@ -331,16 +383,50 @@ class AgentService:
         if not pair:
             return
         self._reset_tool_data(session)
+        session.current_run_id = str(uuid4())
         token = set_kubeconfig(session.kubeconfig)
         try:
             # langfuse_context.update_current_trace(user_id=session.id, tags=["tool-call-approval"])
             # langfuse_context.update_current_observation(input=message)
-            await session.queue.put({"type": "thinking", "content": "Thinking..."})
+            await self._emit(session, "run_started", content=message)
+            await self._emit(session, "thinking", content="Thinking...")
+            requested_namespace = await self._detect_requested_namespace(session, message)
+            command_to_execute = message
+            if requested_namespace:
+                approved, updated_args = await self._await_approval(
+                    session,
+                    f"namespace-{uuid4()}",
+                    "set_namespace",
+                    {"namespace": requested_namespace},
+                )
+                namespace = str(updated_args.get("namespace", "")).strip().lower()
+                if approved and self._is_valid_namespace_scope(namespace):
+                    session.k8s_namespace = namespace
+                    label = "all namespaces" if namespace == _ALL_NAMESPACES_SCOPE else f"`{namespace}`"
+                    confirmation = f"Active namespace set to {label}."
+                    self.record_agent_message(session, confirmation)
+                    await self._emit(session, "message", content=confirmation)
+                    if session.pending_namespace_command:
+                        command_to_execute = session.pending_namespace_command
+                        session.pending_namespace_command = None
+                elif approved:
+                    await self._emit(session, "message", content="The selected namespace is not valid.")
+                    await self._emit(session, "done")
+                    return
+                else:
+                    await self._emit(session, "message", content="Namespace change was not applied.")
+                    await self._emit(session, "done")
+                    return
+            elif session.k8s_namespace is None and _requires_live_kubectl(message):
+                session.pending_namespace_command = message
+                await self._list_namespaces_and_request_selection(session)
+                await self._emit(session, "done")
+                return
             result: dict[str, Any] | None = None
             for attempt in range(_THROTTLE_MAX_RETRIES + 1):
                 try:
                     result = await pair[1].graph.ainvoke({
-                        "messages": [*pair[1].messages, HumanMessage(content=message)],
+                        "messages": [*pair[1].messages, HumanMessage(content=command_to_execute)],
                         "final_output": "",
                     })
                     break
@@ -356,14 +442,89 @@ class AgentService:
                 self.record_agent_message(session, final_output)
             # langfuse_context.update_current_observation(output=final_output)
             # langfuse_context.update_current_trace(output=final_output)
-            await session.queue.put({"type": "done"})
+            await self._emit(session, "run_completed")
+            await self._emit(session, "done")
         except Exception as exc:
             # langfuse_context.update_current_observation(level="ERROR", status_message=str(exc))
-            await session.queue.put({"type": "error", "content": f"Unexpected error: {exc}"})
-            await session.queue.put({"type": "done"})
+            await self._emit(session, "run_failed", content=str(exc))
+            await self._emit(session, "error", content=f"Unexpected error: {exc}")
+            await self._emit(session, "done")
             self._remove_session(session.id)
         finally:
             reset_kubeconfig(token)
+            session.current_run_id = None
+
+    async def _detect_requested_namespace(self, session: Session, message: str) -> str | None:
+        """Run a focused model pass to detect an active-namespace change request."""
+        await self._emit(session, "model_request", model_id=session.model_id,
+                         provider=session.provider, operation="namespace_detection")
+        response = await _build_model(session.model_id, session.provider).ainvoke([
+            SystemMessage(content=_NAMESPACE_INTENT_PROMPT),
+            HumanMessage(content=message),
+        ])
+        await self._emit(session, "model_response", operation="namespace_detection")
+        content = str(getattr(response, "content", "") or "").strip()
+        try:
+            candidate = json.loads(content).get("namespace")
+        except (json.JSONDecodeError, AttributeError):
+            match = re.search(r"\{\s*\"namespace\"\s*:\s*(?:\"([^\"]+)\"|null)\s*\}", content)
+            candidate = match.group(1) if match else None
+        namespace = str(candidate).strip().lower() if candidate else None
+        return namespace if namespace and self._is_valid_namespace_scope(namespace) else None
+
+    async def _list_namespaces_and_request_selection(self, session: Session) -> None:
+        """List available namespaces before allowing the first scoped operation."""
+        tool_id = f"namespace-list-{uuid4()}"
+        args = {"command": "get namespaces"}
+        self._track_tool_command(session, tool_id, "kubectl", args)
+        approved, args = await self._await_approval(session, tool_id, "kubectl", args)
+        if approved:
+            try:
+                await self._emit(session, "tool_started", tool_use_id=tool_id,
+                                 tool_name="kubectl", tool_input=args)
+                output = str(await kubectl.ainvoke(args))
+            except Exception as exc:
+                output = f"Tool error: {exc}"
+                await self._emit(session, "tool_failed", tool_use_id=tool_id,
+                                 tool_name="kubectl", content=str(exc))
+            display = self._format_tool_result("kubectl", args, output)
+            self._track_tool_result(session, tool_id, display)
+            await self._emit(session, "tool_result", tool_use_id=tool_id,
+                             tool_name="kubectl", result=display)
+            message = (
+                f"Available namespaces:\n\n{self._format_namespace_list(output)}\n\n"
+                "Choose a namespace by saying `use <namespace> namespace`. "
+                "To work across the cluster, say `use all namespaces`.\n\n"
+                f"After your selection is approved, I’ll run: **{session.pending_namespace_command or 'your request'}**."
+            )
+        else:
+            message = (
+                "I need to list the available namespaces before running a Kubernetes command. "
+                "Approve that request, then choose a namespace (or say `use all namespaces`)."
+            )
+        self.record_agent_message(session, message)
+        await self._emit(session, "message", content=message)
+
+    @staticmethod
+    def _format_namespace_list(output: str) -> str:
+        """Convert `kubectl get namespaces` tabular output into chat-friendly Markdown."""
+        lines = [line.strip() for line in output.splitlines() if line.strip()]
+        if len(lines) < 2 or lines[0].split()[:3] != ["NAME", "STATUS", "AGE"]:
+            return output
+        rows = [line.split(maxsplit=2) for line in lines[1:]]
+        if not all(len(row) == 3 for row in rows):
+            return output
+        table = ["| Namespace | Status | Age |", "| --- | --- | --- |"]
+        table.extend(f"| {name} | {status} | {age} |" for name, status, age in rows)
+        return "\n".join(table)
+
+    @staticmethod
+    def _is_valid_namespace(namespace: str) -> bool:
+        return len(namespace) <= 63 and bool(_NAMESPACE_NAME_RE.fullmatch(namespace))
+
+    @classmethod
+    def _is_valid_namespace_scope(cls, namespace: str) -> bool:
+        return namespace == _ALL_NAMESPACES_SCOPE or cls._is_valid_namespace(namespace)
 
     # ── Persona, skill, and persistence helpers ──────────────────────────
     def _load_skills(self, instance_id: str | None, persona_ids: list[str]) -> tuple[str, str, list[dict[str, Any]]]:
@@ -417,13 +578,28 @@ class AgentService:
         return ((match.group("name").strip().strip("\"'") if match else Path(filename).stem).replace("/", "-").replace("\\", "-").strip() or "skill")
 
     def get_history(self, session_id: str) -> list[dict]: return self._repository.get_session_history(session_id)
+    def get_events(self, session_id: str, after_sequence: int = 0) -> list[dict]:
+        return self._repository.get_session_events(session_id, after_sequence)
+    def record_event(self, session: Session, event_type: str, **payload: Any) -> dict:
+        return self._repository.append_session_event(
+            session.id, session.current_run_id, event_type, self._redact_event_data(payload),
+        )
+    async def _emit(self, session: Session, event_type: str, **payload: Any) -> None:
+        event = self.record_event(session, event_type, **payload)
+        await session.queue.put({"type": event_type, **payload, **({"sequence": event["sequence"], "run_id": event.get("run_id"), "occurred_at": event.get("occurred_at")} if event else {})})
+    def _emit_nowait(self, session: Session, event_type: str, **payload: Any) -> None:
+        event = self.record_event(session, event_type, **payload)
+        session.queue.put_nowait({"type": event_type, **payload, **({"sequence": event["sequence"], "run_id": event.get("run_id"), "occurred_at": event.get("occurred_at")} if event else {})})
+    def delete_session(self, session_id: str) -> None:
+        self._remove_session(session_id)
+        self._repository.delete_session(session_id)
     def record_user_message(self, session: Session, message: str, message_object: dict[str, Any] | None = None) -> None:
         self._repository.append_session_message(session.id, "user", message, session.instance_id, session.system_prompt_id, session.system_prompt_name, session.system_prompt_instructions_snapshot, message=message_object)
     def record_agent_message(self, session: Session, message: str) -> None:
         payload = {"role": "assistant", "content": message, "data": self._clone_tool_data(session.active_tool_data), "timestamp": datetime.now(timezone.utc).isoformat(), "user": None, "agent": self._agent_message_metadata(session)}
         self._repository.append_session_message(session.id, "assistant", message, message=payload)
     def _agent_message_metadata(self, session: Session) -> dict[str, Any]:
-        return {"session_id": session.id, "instance_id": session.instance_id, "persona_id": session.persona_id, "persona_ids": session.persona_ids, "persona_name": session.persona_name, "persona_names": session.persona_names, "skill_ids": session.skill_ids, "system_prompt_id": session.system_prompt_id, "system_prompt_name": session.system_prompt_name, "model_id": session.model_id, "provider": session.provider}
+        return {"session_id": session.id, "run_id": session.current_run_id, "instance_id": session.instance_id, "persona_id": session.persona_id, "persona_ids": session.persona_ids, "persona_name": session.persona_name, "persona_names": session.persona_names, "skill_ids": session.skill_ids, "system_prompt_id": session.system_prompt_id, "system_prompt_name": session.system_prompt_name, "model_id": session.model_id, "provider": session.provider}
     def _remove_session(self, session_id: str) -> None:
         pair = self._sessions.pop(session_id, None)
         if pair and pair[0].tmpdir: shutil.rmtree(pair[0].tmpdir, ignore_errors=True)
@@ -444,5 +620,26 @@ class AgentService:
         return f"kubectl {str(args.get('args') or '').strip()}".strip() if name == "kubectl" else (name if not args else f"{name}({args})")
     def _format_tool_result(self, name: str, args: dict[str, Any], content: str) -> str:
         return f"{name}({', '.join(f'{key}={value}' for key, value in args.items())}) {content}".strip()
+    @staticmethod
+    def _chunk_text(chunk: Any) -> str:
+        """Extract visible text while preserving tool-call chunks for LangGraph."""
+        content = getattr(chunk, "content", "")
+        if isinstance(content, str):
+            return content
+        if isinstance(content, list):
+            return "".join(
+                item.get("text", "") if isinstance(item, dict) else str(item)
+                for item in content
+            )
+        return ""
     def _clone_tool_data(self, data: dict[str, list[dict[str, Any]]]) -> dict[str, list[dict[str, Any]]]:
         return {key: [dict(item) for item in value] for key, value in data.items()}
+    @classmethod
+    def _redact_event_data(cls, value: Any, key: str | None = None) -> Any:
+        if key and any(secret in key.lower() for secret in _SENSITIVE_EVENT_KEYS):
+            return "[REDACTED]"
+        if isinstance(value, dict):
+            return {str(item_key): cls._redact_event_data(item_value, str(item_key)) for item_key, item_value in value.items()}
+        if isinstance(value, list):
+            return [cls._redact_event_data(item, key) for item in value]
+        return value
