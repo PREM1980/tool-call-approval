@@ -38,7 +38,7 @@ variables:
         > /kaniko/.docker/config.json
 
       /kaniko/executor \
-        --context="${CI_PROJECT_DIR}/${SERVICE_DIR}" \
+        --context="${CI_PROJECT_DIR}/${BUILD_CONTEXT_DIR:-$SERVICE_DIR}" \
         --dockerfile="${CI_PROJECT_DIR}/${SERVICE_DIR}/Dockerfile" \
         --destination="${IMAGE_TAG}" \
         --destination="${IMAGE_VERSION_TAG}" \
@@ -57,6 +57,7 @@ build-and-push-api:
   variables:
     IMAGE_NAME: tool-call-api
     SERVICE_DIR: tool-call-approval/tool-call-api
+    BUILD_CONTEXT_DIR: tool-call-approval
 
 build-and-push-k8s:
   extends: .build-and-push-image
