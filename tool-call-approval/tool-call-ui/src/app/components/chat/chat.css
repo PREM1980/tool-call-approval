@@ -108,6 +108,7 @@
   min-height: 0;
   flex-direction: column;
   overflow: hidden;
+  position: relative;
   border-width: 0;
 }
 
@@ -286,7 +287,61 @@
   min-height: 0;
   padding: 28px clamp(20px, 4vw, 56px);
   overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-color: #8b8b86 #e5e7eb;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
   background: #f3f4f6;
+}
+
+.chat-messages::-webkit-scrollbar {
+  width: 0.7rem;
+}
+
+.chat-messages::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background: #e5e7eb;
+}
+
+.chat-messages::-webkit-scrollbar-thumb {
+  border: 3px solid #e5e7eb;
+  border-radius: 999px;
+  background: #8b8b86;
+}
+
+.scroll-latest {
+  position: absolute;
+  right: 22px;
+  bottom: 112px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border: 1px solid rgba(17, 24, 39, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 8px 22px rgba(17, 24, 39, 0.14);
+  color: #4b5563;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 800;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(8px);
+  transition: opacity 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+}
+
+.scroll-latest.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.scroll-latest:hover,
+.scroll-latest:focus-visible {
+  box-shadow: 0 10px 26px rgba(17, 24, 39, 0.2);
+  outline: none;
 }
 
 .chat-empty {

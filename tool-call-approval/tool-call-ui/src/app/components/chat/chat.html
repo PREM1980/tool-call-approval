@@ -3,7 +3,7 @@
   <div class="chat-layout chat-layout--no-sidebar">
 
     <div class="chat-main">
-      <div class="chat-messages" #messageList>
+      <div class="chat-messages" #messageList (scroll)="onMessageScroll()">
         @for (message of messages; track message.id) {
           @if (message.reportUrl) {
             <div class="msg-row msg-system">
@@ -125,6 +125,17 @@
         }
 
       </div>
+
+      <button
+        aria-label="Scroll to latest message"
+        class="scroll-latest"
+        [class.is-visible]="showScrollToLatest"
+        type="button"
+        (click)="scrollToLatest()"
+      >
+        <span aria-hidden="true">↓</span>
+        <span>Latest</span>
+      </button>
 
       <form class="chat-input-bar" (ngSubmit)="sendMessage()">
         <textarea

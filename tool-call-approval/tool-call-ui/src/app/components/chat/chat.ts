@@ -54,6 +54,7 @@ export class Chat implements OnInit, OnChanges, OnDestroy, AfterViewChecked {
   executionEvents: DebugEvent[] = [];
   isWaiting = false;
   activityStatus = '';
+  showScrollToLatest = false;
   isSwitching = false;
   personas: PersonaData[] = [];
   skills: Skill[] = [];
@@ -81,6 +82,7 @@ export class Chat implements OnInit, OnChanges, OnDestroy, AfterViewChecked {
   private activeToolData: MessageData = this.emptyMessageData();
   private activeToolCommands = new Map<string, Command>();
   private streamingAssistantMessage: Message | null = null;
+  private followLatest = true;
 
   constructor(
     private chatService: ChatService,
@@ -136,10 +138,26 @@ export class Chat implements OnInit, OnChanges, OnDestroy, AfterViewChecked {
   }
 
   ngAfterViewChecked(): void {
-    if (this.shouldScrollToBottom) {
+    if (this.shouldScrollToBottom && this.followLatest) {
       this.scrollToBottom();
-      this.shouldScrollToBottom = false;
     }
+    this.shouldScrollToBottom = false;
+    this.updateScrollToLatestButton();
+  }
+
+  onMessageScroll(): void {
+    const messageList = this.messageListRef?.nativeElement;
+    if (!messageList) return;
+    this.followLatest = this.isNearMessageListBottom(messageList);
+    this.updateScrollToLatestButton();
+  }
+
+  scrollToLatest(): void {
+    const messageList = this.messageListRef?.nativeElement;
+    if (!messageList) return;
+    this.followLatest = true;
+    messageList.scrollTo({ top: messageList.scrollHeight, behavior: 'smooth' });
+    this.showScrollToLatest = false;
   }
 
   ngOnDestroy(): void {
@@ -158,6 +176,8 @@ export class Chat implements OnInit, OnChanges, OnDestroy, AfterViewChecked {
       this.executionEvents = [];
       this.isWaiting = false;
       this.activityStatus = '';
+      this.followLatest = true;
+      this.showScrollToLatest = false;
       this.hasActiveSession = false;
       this.resetActiveToolData();
       this.streamingAssistantMessage = null;
@@ -178,6 +198,8 @@ export class Chat implements OnInit, OnChanges, OnDestroy, AfterViewChecked {
       this.executionEvents = [];
       this.isWaiting = false;
       this.activityStatus = '';
+      this.followLatest = true;
+      this.showScrollToLatest = false;
       this.hasActiveSession = false;
       this.resetActiveToolData();
       this.streamingAssistantMessage = null;
@@ -691,5 +713,16 @@ export class Chat implements OnInit, OnChanges, OnDestroy, AfterViewChecked {
     } catch {
       // ignore scroll errors in test env
     }
+  }
+
+  private updateScrollToLatestButton(): void {
+    const messageList = this.messageListRef?.nativeElement;
+    if (!messageList) return;
+    const isScrollable = messageList.scrollHeight > messageList.clientHeight + 12;
+    this.showScrollToLatest = isScrollable && !this.isNearMessageListBottom(messageList);
+  }
+
+  private isNearMessageListBottom(messageList: HTMLElement): boolean {
+    return messageList.scrollTop + messageList.clientHeight >= messageList.scrollHeight - 48;
   }
 }
