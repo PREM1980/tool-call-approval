@@ -48,6 +48,9 @@ class FakeRegistrationRepository:
     def get_session_ids_for_user(self, user_id: str) -> list[str]:
         return self.owned_sessions.get(user_id, [])
 
+    def get_all_session_ids(self) -> list[str]:
+        return [session_id for sessions in self.owned_sessions.values() for session_id in sessions]
+
     def delete_session_owner(self, user_id: str, session_id: str) -> None:
         self.owned_sessions[user_id] = [item for item in self.owned_sessions.get(user_id, []) if item != session_id]
 
@@ -151,3 +154,17 @@ def test_session_ownership_service_records_and_checks_owned_sessions():
     service.delete_owner(user, "session-123")
 
     assert service.get_session_ids_for_user(user) == []
+
+
+def test_admin_can_view_all_sessions_while_users_can_only_view_their_own():
+    repo = FakeRegistrationRepository()
+    service = SessionOwnershipService(repo)
+    admin = User(id="admin-1", username="admin", role="admin")
+    alice = User(id="alice-1", username="alice", role="user")
+    bob = User(id="bob-1", username="bob", role="user")
+    service.record_owner(alice, "alice-session")
+    service.record_owner(bob, "bob-session")
+
+    assert service.get_visible_session_ids(admin) == ["alice-session", "bob-session"]
+    assert service.can_view_session(admin, "bob-session") is True
+    assert service.can_view_session(alice, "bob-session") is False

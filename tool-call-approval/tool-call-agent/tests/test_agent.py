@@ -139,6 +139,10 @@ async def test_namespace_selection_continues_pending_command(service):
 
     assert session.k8s_namespace == "demo"
     assert session.pending_namespace_command is None
+    assert service._repository.messages[-1]["content"] == (
+        "Active namespace set to `demo`.\n\n### Continuing original request\n\n"
+        "```\ncheck all broken pods\n```"
+    )
     invoked_messages = graph.ainvoke.await_args.args[0]["messages"]
     assert invoked_messages[-1].content == "check all broken pods"
 

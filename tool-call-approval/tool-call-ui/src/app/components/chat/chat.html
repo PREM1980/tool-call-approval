@@ -82,10 +82,15 @@
                     }
                     @let traceEvents = traceEventsFor(message);
                     @if (traceEvents.length > 0) {
+                      @let modelTurns = modelTurnCount(traceEvents);
+                      @let duration = executionDuration(traceEvents);
                       <details class="debug-trace">
                         <summary>
-                          <span class="debug-trace-title">Trace</span>
-                          <span class="debug-trace-count">{{ traceEvents.length }} events</span>
+                          <span class="debug-trace-title">Execution log</span>
+                          <span class="debug-trace-count">
+                            {{ modelTurns }} LLM call{{ modelTurns === 1 ? '' : 's' }} · {{ traceEvents.length }} events
+                            @if (duration) { · {{ duration }} }
+                          </span>
                         </summary>
                         <ol>
                           @for (event of traceEvents; track event.sequence ?? $index) {

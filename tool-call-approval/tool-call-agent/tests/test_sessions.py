@@ -9,7 +9,7 @@ from main import app
 
 TEST_URL = "postgresql://localhost:5432/postgres"
 http = TestClient(app)
-AUTH_USER = User(id="00000000-0000-0000-0000-000000000001", username="admin", role="admin")
+AUTH_USER = User(id="00000000-0000-0000-0000-000000000001", username="alice", role="user")
 
 
 def _auth_headers() -> dict[str, str]:

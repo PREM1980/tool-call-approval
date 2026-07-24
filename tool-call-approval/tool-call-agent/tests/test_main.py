@@ -114,9 +114,9 @@ def test_create_session_requires_authentication():
     assert response.status_code == 401
 
 
-def test_list_sessions_returns_only_owned_sessions():
+def test_list_sessions_returns_visible_sessions():
     with _allow_auth(), \
-         patch.object(main_app._session_ownership_service, "get_session_ids_for_user", return_value=["owned-1"]), \
+         patch.object(main_app._session_ownership_service, "get_visible_session_ids", return_value=["owned-1"]), \
          patch.object(main_app._repository, "list_sessions", return_value=[]) as list_sessions:
         response = client.get("/sessions", headers=_auth_headers())
 

@@ -69,6 +69,39 @@ def test_me_returns_current_user():
     assert response.json()["username"] == "admin"
 
 
+def test_user_can_change_their_own_password():
+    with patch.object(main_app._auth_service, "get_current_user", return_value=PLAIN_USER), \
+         patch.object(
+             main_app._auth_service,
+             "login",
+             return_value=AuthResult("token", "bearer", PLAIN_USER),
+         ) as login, \
+         patch.object(main_app._user_service, "update_user_password") as update_password:
+        response = client.patch(
+            "/auth/me/password",
+            json={"current_password": "old-password", "new_password": "new-password"},
+            headers=_auth_headers(PLAIN_USER),
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "updated"}
+    login.assert_called_once_with("alice", "old-password")
+    update_password.assert_called_once_with(PLAIN_USER.id, "new-password")
+
+
+def test_user_cannot_change_password_with_wrong_current_password():
+    with patch.object(main_app._auth_service, "get_current_user", return_value=PLAIN_USER), \
+         patch.object(main_app._auth_service, "login", side_effect=PermissionError):
+        response = client.patch(
+            "/auth/me/password",
+            json={"current_password": "wrong", "new_password": "new-password"},
+            headers=_auth_headers(PLAIN_USER),
+        )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Current password is incorrect"
+
+
 def test_admin_can_create_user():
     with patch.object(main_app._auth_service, "get_current_user", return_value=ADMIN_USER), \
          patch.object(main_app._user_service, "create_user", return_value=PLAIN_USER) as create_user:
@@ -93,6 +126,20 @@ def test_non_admin_cannot_create_user():
         )
 
     assert response.status_code == 403
+
+
+def test_admin_can_view_another_users_conversation_history():
+    history = [{"role": "user", "content": "private question"}]
+    with patch.object(main_app._auth_service, "get_current_user", return_value=ADMIN_USER), \
+         patch.object(main_app.service, "get_history", return_value=history) as get_history:
+        response = client.get(
+            "/sessions/alice-session/history",
+            headers=_auth_headers(ADMIN_USER),
+        )
+
+    assert response.status_code == 200
+    assert response.json() == history
+    get_history.assert_called_once_with("alice-session")
 
 
 def test_duplicate_username_returns_conflict():

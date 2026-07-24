@@ -10,6 +10,7 @@ class UserRepository(Protocol):
     def create_user(self, username: str, password_hash: str, role: UserRole) -> User: ...
     def list_users(self) -> list[User]: ...
     def update_user_role(self, user_id: str, role: UserRole) -> User | None: ...
+    def update_user_password(self, user_id: str, password_hash: str) -> bool: ...
 
 
 class UserService:
@@ -41,3 +42,12 @@ class UserService:
         if user is None:
             raise LookupError("User not found")
         return user
+
+    def update_user_password(self, user_id: str, password: str) -> None:
+        if not password:
+            raise ValueError("New password is required")
+        if not self._repository.update_user_password(
+            user_id,
+            self._password_hasher.hash_password(password),
+        ):
+            raise LookupError("User not found")

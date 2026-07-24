@@ -32,3 +32,8 @@ class CreateUserRequest(StrictBaseModel):
 
 class UpdateUserRequest(StrictBaseModel):
     role: str
+
+
+class UpdatePasswordRequest(StrictBaseModel):
+    current_password: str
+    new_password: str

@@ -415,11 +415,16 @@ class AgentService:
                     session.k8s_namespace = namespace
                     label = "all namespaces" if namespace == _ALL_NAMESPACES_SCOPE else f"`{namespace}`"
                     confirmation = f"Active namespace set to {label}."
-                    self.record_agent_message(session, confirmation)
-                    await self._emit(session, "message", content=confirmation)
                     if session.pending_namespace_command:
                         command_to_execute = session.pending_namespace_command
                         session.pending_namespace_command = None
+                        confirmation = (
+                            f"{confirmation}\n\n### Continuing original request\n\n"
+                            f"```\n{command_to_execute}\n```"
+                        )
+                    self.record_agent_message(session, confirmation)
+                    await self._emit(session, "message", content=confirmation)
+                    if command_to_execute != message:
                         await self._emit(session, "continuing_namespace_command", content=command_to_execute)
                 elif approved:
                     await self._emit(session, "message", content="The selected namespace is not valid.")

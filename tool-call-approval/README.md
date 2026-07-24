@@ -131,6 +131,10 @@ The Admin credentials page stores app settings such as kubeconfig, but the real
 LLM credentials must still be available to the agent process through `.env` or
 your normal cloud SDK environment.
 
+Every authenticated user also has a personal **Settings** page where they can
+view their account details and change only their own password. Shared agent and
+cluster configuration remains available only through the administrator area.
+
 ## 4. Run the Agent API
 
 In terminal 1:

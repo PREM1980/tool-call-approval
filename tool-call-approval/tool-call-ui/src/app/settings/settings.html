@@ -1,0 +1,37 @@
+<main class="settings-page">
+  <div class="settings-heading">
+    <p class="settings-kicker">Personal settings</p>
+    <h1>Your account</h1>
+    <p>These settings apply only to your account.</p>
+  </div>
+
+  @if (auth.currentUser(); as user) {
+    <section class="settings-card" aria-labelledby="account-details-heading">
+      <h2 id="account-details-heading">Account details</h2>
+      <dl>
+        <div><dt>Username</dt><dd>{{ user.username }}</dd></div>
+        <div><dt>Role</dt><dd>{{ user.role === 'admin' ? 'Administrator' : 'User' }}</dd></div>
+      </dl>
+    </section>
+  }
+
+  <section class="settings-card" aria-labelledby="password-heading">
+    <h2 id="password-heading">Change password</h2>
+    <p class="card-description">Use a password known only to you.</p>
+    <form (ngSubmit)="savePassword()">
+      <label for="currentPassword">Current password</label>
+      <input id="currentPassword" name="currentPassword" type="password" autocomplete="current-password" [(ngModel)]="currentPassword" />
+
+      <label for="newPassword">New password</label>
+      <input id="newPassword" name="newPassword" type="password" autocomplete="new-password" [(ngModel)]="newPassword" />
+
+      <label for="confirmPassword">Confirm new password</label>
+      <input id="confirmPassword" name="confirmPassword" type="password" autocomplete="new-password" [(ngModel)]="confirmPassword" />
+
+      @if (error) { <p class="form-status error" role="alert">{{ error }}</p> }
+      @if (success) { <p class="form-status success" role="status">{{ success }}</p> }
+
+      <button type="submit" [disabled]="saving">{{ saving ? 'Saving…' : 'Update password' }}</button>
+    </form>
+  </section>
+</main>

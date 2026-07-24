@@ -202,6 +202,27 @@ class RegistrationRepository:
         finally:
             conn.close()
 
+    def update_user_password(self, user_id: str, password_hash: str) -> bool:
+        conn = self._connect()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE users
+                    SET password_hash = %s,
+                        updated_at = NOW()
+                    WHERE id = %s::uuid
+                    """,
+                    (password_hash, user_id),
+                )
+            conn.commit()
+            return cur.rowcount == 1
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
     def record_session_owner(self, user_id: str, session_id: str) -> None:
         conn = self._connect()
         try:
@@ -250,6 +271,21 @@ class RegistrationRepository:
                     ORDER BY created_at DESC
                     """,
                     (user_id,),
+                )
+                return [row[0] for row in cur.fetchall()]
+        finally:
+            conn.close()
+
+    def get_all_session_ids(self) -> list[str]:
+        conn = self._connect()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT session_id
+                    FROM user_chat_sessions
+                    ORDER BY created_at DESC
+                    """
                 )
                 return [row[0] for row in cur.fetchall()]
         finally:

@@ -20,6 +20,19 @@ import { ChatService } from '../../services/chat.service';
 import { SessionsService } from '../../services/sessions.service';
 import { ToolApproval } from '../tool-approval/tool-approval';
 import { AmbientContext, ApiMessage, ApprovalDecision, Command, DebugEvent, ExecutedCommand, Message, MessageData, PlatformContext, SseEvent, ToolCall } from '../../models/types';
+
+const DEBUGGER_EVENT_TYPES = new Set([
+  'run_started',
+  'run_completed',
+  'run_failed',
+  'model_request',
+  'model_response',
+  'tool_call_pending',
+  'tool_result',
+  'tool_failed',
+  'tool_rejected',
+  'continuing_namespace_command',
+]);
 import { formatMarkdownBlocks, MarkdownBlock } from '../../shared/markdown-blocks';
 
 const KUBERNETES_SUGGESTIONS = [
@@ -490,7 +503,27 @@ export class Chat implements OnInit, OnChanges, OnDestroy, AfterViewChecked {
   traceEventsFor(message: Message): DebugEvent[] {
     const runId = message.trace_run_id
       ?? (typeof message.agent === 'object' && message.agent ? message.agent['run_id'] : null);
-    return runId ? this.executionEvents.filter(event => event.run_id === runId) : [];
+    return runId
+      ? this.executionEvents.filter(
+        event => event.run_id === runId && DEBUGGER_EVENT_TYPES.has(event.event_type),
+      )
+      : [];
+  }
+
+  modelTurnCount(traceEvents: DebugEvent[]): number {
+    return traceEvents.filter(event => event.event_type === 'model_request').length;
+  }
+
+  executionDuration(traceEvents: DebugEvent[]): string | null {
+    if (traceEvents.length < 2) return null;
+    const start = Date.parse(traceEvents[0].occurred_at);
+    const end = Date.parse(traceEvents.at(-1)?.occurred_at ?? '');
+    if (Number.isNaN(start) || Number.isNaN(end) || end < start) return null;
+
+    const elapsedSeconds = (end - start) / 1000;
+    if (elapsedSeconds < 60) return `${elapsedSeconds.toFixed(1)}s`;
+    const minutes = Math.floor(elapsedSeconds / 60);
+    return `${minutes}m ${(elapsedSeconds % 60).toFixed(1)}s`;
   }
 
   private appendAssistantDelta(content: string, runId?: string | null): void {
@@ -505,9 +538,22 @@ export class Chat implements OnInit, OnChanges, OnDestroy, AfterViewChecked {
   eventSummary(event: DebugEvent): string {
     const payload = event.payload;
     const tool = typeof payload['tool_name'] === 'string' ? `: ${payload['tool_name']}` : '';
-    const content = typeof payload['content'] === 'string' ? ` — ${payload['content']}` : '';
-    const result = typeof payload['result'] === 'string' ? ` — ${payload['result']}` : '';
-    return `${event.event_type.replaceAll('_', ' ')}${tool}${content || result}`;
+    switch (event.event_type) {
+      case 'run_started': return 'Execution started';
+      case 'run_completed': return 'Execution completed';
+      case 'run_failed': return 'Execution failed';
+      case 'model_request': return 'LLM request';
+      case 'model_response': return 'LLM response';
+      case 'tool_call_pending': return `Tool invocation${tool}`;
+      case 'tool_result': return `Tool completed${tool}`;
+      case 'tool_failed': return `Tool failed${tool}`;
+      case 'tool_rejected': return `Tool rejected${tool}`;
+      case 'continuing_namespace_command': {
+        const request = typeof payload['content'] === 'string' ? payload['content'] : 'original request';
+        return `Continuing original request — ${request}`;
+      }
+      default: return event.event_type.replaceAll('_', ' ');
+    }
   }
 
   private addLiveExecutionEvent(event: SseEvent): void {

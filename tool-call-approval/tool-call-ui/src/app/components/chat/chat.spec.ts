@@ -71,6 +71,29 @@ describe('Chat', () => {
     expect(component).toBeTruthy();
   });
 
+  it('shows only debugger lifecycle events and counts model turns', () => {
+    component.executionEvents = [
+      { event_type: 'run_started', payload: {}, occurred_at: '2026-01-01T00:00:00Z', run_id: 'run-1' },
+      { event_type: 'thinking', payload: {}, occurred_at: '2026-01-01T00:00:01Z', run_id: 'run-1' },
+      { event_type: 'model_request', payload: {}, occurred_at: '2026-01-01T00:00:02Z', run_id: 'run-1' },
+      { event_type: 'message_delta', payload: { content: 'Hello' }, occurred_at: '2026-01-01T00:00:03Z', run_id: 'run-1' },
+      { event_type: 'tool_call_pending', payload: { tool_name: 'kubectl' }, occurred_at: '2026-01-01T00:00:04Z', run_id: 'run-1' },
+      { event_type: 'model_request', payload: {}, occurred_at: '2026-01-01T00:00:05Z', run_id: 'run-1' },
+      { event_type: 'continuing_namespace_command', payload: { content: 'list failing pods' }, occurred_at: '2026-01-01T00:00:06Z', run_id: 'run-1' },
+    ];
+    const traceEvents = component.traceEventsFor({
+      id: 'message-1', role: 'assistant', content: 'Done', timestamp: new Date(), trace_run_id: 'run-1',
+    });
+
+    expect(traceEvents.map(event => event.event_type)).toEqual([
+      'run_started', 'model_request', 'tool_call_pending', 'model_request', 'continuing_namespace_command',
+    ]);
+    expect(component.modelTurnCount(traceEvents)).toBe(2);
+    expect(component.executionDuration(traceEvents)).toBe('6.0s');
+    expect(component.eventSummary(traceEvents[2])).toBe('Tool invocation: kubectl');
+    expect(component.eventSummary(traceEvents[4])).toBe('Continuing original request — list failing pods');
+  });
+
   it('should initialize a session on init', () => {
     expect(chatService.createSession).toHaveBeenCalled();
   });

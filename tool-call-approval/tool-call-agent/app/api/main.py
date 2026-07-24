@@ -28,7 +28,14 @@ from app.domain.user import User
 from app.repositories.admin_repository import AdminRepository
 from app.repositories.agent_repository import PostgresRepository
 from app.repositories.registration_repository import RegistrationRepository
-from app.schemas.auth import CreateUserRequest, LoginRequest, TokenResponse, UpdateUserRequest, UserResponse
+from app.schemas.auth import (
+    CreateUserRequest,
+    LoginRequest,
+    TokenResponse,
+    UpdatePasswordRequest,
+    UpdateUserRequest,
+    UserResponse,
+)
 from app.schemas.messages import (
     ApprovalRequest,
     ChatRequest,
@@ -129,6 +136,11 @@ def _require_session_owner(user: User, session_id: str) -> None:
         raise HTTPException(status_code=404, detail="Session not found")
 
 
+def _require_session_view_access(user: User, session_id: str) -> None:
+    if not _session_ownership_service.can_view_session(user, session_id):
+        raise HTTPException(status_code=404, detail="Session not found")
+
+
 @app.get("/health")
 async def health() -> dict:
     return {"status": "ok"}
@@ -150,6 +162,24 @@ async def login(request: LoginRequest) -> TokenResponse:
 @app.get("/auth/me", response_model=UserResponse)
 async def me(current_user: User = Depends(_current_user)) -> UserResponse:
     return _user_response(current_user)
+
+
+@app.patch("/auth/me/password")
+async def change_password(
+    request: UpdatePasswordRequest,
+    current_user: User = Depends(_current_user),
+) -> dict:
+    try:
+        _auth_service.login(current_user.username, request.current_password)
+    except PermissionError:
+        raise HTTPException(status_code=401, detail="Current password is incorrect")
+    try:
+        _user_service.update_user_password(current_user.id, request.new_password)
+    except LookupError:
+        raise HTTPException(status_code=404, detail="User not found")
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    return {"status": "updated"}
 
 
 @app.get("/admin/users", response_model=list[UserResponse])
@@ -190,7 +220,7 @@ async def update_user(
 
 @app.get("/sessions", response_model=list[SessionSummaryResponse])
 async def list_sessions(current_user: User = Depends(_current_user)) -> list[dict]:
-    session_ids = _session_ownership_service.get_session_ids_for_user(current_user)
+    session_ids = _session_ownership_service.get_visible_session_ids(current_user)
     return _repository.list_sessions(session_ids)
 
 
@@ -278,7 +308,7 @@ async def get_history(
     session_id: str,
     current_user: User = Depends(_current_user),
 ) -> list[dict]:
-    _require_session_owner(current_user, session_id)
+    _require_session_view_access(current_user, session_id)
     return service.get_history(session_id)
 
 
@@ -289,7 +319,7 @@ async def get_events(
     current_user: User = Depends(_current_user),
 ) -> list[dict]:
     """Return the durable execution timeline.  This is safe to replay after reconnecting."""
-    _require_session_owner(current_user, session_id)
+    _require_session_view_access(current_user, session_id)
     return service.get_events(session_id, after_sequence)
 
 
@@ -310,7 +340,7 @@ async def get_report(
     report_id: str,
     current_user: User = Depends(_current_user),
 ) -> FileResponse:
-    _require_session_owner(current_user, session_id)
+    _require_session_view_access(current_user, session_id)
     session = service.get_session(session_id)
     if not session or not session.tmpdir:
         raise HTTPException(status_code=404, detail="Session not found")

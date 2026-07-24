@@ -20,6 +20,11 @@ export const routes: Routes = [
           import('./ai-engg/ai-engg').then((m) => m.AiEngg),
       },
       {
+        path: 'settings',
+        loadComponent: () =>
+          import('./settings/settings').then((m) => m.Settings),
+      },
+      {
         path: 'admin',
         canActivate: [adminGuard],
         loadComponent: () =>
