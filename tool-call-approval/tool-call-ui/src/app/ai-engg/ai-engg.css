@@ -91,6 +91,38 @@
   overflow-y: auto;
 }
 
+.conversation-rail-footer {
+  flex: 0 0 auto;
+  margin: 16px 0 0;
+  padding: 14px 6px 0;
+  border-top: 1px solid rgba(17, 24, 39, 0.1);
+}
+
+.settings-link {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: #4b5563;
+  padding: 8px 10px;
+  font-size: 0.82rem;
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.settings-link svg {
+  width: 17px;
+  height: 17px;
+}
+
+.settings-link:hover,
+.settings-link.active {
+  border-color: rgba(180, 83, 9, .22);
+  background: #fffbeb;
+  color: #92400e;
+}
+
 .conversation-list { display: grid; gap: 5px; }
 
 .conversation-item-row {

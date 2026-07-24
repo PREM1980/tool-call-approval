@@ -1,13 +1,15 @@
 import { Component, OnInit, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { RouterLink, RouterLinkActive } from '@angular/router';
 import { Chat } from '../components/chat/chat';
 import { SessionSummary } from '../models/types';
 import { SessionsService } from '../services/sessions.service';
+import { AuthService } from '../services/auth.service';
 
 @Component({
   selector: 'app-ai-engg',
   standalone: true,
-  imports: [CommonModule, Chat],
+  imports: [CommonModule, Chat, RouterLink, RouterLinkActive],
   templateUrl: './ai-engg.html',
   styleUrl: './ai-engg.css',
 })
@@ -20,7 +22,10 @@ export class AiEngg implements OnInit {
   sessionsError = '';
   deletingSessionId: string | null = null;
 
-  constructor(private sessionsService: SessionsService) {}
+  constructor(
+    private sessionsService: SessionsService,
+    public auth: AuthService,
+  ) {}
 
   ngOnInit(): void {
     void this.refreshSessions();

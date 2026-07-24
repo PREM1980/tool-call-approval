@@ -5,9 +5,8 @@
     </a>
     <div class="topbar-nav">
       @if (auth.isAdmin()) {
-        <a class="topbar-link" routerLink="/users" routerLinkActive="active">Users</a>
+        <a class="topbar-link" routerLink="/users" routerLinkActive="active">User Management</a>
       }
-      <a class="topbar-link" routerLink="/admin" routerLinkActive="active">Administration</a>
       @if (auth.currentUser(); as user) {
         <span class="topbar-user">{{ user.username }}</span>
       }
